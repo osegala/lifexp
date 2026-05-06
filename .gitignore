@@ -1,8 +1,12 @@
 HELP.md
 target/
+*.class
+*.jar
+*.war
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+
 
 ### STS ###
 .apt_generated
@@ -31,3 +35,18 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Node / Expo
+frontend/node_modules/
+frontend/.expo/
+frontend/dist/
+
+# Mac
+.DS_Store
+
+# Env files
+.env
+.env.local
+
+# Logs
+*.log
