@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { getToken, setToken, deleteToken } from "../utils/tokenStorage";import { api } from "../api/client";
+import {
+  getToken,
+  setToken as saveToken,
+  deleteToken,
+} from "../utils/tokenStorage";
+import { api } from "../api/client";
 import { AuthResponse, User } from "../types";
 
 type AuthContextType = {
@@ -9,14 +14,16 @@ type AuthContextType = {
   dashboardRefreshKey: number;
   triggerDashboardRefresh: () => void;
   login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  register: (
+    username: string,
+    email: string,
+    password: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -26,22 +33,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function loadToken() {
     try {
-        const savedToken = await getToken();
+      const savedToken = await getToken();
 
-        if (savedToken) {
-            setToken(savedToken);
+      if (savedToken) {
+        setToken(savedToken);
 
-            const response = await api.get<User>("/users/me");
-            setUser(response.data);
-        }
-     } catch {
-         await deleteToken();
-            setToken(null);
-            setUser(null);
-        } finally {
-            setLoading(false);
-        }
-    }  
+        const response = await api.get<User>("/users/me");
+        setUser(response.data);
+      }
+    } catch {
+      await deleteToken();
+      setToken(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     loadToken();
@@ -53,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
     });
 
-    await setToken(response.data.token);
+    await saveToken(response.data.token);
     setToken(response.data.token);
     setUser(response.data.user);
   }
@@ -65,14 +72,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
     });
 
-    await setToken(response.data.token);
+    await saveToken(response.data.token);
     setToken(response.data.token);
     setUser(response.data.user);
   }
 
   async function refreshUser() {
-    const response = await api.get<User>("/users/me");
-    setUser(response.data);
+    try {
+      const response = await api.get("/users/me");
+      setUser(response.data);
+    } catch (error) {
+      console.log("Refresh user error:", error);
+      await deleteToken();
+      setToken(null);
+      setUser(null);
+    }
   }
 
   async function logout() {
@@ -86,7 +100,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, dashboardRefreshKey, triggerDashboardRefresh, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        dashboardRefreshKey,
+        triggerDashboardRefresh,
+        login,
+        register,
+        logout,
+        refreshUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

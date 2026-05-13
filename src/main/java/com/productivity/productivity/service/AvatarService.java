@@ -24,8 +24,7 @@ public class AvatarService {
             AvatarRepository avatarRepository,
             CosmeticRepository cosmeticRepository,
             UserCosmeticRepository userCosmeticRepository,
-            CurrentUserService currentUserService
-    ) {
+            CurrentUserService currentUserService) {
         this.avatarRepository = avatarRepository;
         this.cosmeticRepository = cosmeticRepository;
         this.userCosmeticRepository = userCosmeticRepository;
@@ -34,48 +33,37 @@ public class AvatarService {
 
     public AvatarResponse getAvatarForCurrentUser() {
         User user = currentUserService.getCurrentUser();
+        Avatar avatar = getOrCreateAvatar(user);
 
-        Avatar avatar = avatarRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Avatar not found"));
+        unlockCosmeticsForUser(user);
 
         return mapToAvatarResponse(avatar);
     }
 
-    private boolean isEquipped(Avatar avatar, Cosmetic cosmetic) {
-        return switch (cosmetic.getType()) {
-            case HAT -> cosmetic.getId().equals(avatar.getEquippedHatId());
-            case OUTFIT -> cosmetic.getId().equals(avatar.getEquippedOutfitId());
-            case BACKGROUND -> cosmetic.getId().equals(avatar.getEquippedBackgroundId());
-            case PET -> cosmetic.getId().equals(avatar.getEquippedPetId());
-            case AURA -> cosmetic.getId().equals(avatar.getEquippedAuraId());
-        };
-    }
-
     public List<CosmeticResponse> getCosmeticsForCurrentUser() {
         User user = currentUserService.getCurrentUser();
+        Avatar avatar = getOrCreateAvatar(user);
 
-        Avatar avatar = avatarRepository.findByUserId(user.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("Avatar not found"));
+        unlockCosmeticsForUser(user);
 
         return cosmeticRepository.findAll()
-            .stream()
-            .map(cosmetic -> new CosmeticResponse(
-                    cosmetic.getId(),
-                    cosmetic.getName(),
-                    cosmetic.getType(),
-                    cosmetic.getRequiredLevel(),
-                    cosmetic.getImageUrl(),
-                    userCosmeticRepository.existsByUserIdAndCosmeticId(user.getId(), cosmetic.getId()),
-                    isEquipped(avatar, cosmetic)
-            ))
-            .toList();
+                .stream()
+                .map(cosmetic -> new CosmeticResponse(
+                        cosmetic.getId(),
+                        cosmetic.getName(),
+                        cosmetic.getType(),
+                        cosmetic.getRequiredLevel(),
+                        cosmetic.getImageUrl(),
+                        userCosmeticRepository.existsByUserIdAndCosmeticId(user.getId(), cosmetic.getId()),
+                        isEquipped(avatar, cosmetic)))
+                .toList();
     }
 
     public AvatarResponse equipCosmeticForCurrentUser(Long cosmeticId) {
         User user = currentUserService.getCurrentUser();
+        Avatar avatar = getOrCreateAvatar(user);
 
-        Avatar avatar = avatarRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Avatar not found"));
+        unlockCosmeticsForUser(user);
 
         Cosmetic cosmetic = cosmeticRepository.findById(cosmeticId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cosmetic with ID " + cosmeticId + " not found"));
@@ -83,7 +71,7 @@ public class AvatarService {
         boolean ownsCosmetic = userCosmeticRepository.existsByUserIdAndCosmeticId(user.getId(), cosmeticId);
 
         if (!ownsCosmetic) {
-            throw new ResourceNotFoundException("Cosmetic with ID " + cosmeticId + " not found");
+            throw new ResourceNotFoundException("Cosmetic with ID " + cosmeticId + " not unlocked");
         }
 
         switch (cosmetic.getType()) {
@@ -102,13 +90,27 @@ public class AvatarService {
         return mapToAvatarResponse(avatarRepository.save(avatar));
     }
 
+    private Avatar getOrCreateAvatar(User user) {
+        return avatarRepository.findByUserId(user.getId())
+                .orElseGet(() -> avatarRepository.save(new Avatar(user)));
+    }
+
+    private boolean isEquipped(Avatar avatar, Cosmetic cosmetic) {
+        return switch (cosmetic.getType()) {
+            case HAT -> cosmetic.getId().equals(avatar.getEquippedHatId());
+            case OUTFIT -> cosmetic.getId().equals(avatar.getEquippedOutfitId());
+            case BACKGROUND -> cosmetic.getId().equals(avatar.getEquippedBackgroundId());
+            case PET -> cosmetic.getId().equals(avatar.getEquippedPetId());
+            case AURA -> cosmetic.getId().equals(avatar.getEquippedAuraId());
+        };
+    }
+
     public void unlockCosmeticsForUser(User user) {
-        List<Cosmetic> eligibleCosmetics =
-                cosmeticRepository.findByRequiredLevelLessThanEqual(user.getLevel());
+        List<Cosmetic> eligibleCosmetics = cosmeticRepository.findByRequiredLevelLessThanEqual(user.getLevel());
 
         for (Cosmetic cosmetic : eligibleCosmetics) {
-            boolean alreadyUnlocked =
-                    userCosmeticRepository.existsByUserIdAndCosmeticId(user.getId(), cosmetic.getId());
+            boolean alreadyUnlocked = userCosmeticRepository.existsByUserIdAndCosmeticId(user.getId(),
+                    cosmetic.getId());
 
             if (!alreadyUnlocked) {
                 userCosmeticRepository.save(new UserCosmetic(user, cosmetic));
@@ -117,16 +119,13 @@ public class AvatarService {
     }
 
     public List<String> unlockCosmeticsForUserWithResult(User user) {
-
-    List<Cosmetic> eligibleCosmetics =
-        cosmeticRepository.findByRequiredLevelLessThanEqual(user.getLevel());
+        List<Cosmetic> eligibleCosmetics = cosmeticRepository.findByRequiredLevelLessThanEqual(user.getLevel());
 
         List<String> unlockedNames = new ArrayList<>();
 
         for (Cosmetic cosmetic : eligibleCosmetics) {
-
-            boolean alreadyUnlocked =
-                userCosmeticRepository.existsByUserIdAndCosmeticId(user.getId(), cosmetic.getId());
+            boolean alreadyUnlocked = userCosmeticRepository.existsByUserIdAndCosmeticId(user.getId(),
+                    cosmetic.getId());
 
             if (!alreadyUnlocked) {
                 userCosmeticRepository.save(new UserCosmetic(user, cosmetic));
@@ -145,7 +144,6 @@ public class AvatarService {
                 avatar.getEquippedOutfitId(),
                 avatar.getEquippedBackgroundId(),
                 avatar.getEquippedPetId(),
-                avatar.getEquippedAuraId()
-        );
+                avatar.getEquippedAuraId());
     }
 }
