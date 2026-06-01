@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 
 import { api } from "../../src/api/client";
+import { getCosmeticPreviewSource } from "../../src/avatar/assetRegistry";
 import AvatarRenderer from "../../src/components/AvatarRenderer";
 import LifeButton from "../../src/components/LifeButton";
 import LifeCard from "../../src/components/LifeCard";
@@ -133,46 +134,74 @@ function CosmeticSection({
         )}
 
         {cosmetics.map((cosmetic) => (
-          <View
+          <CosmeticCard
             key={cosmetic.id}
-            style={[
-              styles.cosmeticCard,
-              cosmetic.equipped && styles.equippedCard,
-              !cosmetic.unlocked && styles.lockedCard,
-            ]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cosmeticName}>{cosmetic.name}</Text>
-
-              <Text style={styles.cosmeticMeta}>
-                Level {cosmetic.requiredLevel} Required
-              </Text>
-
-              <Text
-                style={[
-                  styles.status,
-                  cosmetic.equipped && styles.equippedStatus,
-                  !cosmetic.unlocked && styles.lockedStatus,
-                ]}
-              >
-                {cosmetic.equipped
-                  ? "Equipped"
-                  : cosmetic.unlocked
-                    ? "Unlocked"
-                    : "Locked"}
-              </Text>
-            </View>
-
-            {cosmetic.unlocked && !cosmetic.equipped && (
-              <LifeButton
-                title={loadingId === cosmetic.id ? "..." : "Equip"}
-                onPress={() => onEquip(cosmetic.id)}
-              />
-            )}
-          </View>
+            cosmetic={cosmetic}
+            loading={loadingId === cosmetic.id}
+            onEquip={onEquip}
+          />
         ))}
       </View>
     </LifeCard>
+  );
+}
+
+function CosmeticCard({
+  cosmetic,
+  loading,
+  onEquip,
+}: {
+  cosmetic: Cosmetic;
+  loading: boolean;
+  onEquip: (id: number) => void;
+}) {
+  const previewSource = getCosmeticPreviewSource(cosmetic);
+
+  return (
+    <View
+      style={[
+        styles.cosmeticCard,
+        cosmetic.equipped && styles.equippedCard,
+        !cosmetic.unlocked && styles.lockedCard,
+      ]}
+    >
+      <View style={styles.previewBox}>
+        {previewSource ? (
+          <Image source={previewSource} style={styles.previewImage} />
+        ) : (
+          <Text style={styles.previewFallback}>{cosmetic.type[0]}</Text>
+        )}
+      </View>
+
+      <View style={styles.cosmeticInfo}>
+        <Text style={styles.cosmeticName}>{cosmetic.name}</Text>
+
+        <Text style={styles.cosmeticMeta}>
+          Level {cosmetic.requiredLevel} Required
+        </Text>
+
+        <Text
+          style={[
+            styles.status,
+            cosmetic.equipped && styles.equippedStatus,
+            !cosmetic.unlocked && styles.lockedStatus,
+          ]}
+        >
+          {cosmetic.equipped
+            ? "Equipped"
+            : cosmetic.unlocked
+              ? "Unlocked"
+              : "Locked"}
+        </Text>
+      </View>
+
+      {cosmetic.unlocked && !cosmetic.equipped && (
+        <LifeButton
+          title={loading ? "..." : "Equip"}
+          onPress={() => onEquip(cosmetic.id)}
+        />
+      )}
+    </View>
   );
 }
 
@@ -224,6 +253,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+  },
+
+  previewBox: {
+    width: 62,
+    height: 62,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+
+  previewImage: {
+    width: 58,
+    height: 58,
+    resizeMode: "contain",
+  },
+
+  previewFallback: {
+    color: colors.mutedText,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+
+  cosmeticInfo: {
+    flex: 1,
   },
 
   equippedCard: {

@@ -55,6 +55,8 @@ export default function DashboardScreen() {
         <AvatarRenderer
           hatId={avatar?.equippedHatId}
           outfitId={avatar?.equippedOutfitId}
+          backgroundId={avatar?.equippedBackgroundId}
+          petId={avatar?.equippedPetId}
           auraId={avatar?.equippedAuraId}
         />
 
