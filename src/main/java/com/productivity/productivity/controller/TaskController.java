@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -26,8 +27,8 @@ public class TaskController {
     }
 
     @GetMapping
-    public List<TaskResponse> getMyTasks() {
-        return taskService.getTasksForCurrentUser();
+    public List<TaskResponse> getMyTasks(@RequestParam(required = false) LocalDate date) {
+        return taskService.getTasksForCurrentUser(date);
     }
 
     @GetMapping("/{id}")
@@ -44,8 +45,11 @@ public class TaskController {
     }
 
     @PutMapping("/{id}/complete")
-    public TaskResponse completeTask(@PathVariable Long id) {
-        return taskService.markTaskAsCompletedForCurrentUser(id);
+    public TaskResponse completeTask(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate date
+    ) {
+        return taskService.markTaskAsCompletedForCurrentUser(id, date);
     }
 
     @DeleteMapping("/{id}")

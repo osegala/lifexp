@@ -25,10 +25,18 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       async function loadDashboard() {
-        await refreshUser();
+        try {
+          const sessionIsValid = await refreshUser();
 
-        const res = await api.get<Avatar>("/avatar");
-        setAvatar(res.data);
+          if (!sessionIsValid) {
+            return;
+          }
+
+          const res = await api.get<Avatar>("/avatar");
+          setAvatar(res.data);
+        } catch (error) {
+          console.log("Dashboard load error:", error);
+        }
       }
 
       loadDashboard();
@@ -45,7 +53,13 @@ export default function DashboardScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      alwaysBounceVertical={false}
+      bounces={false}
+      overScrollMode="never"
+    >
       <Text style={styles.title}>Dashboard</Text>
       <Text style={styles.subtitle}>
         Welcome back, {user?.username ?? "Hero"}.

@@ -20,7 +20,7 @@ type AuthContextType = {
     password: string,
   ) => Promise<void>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -81,11 +81,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await api.get("/users/me");
       setUser(response.data);
+      return true;
     } catch (error) {
       console.log("Refresh user error:", error);
       await deleteToken();
       setToken(null);
       setUser(null);
+      return false;
     }
   }
 

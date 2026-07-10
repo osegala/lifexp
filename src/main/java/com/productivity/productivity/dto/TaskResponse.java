@@ -1,6 +1,9 @@
 package com.productivity.productivity.dto;
 
+import com.productivity.productivity.entity.RepeatType;
+import com.productivity.productivity.entity.TaskCategory;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 public class TaskResponse {
@@ -9,11 +12,16 @@ public class TaskResponse {
     private String description;
     private int xpValue;
     private LocalDate dueDate;
-    private String category;
+    private LocalTime scheduledTime;
+    private RepeatType repeatType;
+    private LocalDate repeatEndsAt;
+    private TaskCategory category;
     private boolean completed;
     private List<String> unlockedCosmetics;
+    private BuildingProgressResponse buildingProgress;
+    private boolean leveledUp;
 
-    public TaskResponse(Long id, String title, String description, int xpValue, LocalDate dueDate, String category, boolean completed) {
+    public TaskResponse(Long id, String title, String description, int xpValue, LocalDate dueDate, TaskCategory category, boolean completed) {
         this.id = id;
         this.title = title;
         this.description = description;
@@ -23,8 +31,23 @@ public class TaskResponse {
         this.completed = completed;
     }
 
+    public TaskResponse(Long id, String title, String description, int xpValue, LocalDate dueDate, LocalTime scheduledTime, RepeatType repeatType, LocalDate repeatEndsAt, TaskCategory category, boolean completed) {
+        this(id, title, description, xpValue, dueDate, category, completed);
+        this.scheduledTime = scheduledTime;
+        this.repeatType = repeatType;
+        this.repeatEndsAt = repeatEndsAt;
+    }
+
     public void setUnlockedCosmetics(List<String> unlockedCosmetics) {
         this.unlockedCosmetics = unlockedCosmetics;
+    }
+
+    public void setBuildingProgress(BuildingProgressResponse buildingProgress) {
+        this.buildingProgress = buildingProgress;
+    }
+
+    public void setLeveledUp(boolean leveledUp) {
+        this.leveledUp = leveledUp;
     }
 
     public Long getId() { return id; }
@@ -32,7 +55,12 @@ public class TaskResponse {
     public String getDescription() { return description; }
     public int getXpValue() { return xpValue; }
     public LocalDate getDueDate() { return dueDate; }
-    public String getCategory() { return category; }
+    public LocalTime getScheduledTime() { return scheduledTime; }
+    public RepeatType getRepeatType() { return repeatType; }
+    public LocalDate getRepeatEndsAt() { return repeatEndsAt; }
+    public TaskCategory getCategory() { return category; }
     public boolean isCompleted() { return completed; }
     public List<String> getUnlockedCosmetics() { return unlockedCosmetics; }    
+    public BuildingProgressResponse getBuildingProgress() { return buildingProgress; }
+    public boolean isLeveledUp() { return leveledUp; }
 }

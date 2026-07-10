@@ -1,6 +1,9 @@
 package com.productivity.productivity.dto;
 
+import jakarta.validation.constraints.NotNull;
+
 public class EquipCosmeticRequest {
+    @NotNull(message = "Cosmetic ID is required")
     private Long cosmeticId;
 
     public Long getCosmeticId() {

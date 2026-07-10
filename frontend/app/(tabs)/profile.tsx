@@ -32,7 +32,13 @@ export default function ProfileScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      alwaysBounceVertical={false}
+      bounces={false}
+      overScrollMode="never"
+    >
       <Text style={styles.title}>Profile</Text>
       <Text style={styles.subtitle}>Your LifeXP account and progress.</Text>
 

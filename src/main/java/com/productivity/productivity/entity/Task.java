@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import jakarta.validation.constraints.*;
 
@@ -30,10 +31,21 @@ public class Task {
 
     private LocalDate dueDate;
 
-    private String category;
+    private LocalTime scheduledTime;
+
+    @Enumerated(EnumType.STRING)
+    private RepeatType repeatType = RepeatType.NONE;
+
+    private LocalDate repeatEndsAt;
+
+    @Column(nullable = false)
+    private TaskCategory category = TaskCategory.PERSONAL_GROWTH;
 
     @Column(nullable = false)
     private boolean completed = false;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean archived = false;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
@@ -43,7 +55,7 @@ public class Task {
     public Task() {
     }
 
-    public Task(String title, String description, int xpValue, LocalDate dueDate, String category, boolean completed, User user) {
+    public Task(String title, String description, int xpValue, LocalDate dueDate, TaskCategory category, boolean completed, User user) {
         this.title = title;
         this.description = description;
         this.xpValue = xpValue;
@@ -89,12 +101,36 @@ public class Task {
         this.dueDate = dueDate;
     }
 
-    public String getCategory() {
-        return category;
+    public LocalTime getScheduledTime() {
+        return scheduledTime;
     }
 
-    public void setCategory(String category) {
-        this.category = category;
+    public void setScheduledTime(LocalTime scheduledTime) {
+        this.scheduledTime = scheduledTime;
+    }
+
+    public RepeatType getRepeatType() {
+        return repeatType == null ? RepeatType.NONE : repeatType;
+    }
+
+    public void setRepeatType(RepeatType repeatType) {
+        this.repeatType = repeatType == null ? RepeatType.NONE : repeatType;
+    }
+
+    public LocalDate getRepeatEndsAt() {
+        return repeatEndsAt;
+    }
+
+    public void setRepeatEndsAt(LocalDate repeatEndsAt) {
+        this.repeatEndsAt = repeatEndsAt;
+    }
+
+    public TaskCategory getCategory() {
+        return category == null ? TaskCategory.PERSONAL_GROWTH : category;
+    }
+
+    public void setCategory(TaskCategory category) {
+        this.category = category == null ? TaskCategory.PERSONAL_GROWTH : category;
     }
 
     public boolean isCompleted() {
@@ -103,6 +139,14 @@ public class Task {
 
     public void setCompleted(boolean completed) {
         this.completed = completed;
+    }
+
+    public boolean isArchived() {
+        return archived;
+    }
+
+    public void setArchived(boolean archived) {
+        this.archived = archived;
     }
 
     public User getUser() {

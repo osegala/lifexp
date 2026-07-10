@@ -61,7 +61,13 @@ export default function AvatarScreen() {
   const auras = cosmetics.filter((c) => c.type === "AURA");
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      alwaysBounceVertical={false}
+      bounces={false}
+      overScrollMode="never"
+    >
       <Text style={styles.title}>Avatar</Text>
       <Text style={styles.subtitle}>Customize your LifeXP character.</Text>
 

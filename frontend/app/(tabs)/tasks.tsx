@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,10 @@ import {
   TASK_CATEGORIES,
   TaskCategory,
 } from "../../src/utils/taskCategories";
+import { TaskReward } from "../../src/types/progression";
+
+type RepeatType = "NONE" | "DAILY" | "WEEKLY";
+type CalendarViewMode = "week" | "month";
 
 type Task = {
   id: number;
@@ -29,34 +33,72 @@ type Task = {
   xpValue: number;
   category?: string;
   completed: boolean;
+  dueDate?: string;
+  scheduledTime?: string;
+  repeatType: RepeatType;
+  repeatEndsAt?: string;
 };
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskCountsByDate, setTaskCountsByDate] = useState<
+    Record<string, number>
+  >({});
   const [title, setTitle] = useState("");
   const [selectedCategory, setSelectedCategory] =
     useState<TaskCategory>("Personal Growth");
+  const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
+  const [calendarView, setCalendarView] = useState<CalendarViewMode>("week");
+  const [repeatType, setRepeatType] = useState<RepeatType>("NONE");
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [repeatEndsAt, setRepeatEndsAt] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadTasks();
+  const loadTasks = useCallback(async (date: string) => {
+    try {
+      const response = await api.get(`/tasks?date=${date}`);
+      setTasks(response.data);
+    } catch (error) {
+      console.log("Load tasks error:", error);
+      Alert.alert("Error", "Could not load tasks.");
+    }
   }, []);
+
+  const loadTaskCounts = useCallback(async (dates: string[]) => {
+    try {
+      const uniqueDates = Array.from(new Set(dates));
+      const results = await Promise.all(
+        uniqueDates.map(async (date) => {
+          const response = await api.get(`/tasks?date=${date}`);
+          const remainingCount = response.data.filter(
+            (task: Task) => !task.completed,
+          ).length;
+
+          return [date, remainingCount] as const;
+        }),
+      );
+
+      setTaskCountsByDate(Object.fromEntries(results));
+    } catch (error) {
+      console.log("Load calendar task counts error:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTasks(selectedDate);
+  }, [loadTasks, selectedDate]);
+
+  useEffect(() => {
+    loadTaskCounts(
+      getCalendarDays(selectedDate, calendarView).map((day) => day.date),
+    );
+  }, [calendarView, loadTaskCounts, selectedDate]);
 
   useEffect(() => {
     if (title.trim().length > 0) {
       setSelectedCategory(guessCategory(title));
     }
   }, [title]);
-
-  async function loadTasks() {
-    try {
-      const response = await api.get("/tasks");
-      setTasks(response.data);
-    } catch (error) {
-      console.log("Load tasks error:", error);
-      Alert.alert("Error", "Could not load tasks.");
-    }
-  }
 
   async function createTask(
     customTitle?: string,
@@ -70,7 +112,36 @@ export default function TasksScreen() {
       return;
     }
 
-    const xpValue = getXPForCategory(finalCategory);
+    const normalizedScheduledTime = normalizeScheduledTime(scheduledTime);
+
+    if (scheduledTime.trim() && !normalizedScheduledTime) {
+      Alert.alert(
+        "Invalid time",
+        "Use a time like 10:00 PM, 10 PM, or 22:00.",
+      );
+      return;
+    }
+
+    if (repeatType !== "NONE" && repeatEndsAt && !isDateKey(repeatEndsAt)) {
+      Alert.alert("Invalid end date", "Use YYYY-MM-DD, like 2026-06-30.");
+      return;
+    }
+
+    if (repeatType !== "NONE" && !repeatEndsAt) {
+      Alert.alert(
+        "Missing end date",
+        "Choose when this repeating task should stop.",
+      );
+      return;
+    }
+
+    if (repeatType !== "NONE" && repeatEndsAt && repeatEndsAt < selectedDate) {
+      Alert.alert(
+        "Invalid end date",
+        "The repeat end date must be after the start date.",
+      );
+      return;
+    }
 
     try {
       setLoading(true);
@@ -79,12 +150,20 @@ export default function TasksScreen() {
         title: finalTitle,
         description: finalCategory,
         category: finalCategory,
-        xpValue,
+        dueDate: selectedDate,
+        scheduledTime: normalizedScheduledTime,
+        repeatType,
+        repeatEndsAt: repeatType === "NONE" ? null : repeatEndsAt || null,
       });
 
       setTitle("");
+      setScheduledTime("");
+      setRepeatEndsAt("");
       setSelectedCategory("Personal Growth");
-      await loadTasks();
+      await loadTasks(selectedDate);
+      await loadTaskCounts(
+        getCalendarDays(selectedDate, calendarView).map((day) => day.date),
+      );
     } catch (error) {
       console.log("Create task error:", error);
       Alert.alert("Error", "Could not create task.");
@@ -95,8 +174,14 @@ export default function TasksScreen() {
 
   async function completeTask(id: number) {
     try {
-      await api.put(`/tasks/${id}/complete`);
-      await loadTasks();
+      const response = await api.put<TaskReward>(
+        `/tasks/${id}/complete?date=${selectedDate}`,
+      );
+      await loadTasks(selectedDate);
+      await loadTaskCounts(
+        getCalendarDays(selectedDate, calendarView).map((day) => day.date),
+      );
+      showTaskRewards(response.data);
     } catch (error) {
       console.log("Complete task error:", error);
       Alert.alert("Error", "Could not complete task.");
@@ -106,7 +191,10 @@ export default function TasksScreen() {
   async function deleteTask(id: number) {
     try {
       await api.delete(`/tasks/${id}`);
-      await loadTasks();
+      await loadTasks(selectedDate);
+      await loadTaskCounts(
+        getCalendarDays(selectedDate, calendarView).map((day) => day.date),
+      );
     } catch (error) {
       console.log("Delete task error:", error);
       Alert.alert("Error", "Could not delete task.");
@@ -114,15 +202,122 @@ export default function TasksScreen() {
   }
 
   const categoryXP = getXPForCategory(selectedCategory);
+  const calendarDays = getCalendarDays(selectedDate, calendarView);
+  const remainingTasks = tasks.filter((task) => !task.completed);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      alwaysBounceVertical={false}
+      bounces={false}
+      overScrollMode="never"
+    >
       <Text style={styles.title}>Tasks</Text>
       <Text style={styles.subtitle}>
         Create tasks, earn XP, and build your streak.
       </Text>
 
       <LifeCard>
+        <View style={styles.calendarHeader}>
+          <Pressable
+            onPress={() =>
+              setSelectedDate(shiftCalendarDate(selectedDate, calendarView, -1))
+            }
+            style={styles.calendarNavButton}
+          >
+            <Text style={styles.calendarNavText}>‹</Text>
+          </Pressable>
+
+          <Text style={styles.calendarTitle}>
+            {formatCalendarTitle(selectedDate)}
+          </Text>
+
+          <Pressable
+            onPress={() =>
+              setSelectedDate(shiftCalendarDate(selectedDate, calendarView, 1))
+            }
+            style={styles.calendarNavButton}
+          >
+            <Text style={styles.calendarNavText}>›</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.viewToggle}>
+          {(["week", "month"] as CalendarViewMode[]).map((mode) => (
+            <Pressable
+              key={mode}
+              onPress={() => setCalendarView(mode)}
+              style={[
+                styles.viewToggleButton,
+                calendarView === mode && styles.selectedViewToggleButton,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.viewToggleText,
+                  calendarView === mode && styles.selectedViewToggleText,
+                ]}
+              >
+                {mode}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.calendarGrid}>
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+            <Text key={day} style={styles.weekdayLabel}>
+              {day}
+            </Text>
+          ))}
+
+          {calendarDays.map((day) => {
+            const taskCount = taskCountsByDate[day.date] ?? 0;
+
+            return (
+              <Pressable
+                key={day.date}
+                onPress={() => setSelectedDate(day.date)}
+                style={[
+                  styles.calendarDay,
+                  calendarView === "week" && styles.weekCalendarDay,
+                  selectedDate === day.date && styles.selectedCalendarDay,
+                  !day.isCurrentMonth && styles.outsideMonthDay,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.calendarDayText,
+                    !day.isCurrentMonth && styles.outsideMonthText,
+                    selectedDate === day.date && styles.selectedCalendarDayText,
+                  ]}
+                >
+                  {day.day}
+                </Text>
+
+                {taskCount > 0 && (
+                  <View
+                    style={[
+                      styles.taskNotifier,
+                      selectedDate === day.date && styles.selectedTaskNotifier,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.taskNotifierText,
+                        selectedDate === day.date &&
+                          styles.selectedTaskNotifierText,
+                      ]}
+                    >
+                      {taskCount}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
         <Text style={styles.cardTitle}>Create New Task</Text>
 
         <LifeInput
@@ -130,6 +325,57 @@ export default function TasksScreen() {
           value={title}
           onChangeText={setTitle}
         />
+
+        <Text style={styles.label}>Repeat</Text>
+
+        <View style={styles.categoryContainer}>
+          {(["NONE", "DAILY", "WEEKLY"] as RepeatType[]).map((repeat) => (
+            <Pressable
+              key={repeat}
+              onPress={() => setRepeatType(repeat)}
+              style={[
+                styles.categoryChip,
+                repeatType === repeat && styles.selectedChip,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.categoryText,
+                  repeatType === repeat && styles.selectedChipText,
+                ]}
+              >
+                {repeat}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Time</Text>
+
+        <LifeInput
+          placeholder="Optional, example: 10:00 PM"
+          value={scheduledTime}
+          onChangeText={setScheduledTime}
+        />
+
+        {repeatType !== "NONE" && (
+          <>
+            <Text style={styles.label}>Repeat Dates</Text>
+
+            <View style={styles.repeatDatePanel}>
+              <View style={styles.repeatDateRow}>
+                <Text style={styles.repeatDateLabel}>Starts</Text>
+                <Text style={styles.repeatDateValue}>{selectedDate}</Text>
+              </View>
+
+              <LifeInput
+                placeholder="Ends on, example: 2026-06-30"
+                value={repeatEndsAt}
+                onChangeText={setRepeatEndsAt}
+              />
+            </View>
+          </>
+        )}
 
         <Text style={styles.label}>Detected Category</Text>
 
@@ -177,6 +423,9 @@ export default function TasksScreen() {
               <Text style={styles.premadeMeta}>
                 {task.category} · +{getXPForCategory(task.category)} XP
               </Text>
+              <Text style={styles.premadeScheduleMeta}>
+                {formatDraftSchedule(selectedDate, repeatType, repeatEndsAt)}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -185,7 +434,7 @@ export default function TasksScreen() {
       <Text style={styles.sectionTitle}>Your Tasks</Text>
 
       <FlatList
-        data={tasks}
+        data={remainingTasks}
         keyExtractor={(item) => String(item.id)}
         scrollEnabled={false}
         contentContainerStyle={{ gap: spacing.md }}
@@ -209,6 +458,10 @@ export default function TasksScreen() {
                   {item.category ?? item.description ?? "Task"} · +
                   {item.xpValue} XP
                 </Text>
+
+                <Text style={styles.scheduleMeta}>
+                  {formatTaskSchedule(item)}
+                </Text>
               </View>
 
               {!item.completed && (
@@ -227,6 +480,192 @@ export default function TasksScreen() {
       />
     </ScrollView>
   );
+}
+
+function showTaskRewards(reward: TaskReward) {
+  const messages: string[] = [];
+
+  if (reward.buildingProgress) {
+    messages.push(
+      `${reward.buildingProgress.type} gained progress and is now level ${reward.buildingProgress.level}.`,
+    );
+  }
+
+  if (reward.leveledUp) {
+    messages.push("Your hero leveled up.");
+  }
+
+  if (reward.unlockedCosmetics?.length) {
+    messages.push(`Unlocked: ${reward.unlockedCosmetics.join(", ")}.`);
+  }
+
+  if (messages.length > 0) {
+    Alert.alert("Progress Earned", messages.join("\n\n"));
+  }
+}
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getCalendarDays(selectedDate: string, viewMode: CalendarViewMode) {
+  return viewMode === "week"
+    ? getWeekDays(selectedDate)
+    : getMonthDays(selectedDate);
+}
+
+function getWeekDays(selectedDate: string) {
+  const selected = new Date(`${selectedDate}T00:00:00`);
+  const start = new Date(selected);
+  start.setDate(selected.getDate() - selected.getDay());
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+
+    return {
+      date: toDateKey(date),
+      day: date.getDate(),
+      isCurrentMonth: true,
+    };
+  });
+}
+
+function getMonthDays(selectedDate: string) {
+  const selected = new Date(`${selectedDate}T00:00:00`);
+  const year = selected.getFullYear();
+  const month = selected.getMonth();
+
+  const firstOfMonth = new Date(year, month, 1);
+  const start = new Date(firstOfMonth);
+  start.setDate(firstOfMonth.getDate() - firstOfMonth.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+
+    return {
+      date: toDateKey(date),
+      day: date.getDate(),
+      isCurrentMonth: date.getMonth() === month,
+    };
+  });
+}
+
+function shiftCalendarDate(
+  selectedDate: string,
+  viewMode: CalendarViewMode,
+  direction: -1 | 1,
+) {
+  const date = new Date(`${selectedDate}T00:00:00`);
+
+  if (viewMode === "week") {
+    date.setDate(date.getDate() + direction * 7);
+  } else {
+    date.setMonth(date.getMonth() + direction);
+  }
+
+  return toDateKey(date);
+}
+
+function formatCalendarTitle(selectedDate: string) {
+  return new Date(`${selectedDate}T00:00:00`).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function normalizeScheduledTime(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const twentyFourHourMatch = trimmedValue.match(/^(\d{1,2}):(\d{2})$/);
+
+  if (twentyFourHourMatch) {
+    const hour = Number(twentyFourHourMatch[1]);
+    const minute = Number(twentyFourHourMatch[2]);
+
+    if (hour < 24 && minute < 60) {
+      return `${String(hour).padStart(2, "0")}:${String(minute).padStart(
+        2,
+        "0",
+      )}`;
+    }
+  }
+
+  const meridiemMatch = trimmedValue.match(
+    /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i,
+  );
+
+  if (meridiemMatch) {
+    let hour = Number(meridiemMatch[1]);
+    const minute = Number(meridiemMatch[2] ?? "0");
+    const meridiem = meridiemMatch[3].toLowerCase();
+
+    if (hour >= 1 && hour <= 12 && minute < 60) {
+      if (meridiem === "pm" && hour !== 12) {
+        hour += 12;
+      }
+
+      if (meridiem === "am" && hour === 12) {
+        hour = 0;
+      }
+
+      return `${String(hour).padStart(2, "0")}:${String(minute).padStart(
+        2,
+        "0",
+      )}`;
+    }
+  }
+
+  return null;
+}
+
+function isDateKey(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  return toDateKey(new Date(`${value}T00:00:00`)) === value;
+}
+
+function formatDraftSchedule(
+  selectedDate: string,
+  repeatType: RepeatType,
+  repeatEndsAt: string,
+) {
+  if (repeatType === "NONE") {
+    return selectedDate;
+  }
+
+  return repeatEndsAt
+    ? `${repeatType.toLowerCase()} from ${selectedDate} to ${repeatEndsAt}`
+    : `${repeatType.toLowerCase()} from ${selectedDate}`;
+}
+
+function formatTaskSchedule(task: Task) {
+  const details = [];
+
+  if (task.dueDate) {
+    details.push(task.dueDate);
+  }
+
+  if (task.scheduledTime) {
+    details.push(task.scheduledTime.slice(0, 5));
+  }
+
+  if (task.repeatType && task.repeatType !== "NONE") {
+    details.push(task.repeatType.toLowerCase());
+  }
+
+  return details.length > 0 ? details.join(" · ") : "Unscheduled";
 }
 
 const styles = StyleSheet.create({
@@ -258,6 +697,169 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     marginBottom: spacing.md,
+  },
+
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.md,
+  },
+
+  calendarNavButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: colors.cardLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  calendarNavText: {
+    color: colors.text,
+    fontSize: 28,
+    fontWeight: "900",
+    lineHeight: 30,
+  },
+
+  calendarTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+
+  viewToggle: {
+    flexDirection: "row",
+    backgroundColor: colors.cardLight,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 4,
+    marginBottom: spacing.lg,
+  },
+
+  viewToggleButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    paddingVertical: 9,
+  },
+
+  selectedViewToggleButton: {
+    backgroundColor: colors.primary,
+  },
+
+  viewToggleText: {
+    color: colors.mutedText,
+    fontWeight: "800",
+    textTransform: "capitalize",
+  },
+
+  selectedViewToggleText: {
+    color: colors.text,
+  },
+
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: spacing.lg,
+  },
+
+  weekdayLabel: {
+    width: "14.285%",
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center",
+    marginBottom: spacing.sm,
+  },
+
+  calendarDay: {
+    width: "14.285%",
+    aspectRatio: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    position: "relative",
+  },
+
+  weekCalendarDay: {
+    minHeight: 62,
+  },
+
+  selectedCalendarDay: {
+    backgroundColor: colors.primary,
+  },
+
+  outsideMonthDay: {
+    opacity: 0.55,
+  },
+
+  calendarDayText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+
+  outsideMonthText: {
+    color: colors.mutedText,
+  },
+
+  selectedCalendarDayText: {
+    color: colors.text,
+  },
+
+  taskNotifier: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+    marginTop: 4,
+  },
+
+  selectedTaskNotifier: {
+    backgroundColor: colors.text,
+  },
+
+  taskNotifierText: {
+    color: colors.background,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  selectedTaskNotifierText: {
+    color: colors.primary,
+  },
+
+  repeatDatePanel: {
+    gap: spacing.sm,
+  },
+
+  repeatDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.cardLight,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+
+  repeatDateLabel: {
+    color: colors.mutedText,
+    fontWeight: "800",
+  },
+
+  repeatDateValue: {
+    color: colors.text,
+    fontWeight: "900",
   },
 
   label: {
@@ -328,6 +930,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
+  premadeScheduleMeta: {
+    color: colors.mutedText,
+    marginTop: 4,
+    fontWeight: "700",
+  },
+
   sectionTitle: {
     color: colors.text,
     fontSize: 24,
@@ -359,6 +967,12 @@ const styles = StyleSheet.create({
 
   taskMeta: {
     color: colors.accent,
+    marginTop: 4,
+    fontWeight: "700",
+  },
+
+  scheduleMeta: {
+    color: colors.mutedText,
     marginTop: 4,
     fontWeight: "700",
   },

@@ -17,6 +17,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -41,9 +42,17 @@ public class UserService {
     @Autowired
     private CurrentUserService currentUserService;
 
+    @Autowired
+    private BuildingService buildingService;
+
+    @Transactional
     public AuthResponse registerUser(CreateUserRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("Email is already in use");
+        }
+
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new DuplicateResourceException("Username is already in use");
         }
 
         User user = new User();
@@ -57,6 +66,7 @@ public class UserService {
 
         avatarService.createDefaultAvatar(savedUser);
         avatarService.unlockCosmeticsForUser(savedUser);
+        buildingService.createDefaultBuildings(savedUser);
 
         String token = jwtService.generateToken(savedUser.getEmail());
 
@@ -80,15 +90,23 @@ public class UserService {
     }
 
     public UserResponse getUserProfile(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User with ID " + userId + " not found"));
+        User user = getAuthorizedUser(userId);
 
         return mapToUserResponse(user);
     }
 
     public UserResponse updateUserProfile(Long userId, CreateUserRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User with ID " + userId + " not found"));
+        User user = getAuthorizedUser(userId);
+
+        userRepository.findByEmail(request.getEmail())
+                .filter(existingUser -> !existingUser.getId().equals(user.getId()))
+                .ifPresent(existingUser -> {
+                    throw new DuplicateResourceException("Email is already in use");
+                });
+
+        if (!user.getUsername().equals(request.getUsername()) && userRepository.existsByUsername(request.getUsername())) {
+            throw new DuplicateResourceException("Username is already in use");
+        }
 
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
@@ -98,16 +116,25 @@ public class UserService {
     }
 
     public void deleteUserProfile(Long userId) {
-        if (!userRepository.existsById(userId)) {
+        User user = getAuthorizedUser(userId);
+        userRepository.delete(user);
+    }
+
+    private User getAuthorizedUser(Long userId) {
+        User currentUser = currentUserService.getCurrentUser();
+
+        if (!currentUser.getId().equals(userId)) {
             throw new ResourceNotFoundException("User with ID " + userId + " not found");
         }
 
-        userRepository.deleteById(userId);
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User with ID " + userId + " not found"));
     }
 
     private UserResponse mapToUserResponse(User user) {
         List<TaskResponse> taskResponses = user.getTasks()
                 .stream()
+                .filter(task -> !task.isArchived())
                 .map(this::mapToTaskResponse)
                 .toList();
 
@@ -135,6 +162,9 @@ public class UserService {
                 task.getDescription(),
                 task.getXpValue(),
                 task.getDueDate(),
+                task.getScheduledTime(),
+                task.getRepeatType(),
+                task.getRepeatEndsAt(),
                 task.getCategory(),
                 task.isCompleted()
         );

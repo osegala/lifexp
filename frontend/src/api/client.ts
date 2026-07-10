@@ -1,7 +1,7 @@
-import axios from "axios";
+import { create } from "axios";
 import { getToken } from "../utils/tokenStorage";
 
-export const api = axios.create({
+export const api = create({
   baseURL: "http://localhost:8080/api",
 });
 
