@@ -1,30 +1,45 @@
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Pressable,
+  ActivityIndicator,
   Alert,
+  FlatList,
+  Platform,
+  Pressable,
   ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import { api } from "../../src/api/client";
+import { useAuth } from "../../src/context/AuthContext";
 import LifeButton from "../../src/components/LifeButton";
 import LifeCard from "../../src/components/LifeCard";
 import LifeInput from "../../src/components/LifeInput";
-import { colors, spacing, radius } from "../../src/theme/theme";
+import { colors, radius, spacing } from "../../src/theme/theme";
+import { TaskReward } from "../../src/types/progression";
 import {
-  guessCategory,
-  getXPForCategory,
   PREMADE_TASKS,
   TASK_CATEGORIES,
+  TASK_CATEGORY_REWARDS,
   TaskCategory,
+  getXPForCategory,
+  guessCategory,
 } from "../../src/utils/taskCategories";
-import { TaskReward } from "../../src/types/progression";
 
 type RepeatType = "NONE" | "DAILY" | "WEEKLY";
 type CalendarViewMode = "week" | "month";
+type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+type FieldErrors = Partial<
+  Record<"title" | "scheduledTime" | "repeatEndsAt", string>
+>;
+type RewardNotice = {
+  message: string;
+  buildingChanged: boolean;
+  cosmeticsUnlocked: boolean;
+};
 
 type Task = {
   id: number;
@@ -39,7 +54,27 @@ type Task = {
   repeatEndsAt?: string;
 };
 
+const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
+  { value: "NONE", label: "Does not repeat" },
+  { value: "DAILY", label: "Daily" },
+  { value: "WEEKLY", label: "Weekly" },
+];
+
+const QUICK_TIMES = [
+  { label: "No time", value: "" },
+  { label: "Morning", value: "09:00" },
+  { label: "Afternoon", value: "14:00" },
+  { label: "Evening", value: "18:00" },
+];
+
+const REPEAT_END_OPTIONS = [
+  { label: "1 week", days: 7 },
+  { label: "1 month", days: 30 },
+  { label: "3 months", days: 90 },
+];
+
 export default function TasksScreen() {
+  const { triggerDashboardRefresh } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskCountsByDate, setTaskCountsByDate] = useState<
     Record<string, number>
@@ -53,14 +88,23 @@ export default function TasksScreen() {
   const [scheduledTime, setScheduledTime] = useState("");
   const [repeatEndsAt, setRepeatEndsAt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [rewardNotice, setRewardNotice] = useState<RewardNotice | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
+  const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null);
 
   const loadTasks = useCallback(async (date: string) => {
     try {
+      setTasksLoading(true);
       const response = await api.get(`/tasks?date=${date}`);
       setTasks(response.data);
     } catch (error) {
       console.log("Load tasks error:", error);
       Alert.alert("Error", "Could not load tasks.");
+    } finally {
+      setTasksLoading(false);
     }
   }, []);
 
@@ -103,64 +147,86 @@ export default function TasksScreen() {
   async function createTask(
     customTitle?: string,
     customCategory?: TaskCategory,
+    useCurrentSchedule = true,
   ) {
     const finalTitle = customTitle ?? title;
     const finalCategory = customCategory ?? selectedCategory;
+    const finalRepeatType = useCurrentSchedule ? repeatType : "NONE";
+    const finalScheduledTime = useCurrentSchedule ? scheduledTime : "";
+    const finalRepeatEndsAt = useCurrentSchedule ? repeatEndsAt : "";
+    const errors: FieldErrors = {};
 
     if (!finalTitle.trim()) {
-      Alert.alert("Missing title", "Please enter a task name.");
-      return;
+      errors.title = "Name the quest before adding it.";
     }
 
-    const normalizedScheduledTime = normalizeScheduledTime(scheduledTime);
+    const normalizedScheduledTime = normalizeScheduledTime(finalScheduledTime);
 
-    if (scheduledTime.trim() && !normalizedScheduledTime) {
-      Alert.alert(
-        "Invalid time",
-        "Use a time like 10:00 PM, 10 PM, or 22:00.",
-      );
-      return;
+    if (finalScheduledTime.trim() && !normalizedScheduledTime) {
+      errors.scheduledTime = "Use 10:00 PM, 10 PM, or 22:00.";
     }
 
-    if (repeatType !== "NONE" && repeatEndsAt && !isDateKey(repeatEndsAt)) {
-      Alert.alert("Invalid end date", "Use YYYY-MM-DD, like 2026-06-30.");
-      return;
+    if (
+      finalRepeatType !== "NONE" &&
+      finalRepeatEndsAt &&
+      !isDateKey(finalRepeatEndsAt)
+    ) {
+      errors.repeatEndsAt = "Use YYYY-MM-DD, like 2026-06-30.";
     }
 
-    if (repeatType !== "NONE" && !repeatEndsAt) {
-      Alert.alert(
-        "Missing end date",
-        "Choose when this repeating task should stop.",
-      );
-      return;
+    if (finalRepeatType !== "NONE" && !finalRepeatEndsAt) {
+      errors.repeatEndsAt = "Choose when this repeating quest should stop.";
     }
 
-    if (repeatType !== "NONE" && repeatEndsAt && repeatEndsAt < selectedDate) {
-      Alert.alert(
-        "Invalid end date",
-        "The repeat end date must be after the start date.",
-      );
+    if (
+      finalRepeatType !== "NONE" &&
+      finalRepeatEndsAt &&
+      finalRepeatEndsAt < selectedDate
+    ) {
+      errors.repeatEndsAt = "The repeat end date must be after the start date.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setShowCreateForm(true);
       return;
     }
 
     try {
       setLoading(true);
+      setFieldErrors({});
 
-      await api.post("/tasks", {
+      const response = await api.post<Task>("/tasks", {
         title: finalTitle,
         description: finalCategory,
         category: finalCategory,
         dueDate: selectedDate,
         scheduledTime: normalizedScheduledTime,
-        repeatType,
-        repeatEndsAt: repeatType === "NONE" ? null : repeatEndsAt || null,
+        repeatType: finalRepeatType,
+        repeatEndsAt:
+          finalRepeatType === "NONE" ? null : finalRepeatEndsAt || null,
       });
+
+      if (!response.data.completed) {
+        setTasks((current) => [
+          response.data,
+          ...current.filter((task) => task.id !== response.data.id),
+        ]);
+      }
 
       setTitle("");
       setScheduledTime("");
       setRepeatEndsAt("");
+      setRepeatType("NONE");
       setSelectedCategory("Personal Growth");
+      setShowCreateForm(false);
+      setRewardNotice({
+        message: `${finalTitle.trim()} added to ${formatShortDate(selectedDate)}.`,
+        buildingChanged: false,
+        cosmeticsUnlocked: false,
+      });
       await loadTasks(selectedDate);
+      triggerDashboardRefresh();
       await loadTaskCounts(
         getCalendarDays(selectedDate, calendarView).map((day) => day.date),
       );
@@ -172,38 +238,86 @@ export default function TasksScreen() {
     }
   }
 
-  async function completeTask(id: number) {
+  async function completeTask(task: Task) {
     try {
+      setCompletingTaskId(task.id);
       const response = await api.put<TaskReward>(
-        `/tasks/${id}/complete?date=${selectedDate}`,
+        `/tasks/${task.id}/complete?date=${selectedDate}`,
       );
       await loadTasks(selectedDate);
+      triggerDashboardRefresh();
       await loadTaskCounts(
         getCalendarDays(selectedDate, calendarView).map((day) => day.date),
       );
-      showTaskRewards(response.data);
+      setRewardNotice(formatTaskRewards(response.data, task));
     } catch (error) {
       console.log("Complete task error:", error);
       Alert.alert("Error", "Could not complete task.");
+    } finally {
+      setCompletingTaskId(null);
     }
   }
 
-  async function deleteTask(id: number) {
+  function deleteTask(task: Task) {
+    const isRepeating = task.repeatType !== "NONE";
+
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(
+        isRepeating
+          ? "Delete this repeating quest from future dates too?"
+          : "Delete this quest?",
+      );
+
+      if (confirmed) {
+        void performDeleteTask(task.id);
+      }
+      return;
+    }
+
+    Alert.alert(
+      isRepeating ? "Delete repeating quest?" : "Delete quest?",
+      isRepeating
+        ? "This removes the repeating quest from future dates too."
+        : "You can add it again later if you need it.",
+      [
+        { text: "Keep", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            void performDeleteTask(task.id);
+          },
+        },
+      ],
+    );
+  }
+
+  async function performDeleteTask(id: number) {
     try {
+      setDeletingTaskId(id);
       await api.delete(`/tasks/${id}`);
       await loadTasks(selectedDate);
       await loadTaskCounts(
         getCalendarDays(selectedDate, calendarView).map((day) => day.date),
       );
+      setRewardNotice({
+        message: "Quest deleted.",
+        buildingChanged: false,
+        cosmeticsUnlocked: false,
+      });
     } catch (error) {
       console.log("Delete task error:", error);
       Alert.alert("Error", "Could not delete task.");
+    } finally {
+      setDeletingTaskId(null);
     }
   }
 
   const categoryXP = getXPForCategory(selectedCategory);
   const calendarDays = getCalendarDays(selectedDate, calendarView);
-  const remainingTasks = tasks.filter((task) => !task.completed);
+  const completedTasks = tasks.filter((task) => task.completed).length;
+  const remainingTasks = tasks.length - completedTasks;
+  const selectedCategoryReward = TASK_CATEGORY_REWARDS[selectedCategory];
 
   return (
     <ScrollView
@@ -213,12 +327,217 @@ export default function TasksScreen() {
       bounces={false}
       overScrollMode="never"
     >
-      <Text style={styles.title}>Tasks</Text>
-      <Text style={styles.subtitle}>
-        Create tasks, earn XP, and build your streak.
-      </Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerActions}>
+          {selectedDate !== toDateKey(new Date()) && (
+            <Pressable
+              onPress={() => setSelectedDate(toDateKey(new Date()))}
+              style={styles.todayButton}
+            >
+              <Text style={styles.todayButtonText}>Today</Text>
+            </Pressable>
+          )}
 
-      <LifeCard>
+          <Pressable
+            onPress={() => setShowCreateForm((current) => !current)}
+            style={styles.addButton}
+          >
+            <MaterialCommunityIcons
+              name={showCreateForm ? "close" : "plus"}
+              color={colors.text}
+              size={24}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      {showCreateForm && (
+        <LifeCard compact style={styles.addQuestCard}>
+          <Text style={styles.cardTitle}>Add Quest</Text>
+          <Text style={styles.formSectionTitle}>1. Name the quest</Text>
+
+          <LifeInput
+            placeholder="Example: Finish homework"
+            value={title}
+            onChangeText={(value) => {
+              setTitle(value);
+              setFieldErrors((current) => ({ ...current, title: undefined }));
+            }}
+          />
+          {fieldErrors.title && (
+            <Text style={styles.errorText}>{fieldErrors.title}</Text>
+          )}
+
+          <Text style={styles.formSectionTitle}>2. Schedule it</Text>
+
+          <Text style={styles.label}>Repeat</Text>
+          <View style={styles.categoryContainer}>
+            {REPEAT_OPTIONS.map((repeat) => (
+              <Pressable
+                key={repeat.value}
+                onPress={() => setRepeatType(repeat.value)}
+                style={[
+                  styles.categoryChip,
+                  repeatType === repeat.value && styles.selectedChip,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.categoryText,
+                    repeatType === repeat.value && styles.selectedChipText,
+                  ]}
+                >
+                  {repeat.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Time</Text>
+          <View style={styles.categoryContainer}>
+            {QUICK_TIMES.map((time) => (
+              <Pressable
+                key={time.label}
+                onPress={() => {
+                  setScheduledTime(time.value);
+                  setFieldErrors((current) => ({
+                    ...current,
+                    scheduledTime: undefined,
+                  }));
+                }}
+                style={[
+                  styles.categoryChip,
+                  scheduledTime === time.value && styles.selectedChip,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.categoryText,
+                    scheduledTime === time.value && styles.selectedChipText,
+                  ]}
+                >
+                  {time.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <LifeInput
+            placeholder="Custom time, example: 10:00 PM"
+            value={scheduledTime}
+            onChangeText={(value) => {
+              setScheduledTime(value);
+              setFieldErrors((current) => ({
+                ...current,
+                scheduledTime: undefined,
+              }));
+            }}
+          />
+          {fieldErrors.scheduledTime && (
+            <Text style={styles.errorText}>{fieldErrors.scheduledTime}</Text>
+          )}
+
+          {repeatType !== "NONE" && (
+            <>
+              <Text style={styles.label}>Repeat Window</Text>
+
+              <View style={styles.repeatDatePanel}>
+                <View style={styles.repeatDateRow}>
+                  <Text style={styles.repeatDateLabel}>Starts</Text>
+                  <Text style={styles.repeatDateValue}>
+                    {formatShortDate(selectedDate)}
+                  </Text>
+                </View>
+
+                <View style={styles.categoryContainer}>
+                  {REPEAT_END_OPTIONS.map((option) => {
+                    const optionDate = shiftDateByDays(selectedDate, option.days);
+
+                    return (
+                      <Pressable
+                        key={option.label}
+                        onPress={() => {
+                          setRepeatEndsAt(optionDate);
+                          setFieldErrors((current) => ({
+                            ...current,
+                            repeatEndsAt: undefined,
+                          }));
+                        }}
+                        style={[
+                          styles.categoryChip,
+                          repeatEndsAt === optionDate && styles.selectedChip,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.categoryText,
+                            repeatEndsAt === optionDate &&
+                              styles.selectedChipText,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <LifeInput
+                  placeholder="Custom end date, example: 2026-06-30"
+                  value={repeatEndsAt}
+                  onChangeText={(value) => {
+                    setRepeatEndsAt(value);
+                    setFieldErrors((current) => ({
+                      ...current,
+                      repeatEndsAt: undefined,
+                    }));
+                  }}
+                />
+                {fieldErrors.repeatEndsAt && (
+                  <Text style={styles.errorText}>
+                    {fieldErrors.repeatEndsAt}
+                  </Text>
+                )}
+              </View>
+            </>
+          )}
+
+          <Text style={styles.formSectionTitle}>3. Pick the reward lane</Text>
+          <Text style={styles.label}>Suggested Category</Text>
+          <View style={styles.rewardGrid}>
+            {Object.keys(TASK_CATEGORIES).map((category) => (
+              <CategoryRewardChip
+                key={category}
+                category={category as TaskCategory}
+                selected={selectedCategory === category}
+                onPress={() => setSelectedCategory(category as TaskCategory)}
+              />
+            ))}
+          </View>
+
+          <View style={styles.xpPreview}>
+            <MaterialCommunityIcons
+              name={selectedCategoryReward.icon as IconName}
+              color={colors.accent}
+              size={22}
+            />
+            <View style={styles.xpPreviewText}>
+              <Text style={styles.xpPreviewTitle}>+{categoryXP} XP</Text>
+              <Text style={styles.xpPreviewMeta}>
+                Upgrades {selectedCategoryReward.building}
+              </Text>
+            </View>
+          </View>
+
+          <LifeButton
+            title={loading ? "Adding..." : "Add Quest"}
+            onPress={() => createTask()}
+            disabled={loading}
+          />
+        </LifeCard>
+      )}
+
+      <LifeCard compact style={styles.calendarCard}>
         <View style={styles.calendarHeader}>
           <Pressable
             onPress={() =>
@@ -226,12 +545,21 @@ export default function TasksScreen() {
             }
             style={styles.calendarNavButton}
           >
-            <Text style={styles.calendarNavText}>‹</Text>
+            <MaterialCommunityIcons
+              name="chevron-left"
+              color={colors.text}
+              size={24}
+            />
           </Pressable>
 
-          <Text style={styles.calendarTitle}>
-            {formatCalendarTitle(selectedDate)}
-          </Text>
+          <View style={styles.calendarHeading}>
+            <Text style={styles.calendarTitle}>
+              {formatCalendarTitle(selectedDate)}
+            </Text>
+            <Text style={styles.calendarSubtitle}>
+              {formatShortDate(selectedDate)} - {remainingTasks} open
+            </Text>
+          </View>
 
           <Pressable
             onPress={() =>
@@ -239,7 +567,11 @@ export default function TasksScreen() {
             }
             style={styles.calendarNavButton}
           >
-            <Text style={styles.calendarNavText}>›</Text>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              color={colors.text}
+              size={24}
+            />
           </Pressable>
         </View>
 
@@ -318,176 +650,243 @@ export default function TasksScreen() {
             );
           })}
         </View>
-        <Text style={styles.cardTitle}>Create New Task</Text>
+      </LifeCard>
 
-        <LifeInput
-          placeholder="Example: Finish homework"
-          value={title}
-          onChangeText={setTitle}
-        />
-
-        <Text style={styles.label}>Repeat</Text>
-
-        <View style={styles.categoryContainer}>
-          {(["NONE", "DAILY", "WEEKLY"] as RepeatType[]).map((repeat) => (
-            <Pressable
-              key={repeat}
-              onPress={() => setRepeatType(repeat)}
-              style={[
-                styles.categoryChip,
-                repeatType === repeat && styles.selectedChip,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.categoryText,
-                  repeatType === repeat && styles.selectedChipText,
-                ]}
-              >
-                {repeat}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={styles.label}>Time</Text>
-
-        <LifeInput
-          placeholder="Optional, example: 10:00 PM"
-          value={scheduledTime}
-          onChangeText={setScheduledTime}
-        />
-
-        {repeatType !== "NONE" && (
-          <>
-            <Text style={styles.label}>Repeat Dates</Text>
-
-            <View style={styles.repeatDatePanel}>
-              <View style={styles.repeatDateRow}>
-                <Text style={styles.repeatDateLabel}>Starts</Text>
-                <Text style={styles.repeatDateValue}>{selectedDate}</Text>
+      {rewardNotice && (
+        <View style={styles.rewardNotice}>
+          <MaterialCommunityIcons
+            name="progress-star"
+            color={colors.accent}
+            size={22}
+          />
+          <View style={styles.rewardNoticeBody}>
+            <Text style={styles.rewardNoticeText}>{rewardNotice.message}</Text>
+            {(rewardNotice.buildingChanged || rewardNotice.cosmeticsUnlocked) && (
+              <View style={styles.rewardNoticeActions}>
+                {rewardNotice.buildingChanged && (
+                  <Pressable
+                    onPress={() => router.push("/(tabs)/base")}
+                    style={styles.rewardNoticeButton}
+                  >
+                    <Text style={styles.rewardNoticeButtonText}>View Base</Text>
+                  </Pressable>
+                )}
+                {rewardNotice.cosmeticsUnlocked && (
+                  <Pressable
+                    onPress={() => router.push("/(tabs)/avatar")}
+                    style={styles.rewardNoticeButton}
+                  >
+                    <Text style={styles.rewardNoticeButtonText}>View Avatar</Text>
+                  </Pressable>
+                )}
               </View>
+            )}
+          </View>
+          <Pressable
+            onPress={() => setRewardNotice(null)}
+            style={styles.noticeCloseButton}
+          >
+            <MaterialCommunityIcons
+              name="close"
+              color={colors.mutedText}
+              size={18}
+            />
+          </Pressable>
+        </View>
+      )}
 
-              <LifeInput
-                placeholder="Ends on, example: 2026-06-30"
-                value={repeatEndsAt}
-                onChangeText={setRepeatEndsAt}
-              />
-            </View>
-          </>
-        )}
-
-        <Text style={styles.label}>Detected Category</Text>
-
-        <View style={styles.categoryContainer}>
-          {Object.keys(TASK_CATEGORIES).map((category) => (
-            <Pressable
-              key={category}
-              onPress={() => setSelectedCategory(category as TaskCategory)}
-              style={[
-                styles.categoryChip,
-                selectedCategory === category && styles.selectedChip,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.categoryText,
-                  selectedCategory === category && styles.selectedChipText,
-                ]}
-              >
-                {category}
-              </Text>
-            </Pressable>
-          ))}
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>
+            Quests for {formatShortDate(selectedDate)}
+          </Text>
+          <Text style={styles.sectionSubtitle}>
+            {completedTasks} done - {remainingTasks} open
+          </Text>
         </View>
 
-        <Text style={styles.xpPreview}>Reward: +{categoryXP} XP</Text>
-
-        <LifeButton
-          title={loading ? "Creating..." : "Create Task"}
-          onPress={() => createTask()}
-        />
-      </LifeCard>
-
-      <LifeCard>
-        <Text style={styles.cardTitle}>Premade Tasks</Text>
-
-        <View style={styles.premadeContainer}>
-          {PREMADE_TASKS.map((task) => (
-            <Pressable
-              key={task.title}
-              style={styles.premadeTask}
-              onPress={() => createTask(task.title, task.category)}
-            >
-              <Text style={styles.premadeTitle}>{task.title}</Text>
-              <Text style={styles.premadeMeta}>
-                {task.category} · +{getXPForCategory(task.category)} XP
-              </Text>
-              <Text style={styles.premadeScheduleMeta}>
-                {formatDraftSchedule(selectedDate, repeatType, repeatEndsAt)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </LifeCard>
-
-      <Text style={styles.sectionTitle}>Your Tasks</Text>
+        {tasksLoading && <ActivityIndicator color={colors.primary} />}
+      </View>
 
       <FlatList
-        data={remainingTasks}
+        data={tasks}
         keyExtractor={(item) => String(item.id)}
         scrollEnabled={false}
-        contentContainerStyle={{ gap: spacing.md }}
+        contentContainerStyle={styles.taskList}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>No tasks yet. Create one above.</Text>
+          <LifeCard style={styles.emptyCard}>
+            <MaterialCommunityIcons
+              name="clipboard-check-outline"
+              color={colors.accent}
+              size={34}
+            />
+            <Text style={styles.emptyTitle}>No quests planned.</Text>
+            <Text style={styles.emptyText}>
+              Add one task or pick a quick quest to start earning XP.
+            </Text>
+          </LifeCard>
         }
         renderItem={({ item }) => (
-          <LifeCard>
-            <View style={styles.taskHeader}>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[
-                    styles.taskTitle,
-                    item.completed && styles.completedText,
-                  ]}
-                >
-                  {item.title}
-                </Text>
-
-                <Text style={styles.taskMeta}>
-                  {item.category ?? item.description ?? "Task"} · +
-                  {item.xpValue} XP
-                </Text>
-
-                <Text style={styles.scheduleMeta}>
-                  {formatTaskSchedule(item)}
-                </Text>
-              </View>
-
-              {!item.completed && (
-                <LifeButton
-                  title="Complete"
-                  onPress={() => completeTask(item.id)}
-                />
-              )}
-            </View>
-
-            <Pressable onPress={() => deleteTask(item.id)}>
-              <Text style={styles.deleteText}>Delete</Text>
-            </Pressable>
-          </LifeCard>
+          <QuestCard
+            task={item}
+            completing={completingTaskId === item.id}
+            deleting={deletingTaskId === item.id}
+            onComplete={() => completeTask(item)}
+            onDelete={() => deleteTask(item)}
+          />
         )}
       />
+
+      <LifeCard compact>
+        <Text style={styles.cardTitle}>Quick Quests</Text>
+
+        <View style={styles.premadeContainer}>
+          {PREMADE_TASKS.map((task) => {
+            const reward = TASK_CATEGORY_REWARDS[task.category];
+
+            return (
+              <Pressable
+                key={task.title}
+                style={styles.premadeTask}
+                onPress={() => createTask(task.title, task.category, false)}
+              >
+                <View style={styles.premadeIcon}>
+                  <MaterialCommunityIcons
+                    name={reward.icon as IconName}
+                    color={colors.accent}
+                    size={20}
+                  />
+                </View>
+
+                <View style={styles.premadeInfo}>
+                  <Text style={styles.premadeTitle}>{task.title}</Text>
+                  <Text style={styles.premadeMeta}>
+                    {task.category} - +{getXPForCategory(task.category)} XP
+                  </Text>
+                  <Text style={styles.premadeScheduleMeta}>
+                    Adds to {formatShortDate(selectedDate)} without repeat
+                    settings
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      </LifeCard>
     </ScrollView>
   );
 }
 
-function showTaskRewards(reward: TaskReward) {
-  const messages: string[] = [];
+function CategoryRewardChip({
+  category,
+  selected,
+  onPress,
+}: {
+  category: TaskCategory;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const reward = TASK_CATEGORY_REWARDS[category];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.rewardChip, selected && styles.selectedRewardChip]}
+    >
+      <MaterialCommunityIcons
+        name={reward.icon as IconName}
+        color={selected ? colors.text : colors.accent}
+        size={20}
+      />
+      <View style={styles.rewardChipText}>
+        <Text
+          style={[styles.rewardChipTitle, selected && styles.selectedChipText]}
+        >
+          {category}
+        </Text>
+        <Text
+          style={[styles.rewardChipMeta, selected && styles.selectedChipText]}
+        >
+          +{getXPForCategory(category)} XP - {reward.building}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function QuestCard({
+  task,
+  completing,
+  deleting,
+  onComplete,
+  onDelete,
+}: {
+  task: Task;
+  completing: boolean;
+  deleting: boolean;
+  onComplete: () => void;
+  onDelete: () => void;
+}) {
+  const category = normalizeCategory(task.category ?? task.description);
+  const reward = category ? TASK_CATEGORY_REWARDS[category] : null;
+
+  return (
+    <LifeCard compact style={[styles.questCard, task.completed && styles.completedCard]}>
+      <View style={styles.taskHeader}>
+        <View style={styles.questStatus}>
+          <MaterialCommunityIcons
+            name={task.completed ? "check-circle" : "circle-outline"}
+            color={task.completed ? colors.accent : colors.mutedText}
+            size={26}
+          />
+        </View>
+
+        <View style={styles.taskInfo}>
+          <Text style={[styles.taskTitle, task.completed && styles.completedText]}>
+            {task.title}
+          </Text>
+
+          <Text style={styles.taskMeta}>
+            {category ?? "Quest"} - +{task.xpValue} XP
+            {reward ? ` - ${reward.building}` : ""}
+          </Text>
+
+          <Text style={styles.scheduleMeta}>{formatTaskSchedule(task)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.taskActionRow}>
+        {!task.completed && (
+          <LifeButton
+            title={completing ? "..." : "Done"}
+            onPress={onComplete}
+            disabled={completing || deleting}
+          />
+        )}
+
+        <Pressable
+          onPress={onDelete}
+          disabled={deleting}
+          style={styles.deleteButton}
+        >
+          <MaterialCommunityIcons
+            name="trash-can-outline"
+            color={colors.danger}
+            size={18}
+          />
+          <Text style={styles.deleteText}>{deleting ? "Deleting..." : "Delete"}</Text>
+        </Pressable>
+      </View>
+    </LifeCard>
+  );
+}
+
+function formatTaskRewards(reward: TaskReward, task: Task): RewardNotice {
+  const messages = [`${task.title} complete. +${task.xpValue} XP earned.`];
 
   if (reward.buildingProgress) {
     messages.push(
-      `${reward.buildingProgress.type} gained progress and is now level ${reward.buildingProgress.level}.`,
+      `${reward.buildingProgress.type} reached level ${reward.buildingProgress.level}.`,
     );
   }
 
@@ -499,9 +898,21 @@ function showTaskRewards(reward: TaskReward) {
     messages.push(`Unlocked: ${reward.unlockedCosmetics.join(", ")}.`);
   }
 
-  if (messages.length > 0) {
-    Alert.alert("Progress Earned", messages.join("\n\n"));
+  return {
+    message: messages.join(" "),
+    buildingChanged: Boolean(reward.buildingProgress),
+    cosmeticsUnlocked: Boolean(reward.unlockedCosmetics?.length),
+  };
+}
+
+function normalizeCategory(value?: string): TaskCategory | null {
+  if (!value) {
+    return null;
   }
+
+  return Object.keys(TASK_CATEGORIES).includes(value)
+    ? (value as TaskCategory)
+    : null;
 }
 
 function toDateKey(date: Date) {
@@ -572,10 +983,23 @@ function shiftCalendarDate(
   return toDateKey(date);
 }
 
+function shiftDateByDays(dateKey: string, days: number) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
 function formatCalendarTitle(selectedDate: string) {
   return new Date(`${selectedDate}T00:00:00`).toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
+  });
+}
+
+function formatShortDate(dateKey: string) {
+  return new Date(`${dateKey}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
   });
 }
 
@@ -636,25 +1060,11 @@ function isDateKey(value: string) {
   return toDateKey(new Date(`${value}T00:00:00`)) === value;
 }
 
-function formatDraftSchedule(
-  selectedDate: string,
-  repeatType: RepeatType,
-  repeatEndsAt: string,
-) {
-  if (repeatType === "NONE") {
-    return selectedDate;
-  }
-
-  return repeatEndsAt
-    ? `${repeatType.toLowerCase()} from ${selectedDate} to ${repeatEndsAt}`
-    : `${repeatType.toLowerCase()} from ${selectedDate}`;
-}
-
 function formatTaskSchedule(task: Task) {
   const details = [];
 
   if (task.dueDate) {
-    details.push(task.dueDate);
+    details.push(formatShortDate(task.dueDate));
   }
 
   if (task.scheduledTime) {
@@ -665,7 +1075,7 @@ function formatTaskSchedule(task: Task) {
     details.push(task.repeatType.toLowerCase());
   }
 
-  return details.length > 0 ? details.join(" · ") : "Unscheduled";
+  return details.length > 0 ? details.join(" - ") : "Unscheduled";
 }
 
 const styles = StyleSheet.create({
@@ -680,30 +1090,71 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
 
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+
+  headerText: {
+    flex: 1,
+  },
+
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+
+  todayButton: {
+    backgroundColor: colors.cardLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+
+  todayButtonText: {
+    color: colors.text,
+    fontWeight: "600",
+  },
+
   title: {
     color: colors.text,
-    fontSize: 36,
-    fontWeight: "900",
+    fontSize: 30,
+    fontWeight: "700",
   },
 
   subtitle: {
     color: colors.mutedText,
     fontSize: 16,
-    marginTop: -spacing.md,
+    marginTop: 2,
+    lineHeight: 22,
   },
 
-  cardTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: spacing.md,
+  addButton: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  calendarCard: {
+    gap: spacing.md,
   },
 
   calendarHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: spacing.md,
+    flexWrap: "wrap",
+    gap: spacing.md,
   },
 
   calendarNavButton: {
@@ -717,17 +1168,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  calendarNavText: {
-    color: colors.text,
-    fontSize: 28,
-    fontWeight: "900",
-    lineHeight: 30,
+  calendarHeading: {
+    flex: 1,
+    minWidth: 150,
+    alignItems: "center",
   },
 
   calendarTitle: {
     color: colors.text,
     fontSize: 18,
-    fontWeight: "900",
+    fontWeight: "700",
+  },
+
+  calendarSubtitle: {
+    color: colors.mutedText,
+    fontSize: 13,
+    fontWeight: "500",
+    marginTop: 2,
   },
 
   viewToggle: {
@@ -737,7 +1194,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: 4,
-    marginBottom: spacing.lg,
   },
 
   viewToggleButton: {
@@ -754,7 +1210,7 @@ const styles = StyleSheet.create({
 
   viewToggleText: {
     color: colors.mutedText,
-    fontWeight: "800",
+    fontWeight: "600",
     textTransform: "capitalize",
   },
 
@@ -765,14 +1221,13 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginBottom: spacing.lg,
   },
 
   weekdayLabel: {
     width: "14.285%",
     color: colors.mutedText,
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: "600",
     textAlign: "center",
     marginBottom: spacing.sm,
   },
@@ -801,7 +1256,7 @@ const styles = StyleSheet.create({
   calendarDayText: {
     color: colors.text,
     fontSize: 16,
-    fontWeight: "900",
+    fontWeight: "600",
   },
 
   outsideMonthText: {
@@ -816,7 +1271,7 @@ const styles = StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.primaryDark,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 5,
@@ -828,13 +1283,165 @@ const styles = StyleSheet.create({
   },
 
   taskNotifierText: {
-    color: colors.background,
+    color: colors.text,
     fontSize: 10,
-    fontWeight: "900",
+    fontWeight: "600",
   },
 
   selectedTaskNotifierText: {
     color: colors.primary,
+  },
+
+  rewardNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.cardLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+
+  rewardNoticeText: {
+    color: colors.text,
+    fontWeight: "500",
+    lineHeight: 20,
+  },
+
+  rewardNoticeBody: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+
+  rewardNoticeActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+
+  rewardNoticeButton: {
+    backgroundColor: colors.card,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+
+  rewardNoticeButtonText: {
+    color: colors.text,
+    fontWeight: "600",
+  },
+
+  noticeCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+
+  sectionTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+
+  sectionSubtitle: {
+    color: colors.mutedText,
+    fontSize: 14,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+
+  taskList: {
+    gap: spacing.md,
+  },
+
+  emptyCard: {
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+
+  emptyText: {
+    color: colors.mutedText,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+
+  cardTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: spacing.md,
+  },
+
+  addQuestCard: {
+    gap: spacing.xs,
+  },
+
+  formSectionTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+
+  label: {
+    color: colors.mutedText,
+    fontSize: 14,
+    fontWeight: "500",
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+
+  errorText: {
+    color: colors.danger,
+    fontWeight: "600",
+    marginTop: spacing.xs,
+  },
+
+  categoryContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  categoryChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: colors.cardLight,
+  },
+
+  selectedChip: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+
+  categoryText: {
+    color: colors.mutedText,
+    fontWeight: "500",
+  },
+
+  selectedChipText: {
+    color: colors.text,
   },
 
   repeatDatePanel: {
@@ -854,56 +1461,76 @@ const styles = StyleSheet.create({
 
   repeatDateLabel: {
     color: colors.mutedText,
-    fontWeight: "800",
+    fontWeight: "600",
   },
 
   repeatDateValue: {
     color: colors.text,
-    fontWeight: "900",
+    fontWeight: "600",
   },
 
-  label: {
-    color: colors.mutedText,
-    fontSize: 14,
-    fontWeight: "700",
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-
-  categoryContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  rewardGrid: {
     gap: spacing.sm,
   },
 
-  categoryChip: {
+  rewardChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    padding: spacing.md,
     backgroundColor: colors.cardLight,
   },
 
-  selectedChip: {
+  selectedRewardChip: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
 
-  categoryText: {
-    color: colors.mutedText,
+  rewardChipText: {
+    flex: 1,
+  },
+
+  rewardChipTitle: {
+    color: colors.text,
     fontWeight: "700",
   },
 
-  selectedChipText: {
-    color: colors.text,
+  rewardChipMeta: {
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
   },
 
   xpPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.cardLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginVertical: spacing.md,
+  },
+
+  xpPreviewText: {
+    flex: 1,
+  },
+
+  xpPreviewTitle: {
     color: colors.accent,
     fontSize: 18,
-    fontWeight: "900",
-    marginVertical: spacing.md,
+    fontWeight: "700",
+  },
+
+  xpPreviewMeta: {
+    color: colors.mutedText,
+    fontWeight: "500",
+    marginTop: 2,
   },
 
   premadeContainer: {
@@ -911,6 +1538,9 @@ const styles = StyleSheet.create({
   },
 
   premadeTask: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
     backgroundColor: colors.cardLight,
     borderRadius: radius.md,
     padding: spacing.md,
@@ -918,46 +1548,66 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
 
+  premadeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  premadeInfo: {
+    flex: 1,
+  },
+
   premadeTitle: {
     color: colors.text,
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
   },
 
   premadeMeta: {
     color: colors.accent,
     marginTop: 4,
-    fontWeight: "700",
+    fontWeight: "600",
   },
 
   premadeScheduleMeta: {
     color: colors.mutedText,
     marginTop: 4,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "500",
   },
 
-  sectionTitle: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: "900",
+  questCard: {
+    gap: spacing.md,
   },
 
-  emptyText: {
-    color: colors.mutedText,
-    textAlign: "center",
-    marginTop: spacing.lg,
+  completedCard: {
+    opacity: 0.72,
   },
 
   taskHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.md,
+  },
+
+  questStatus: {
+    width: 32,
+    alignItems: "center",
+  },
+
+  taskInfo: {
+    flex: 1,
+    minWidth: 0,
   },
 
   taskTitle: {
     color: colors.text,
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "700",
   },
 
   completedText: {
@@ -968,18 +1618,35 @@ const styles = StyleSheet.create({
   taskMeta: {
     color: colors.accent,
     marginTop: 4,
-    fontWeight: "700",
+    fontWeight: "600",
   },
 
   scheduleMeta: {
     color: colors.mutedText,
     marginTop: 4,
-    fontWeight: "700",
+    fontWeight: "500",
+  },
+
+  deleteButton: {
+    minHeight: 44,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+
+  taskActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    paddingLeft: 32 + spacing.md,
   },
 
   deleteText: {
     color: colors.danger,
-    marginTop: spacing.md,
-    fontWeight: "700",
+    fontWeight: "600",
   },
 });

@@ -22,6 +22,92 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
         migrateTaskCompletions();
         migrateUserBuildings();
         migrateUserCosmetics();
+        migrateUsers();
+        migrateAvatars();
+        migrateGameSystems();
+    }
+
+    private void migrateUsers() {
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_streak integer");
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak integer");
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_task_completed_date date");
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS coins integer");
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_active boolean");
+        jdbcTemplate.execute("UPDATE users SET current_streak = 0 WHERE current_streak IS NULL");
+        jdbcTemplate.execute("UPDATE users SET longest_streak = 0 WHERE longest_streak IS NULL");
+        jdbcTemplate.execute("UPDATE users SET coins = 0 WHERE coins IS NULL");
+        jdbcTemplate.execute("UPDATE users SET premium_active = false WHERE premium_active IS NULL");
+        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN current_streak SET DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN longest_streak SET DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN coins SET DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN premium_active SET DEFAULT false");
+        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN current_streak SET NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN longest_streak SET NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN coins SET NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN premium_active SET NOT NULL");
+    }
+
+    private void migrateAvatars() {
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS body_type varchar(255)");
+        jdbcTemplate.execute("UPDATE avatars SET body_type = 'BOY' WHERE body_type IS NULL");
+    }
+
+    private void migrateGameSystems() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS user_weekly_quest_claims (
+                    id bigserial PRIMARY KEY,
+                    user_id bigint NOT NULL REFERENCES users(id),
+                    quest_key varchar(255) NOT NULL,
+                    week_start date NOT NULL,
+                    CONSTRAINT uk_weekly_quest_claim UNIQUE (user_id, quest_key, week_start)
+                )
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS user_achievement_claims (
+                    id bigserial PRIMARY KEY,
+                    user_id bigint NOT NULL REFERENCES users(id),
+                    achievement_key varchar(255) NOT NULL,
+                    claimed_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uk_achievement_claim UNIQUE (user_id, achievement_key)
+                )
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS user_building_interiors (
+                    id bigserial PRIMARY KEY,
+                    user_id bigint NOT NULL REFERENCES users(id),
+                    building_type varchar(255) NOT NULL,
+                    wall_style varchar(255),
+                    floor_style varchar(255),
+                    center_item varchar(255),
+                    left_item varchar(255),
+                    right_item varchar(255),
+                    CONSTRAINT uk_building_interiors_user_type UNIQUE (user_id, building_type)
+                )
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS friendships (
+                    id bigserial PRIMARY KEY,
+                    requester_id bigint NOT NULL REFERENCES users(id),
+                    receiver_id bigint NOT NULL REFERENCES users(id),
+                    status varchar(255) NOT NULL,
+                    created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uk_friendships_pair UNIQUE (requester_id, receiver_id)
+                )
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id bigserial PRIMARY KEY,
+                    sender_id bigint NOT NULL REFERENCES users(id),
+                    recipient_id bigint REFERENCES users(id),
+                    realm varchar(255) NOT NULL DEFAULT 'town-square',
+                    body varchar(500) NOT NULL,
+                    created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
     }
 
     private void migrateTasks() {
@@ -29,12 +115,15 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
         jdbcTemplate.execute("UPDATE tasks SET archived = false WHERE archived IS NULL");
         jdbcTemplate.execute("ALTER TABLE tasks ALTER COLUMN archived SET DEFAULT false");
         jdbcTemplate.execute("ALTER TABLE tasks ALTER COLUMN archived SET NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_category_check");
+        normalizeTaskCategoryLabels("tasks");
     }
 
     private void migrateTaskCompletions() {
         jdbcTemplate.execute("ALTER TABLE task_completions ADD COLUMN IF NOT EXISTS awarded_xp integer");
         jdbcTemplate.execute("ALTER TABLE task_completions ADD COLUMN IF NOT EXISTS category varchar(255)");
         jdbcTemplate.execute("ALTER TABLE task_completions ADD COLUMN IF NOT EXISTS building_type varchar(255)");
+        jdbcTemplate.execute("ALTER TABLE task_completions DROP CONSTRAINT IF EXISTS task_completions_category_check");
 
         jdbcTemplate.execute("""
                 UPDATE task_completions completion
@@ -42,10 +131,15 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
                     category = task.category,
                     building_type = CASE task.category
                         WHEN 'Cleaning' THEN 'HOME_BASE'
+                        WHEN 'CLEANING' THEN 'HOME_BASE'
                         WHEN 'Work' THEN 'WORKSHOP'
+                        WHEN 'WORK' THEN 'WORKSHOP'
                         WHEN 'School' THEN 'LIBRARY'
+                        WHEN 'SCHOOL' THEN 'LIBRARY'
                         WHEN 'Fitness' THEN 'TRAINING_GROUNDS'
+                        WHEN 'FITNESS' THEN 'TRAINING_GROUNDS'
                         WHEN 'Health' THEN 'GARDEN'
+                        WHEN 'HEALTH' THEN 'GARDEN'
                         ELSE 'HALL_OF_ACHIEVEMENTS'
                     END
                 FROM tasks task
@@ -57,9 +151,33 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
                   )
                 """);
 
+        normalizeTaskCategoryLabels("task_completions");
         jdbcTemplate.execute("UPDATE task_completions SET awarded_xp = 0 WHERE awarded_xp IS NULL");
         jdbcTemplate.execute("ALTER TABLE task_completions ALTER COLUMN awarded_xp SET DEFAULT 0");
         jdbcTemplate.execute("ALTER TABLE task_completions ALTER COLUMN awarded_xp SET NOT NULL");
+    }
+
+    private void normalizeTaskCategoryLabels(String tableName) {
+        jdbcTemplate.execute("""
+                UPDATE %s
+                SET category = CASE category
+                    WHEN 'School' THEN 'SCHOOL'
+                    WHEN 'Fitness' THEN 'FITNESS'
+                    WHEN 'Cleaning' THEN 'CLEANING'
+                    WHEN 'Work' THEN 'WORK'
+                    WHEN 'Health' THEN 'HEALTH'
+                    WHEN 'Personal Growth' THEN 'PERSONAL_GROWTH'
+                    ELSE category
+                END
+                WHERE category IN (
+                    'School',
+                    'Fitness',
+                    'Cleaning',
+                    'Work',
+                    'Health',
+                    'Personal Growth'
+                )
+                """.formatted(tableName));
     }
 
     private void migrateUserBuildings() {

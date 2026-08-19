@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useFocusEffect } from "expo-router";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { api } from "../../src/api/client";
 import { useAuth } from "../../src/context/AuthContext";
@@ -9,6 +10,7 @@ import LifeButton from "../../src/components/LifeButton";
 import XPBar from "../../src/components/XPBar";
 import AvatarRenderer from "../../src/components/AvatarRenderer";
 import { colors, spacing } from "../../src/theme/theme";
+import { Achievement, WeeklyQuest } from "../../src/types";
 
 type Avatar = {
   equippedHatId: number | null;
@@ -16,11 +18,15 @@ type Avatar = {
   equippedBackgroundId: number | null;
   equippedPetId: number | null;
   equippedAuraId: number | null;
+  bodyType?: "BOY" | "GIRL";
 };
 
 export default function DashboardScreen() {
   const { user, refreshUser } = useAuth();
   const [avatar, setAvatar] = useState<Avatar | null>(null);
+  const [weeklyQuest, setWeeklyQuest] = useState<WeeklyQuest | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [questBusy, setQuestBusy] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -34,6 +40,10 @@ export default function DashboardScreen() {
 
           const res = await api.get<Avatar>("/avatar");
           setAvatar(res.data);
+          const questRes = await api.get<WeeklyQuest>("/weekly-quests/current");
+          setWeeklyQuest(questRes.data);
+          const achievementRes = await api.get<Achievement[]>("/achievements");
+          setAchievements(achievementRes.data);
         } catch (error) {
           console.log("Dashboard load error:", error);
         }
@@ -52,6 +62,46 @@ export default function DashboardScreen() {
     1,
   );
 
+  async function reloadQuestAndAchievements() {
+    await refreshUser();
+    const [questRes, achievementRes] = await Promise.all([
+      api.get<WeeklyQuest>("/weekly-quests/current"),
+      api.get<Achievement[]>("/achievements"),
+    ]);
+    setWeeklyQuest(questRes.data);
+    setAchievements(achievementRes.data);
+  }
+
+  async function handleQuestAction() {
+    if (!weeklyQuest || questBusy) {
+      return;
+    }
+
+    try {
+      setQuestBusy(true);
+
+      if (weeklyQuest.completed && !weeklyQuest.claimed) {
+        await api.post("/weekly-quests/current/claim");
+      } else if (!weeklyQuest.completed) {
+        const today = new Date().toISOString().slice(0, 10);
+        const taskRes = await api.post<{ id: number }>("/tasks", {
+          title: weeklyQuest.taskTitle,
+          description: weeklyQuest.category,
+          category: weeklyQuest.category,
+          dueDate: today,
+          repeatType: "NONE",
+        });
+        await api.put(`/tasks/${taskRes.data.id}/complete?date=${today}`);
+      }
+
+      await reloadQuestAndAchievements();
+    } catch (error) {
+      console.log("Quest action error:", error);
+    } finally {
+      setQuestBusy(false);
+    }
+  }
+
   return (
     <ScrollView
       style={styles.container}
@@ -60,11 +110,6 @@ export default function DashboardScreen() {
       bounces={false}
       overScrollMode="never"
     >
-      <Text style={styles.title}>Dashboard</Text>
-      <Text style={styles.subtitle}>
-        Welcome back, {user?.username ?? "Hero"}.
-      </Text>
-
       <LifeCard style={styles.heroCard}>
         <AvatarRenderer
           hatId={avatar?.equippedHatId}
@@ -72,6 +117,8 @@ export default function DashboardScreen() {
           backgroundId={avatar?.equippedBackgroundId}
           petId={avatar?.equippedPetId}
           auraId={avatar?.equippedAuraId}
+          bodyType={avatar?.bodyType}
+          size="compact"
         />
 
         <Text style={styles.level}>Level {level}</Text>
@@ -83,28 +130,95 @@ export default function DashboardScreen() {
       </LifeCard>
 
       <View style={styles.statsGrid}>
-        <LifeCard style={styles.statCard}>
-          <Text style={styles.statValue}>🔥</Text>
+        <LifeCard compact style={styles.statCard}>
+          <View style={styles.statIcon}>
+            <MaterialCommunityIcons name="fire" color={colors.primary} size={26} />
+          </View>
           <Text style={styles.statLabel}>Streak</Text>
-          <Text style={styles.statSubtext}>Coming soon</Text>
+          <Text style={styles.statSubtext}>
+            {user?.currentStreak ?? 0} day{(user?.currentStreak ?? 0) === 1 ? "" : "s"}
+          </Text>
         </LifeCard>
 
-        <LifeCard style={styles.statCard}>
-          <Text style={styles.statValue}>⚔️</Text>
+        <LifeCard compact style={styles.statCard}>
+          <View style={styles.statIcon}>
+            <MaterialCommunityIcons
+              name="shield-star"
+              color={colors.accent}
+              size={26}
+            />
+          </View>
           <Text style={styles.statLabel}>Rank</Text>
-          <Text style={styles.statSubtext}>Adventurer</Text>
+          <Text style={styles.statSubtext}>{user?.coins ?? 0} coins</Text>
         </LifeCard>
       </View>
 
       <LifeCard>
-        <Text style={styles.cardTitle}>Today’s Goal</Text>
-        <Text style={styles.cardText}>
-          Complete at least one task today to keep leveling up.
+        <Text style={styles.cardTitle}>
+          {weeklyQuest?.title ?? "Weekly Quest"}
         </Text>
+        <Text style={styles.cardText}>
+          {weeklyQuest?.storyText ??
+            "Complete quests this week to keep your town prepared."}
+        </Text>
+        {weeklyQuest && (
+          <>
+            <Text style={styles.questTask}>{weeklyQuest.taskTitle}</Text>
+            <View style={styles.xpBarWrapper}>
+              <XPBar
+                progress={Math.min(
+                  weeklyQuest.progress / weeklyQuest.requiredCompletions,
+                  1,
+                )}
+              />
+            </View>
+            <Text style={styles.statSubtext}>
+              {weeklyQuest.progress}/{weeklyQuest.requiredCompletions} complete -
+              {" "}+{weeklyQuest.xpReward} XP / +{weeklyQuest.coinReward} coins
+            </Text>
+          </>
+        )}
 
         <View style={styles.buttonSpacing}>
-          <LifeButton title="Refresh Stats" onPress={refreshUser} />
+          <LifeButton
+            title={
+              questBusy
+                ? "Working..."
+                : weeklyQuest?.claimed
+                ? "Reward Claimed"
+                : weeklyQuest?.completed
+                  ? "Claim Weekly Reward"
+                  : "Complete Quest"
+            }
+            onPress={handleQuestAction}
+            disabled={weeklyQuest?.claimed || questBusy || !weeklyQuest}
+          />
         </View>
+      </LifeCard>
+
+      <LifeCard compact>
+        <Text style={styles.cardTitle}>Achievements</Text>
+        {achievements.slice(0, 3).map((achievement) => (
+          <View key={achievement.key} style={styles.achievementRow}>
+            <View style={styles.achievementCopy}>
+              <Text style={styles.achievementTitle}>{achievement.title}</Text>
+              <Text style={styles.statSubtext}>
+                {achievement.progress}/{achievement.target} - {achievement.coinReward} coins
+              </Text>
+            </View>
+            <LifeButton
+              title={achievement.claimed ? "Claimed" : achievement.completed ? "Claim" : "Locked"}
+              variant="secondary"
+              disabled={!achievement.completed || achievement.claimed}
+              onPress={async () => {
+                await api.post(`/achievements/${achievement.key}/claim`);
+                await refreshUser();
+                const achievementRes = await api.get<Achievement[]>("/achievements");
+                setAchievements(achievementRes.data);
+              }}
+            />
+          </View>
+        ))}
       </LifeCard>
     </ScrollView>
   );
@@ -124,14 +238,14 @@ const styles = StyleSheet.create({
 
   title: {
     color: colors.text,
-    fontSize: 36,
-    fontWeight: "900",
+    fontSize: 30,
+    fontWeight: "700",
   },
 
   subtitle: {
     color: colors.mutedText,
     fontSize: 16,
-    marginTop: -spacing.md,
+    marginTop: 2,
   },
 
   heroCard: {
@@ -140,15 +254,15 @@ const styles = StyleSheet.create({
 
   level: {
     color: colors.text,
-    fontSize: 26,
-    fontWeight: "900",
+    fontSize: 24,
+    fontWeight: "700",
     marginTop: spacing.md,
   },
 
   xpText: {
     color: colors.accent,
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
     marginTop: 4,
   },
 
@@ -167,15 +281,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  statValue: {
-    fontSize: 32,
+  statIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: colors.cardLight,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: spacing.sm,
   },
 
   statLabel: {
     color: colors.text,
-    fontSize: 18,
-    fontWeight: "900",
+    fontSize: 17,
+    fontWeight: "700",
   },
 
   statSubtext: {
@@ -185,8 +304,8 @@ const styles = StyleSheet.create({
 
   cardTitle: {
     color: colors.text,
-    fontSize: 20,
-    fontWeight: "900",
+    fontSize: 18,
+    fontWeight: "700",
     marginBottom: spacing.sm,
   },
 
@@ -194,6 +313,30 @@ const styles = StyleSheet.create({
     color: colors.mutedText,
     fontSize: 16,
     lineHeight: 24,
+  },
+
+  questTask: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: spacing.md,
+  },
+
+  achievementRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+
+  achievementCopy: {
+    flex: 1,
+  },
+
+  achievementTitle: {
+    color: colors.text,
+    fontWeight: "700",
   },
 
   buttonSpacing: {

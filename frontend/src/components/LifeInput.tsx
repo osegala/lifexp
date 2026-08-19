@@ -13,7 +13,7 @@ export default function LifeInput(props: TextInputProps) {
 
 const styles = StyleSheet.create({
   input: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardLight,
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,

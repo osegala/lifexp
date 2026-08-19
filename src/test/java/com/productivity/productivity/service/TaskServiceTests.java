@@ -22,14 +22,12 @@ class TaskServiceTests {
         TaskRepository taskRepository = mock(TaskRepository.class);
         TaskCompletionRepository completionRepository = mock(TaskCompletionRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
-        AvatarService avatarService = mock(AvatarService.class);
         BuildingService buildingService = mock(BuildingService.class);
         CurrentUserService currentUserService = mock(CurrentUserService.class);
         TaskService service = new TaskService(
                 taskRepository,
                 completionRepository,
                 userRepository,
-                avatarService,
                 buildingService,
                 currentUserService
         );
@@ -51,6 +49,6 @@ class TaskServiceTests {
                 () -> service.markTaskAsCompletedForCurrentUser(9L, LocalDate.of(2026, 6, 2))
         );
 
-        verifyNoInteractions(completionRepository, avatarService, buildingService);
+        verifyNoInteractions(completionRepository, buildingService);
     }
 }

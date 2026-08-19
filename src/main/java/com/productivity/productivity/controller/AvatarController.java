@@ -3,6 +3,7 @@ package com.productivity.productivity.controller;
 import com.productivity.productivity.dto.AvatarResponse;
 import com.productivity.productivity.dto.CosmeticResponse;
 import com.productivity.productivity.dto.EquipCosmeticRequest;
+import com.productivity.productivity.dto.SetAvatarBodyTypeRequest;
 import com.productivity.productivity.service.AvatarService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -32,5 +33,10 @@ public class AvatarController {
     @PutMapping("/equip")
     public AvatarResponse equipCosmetic(@Valid @RequestBody EquipCosmeticRequest request) {
         return avatarService.equipCosmeticForCurrentUser(request.getCosmeticId());
+    }
+
+    @PutMapping("/body-type")
+    public AvatarResponse setBodyType(@Valid @RequestBody SetAvatarBodyTypeRequest request) {
+        return avatarService.setBodyTypeForCurrentUser(request.getBodyType());
     }
 }

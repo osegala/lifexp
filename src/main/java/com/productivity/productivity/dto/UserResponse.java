@@ -10,9 +10,26 @@ public class UserResponse {
     private int level;
     private int xpToNextLevel;
     private int progressPercent;
+    private int currentStreak;
+    private int longestStreak;
+    private int coins;
+    private boolean premiumActive;
     private List<TaskResponse> tasks;
 
-    public UserResponse(Long id, String username, String email, int totalXp, int level, int xpToNextLevel, int progressPercent, List<TaskResponse> tasks) {
+    public UserResponse(
+            Long id,
+            String username,
+            String email,
+            int totalXp,
+            int level,
+            int xpToNextLevel,
+            int progressPercent,
+            int currentStreak,
+            int longestStreak,
+            int coins,
+            boolean premiumActive,
+            List<TaskResponse> tasks
+    ) {
         this.id = id;
         this.username = username;
         this.email = email;
@@ -20,6 +37,10 @@ public class UserResponse {
         this.level = level;
         this.xpToNextLevel = xpToNextLevel;
         this.progressPercent = progressPercent;
+        this.currentStreak = currentStreak;
+        this.longestStreak = longestStreak;
+        this.coins = coins;
+        this.premiumActive = premiumActive;
         this.tasks = tasks;
     }
 
@@ -30,5 +51,9 @@ public class UserResponse {
     public int getLevel() { return level; }
     public int getXpToNextLevel() { return xpToNextLevel; }
     public int getProgressPercent() { return progressPercent; }
+    public int getCurrentStreak() { return currentStreak; }
+    public int getLongestStreak() { return longestStreak; }
+    public int getCoins() { return coins; }
+    public boolean isPremiumActive() { return premiumActive; }
     public List<TaskResponse> getTasks() { return tasks; }
 }

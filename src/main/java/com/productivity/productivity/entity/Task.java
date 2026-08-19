@@ -38,6 +38,7 @@ public class Task {
 
     private LocalDate repeatEndsAt;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TaskCategory category = TaskCategory.PERSONAL_GROWTH;
 

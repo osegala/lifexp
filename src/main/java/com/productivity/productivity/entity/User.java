@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +31,20 @@ public class User {
 
     @Column(nullable = false)
     private int level = 1;
+
+    @Column(nullable = false)
+    private int currentStreak = 0;
+
+    @Column(nullable = false)
+    private int longestStreak = 0;
+
+    private LocalDate lastTaskCompletedDate;
+
+    @Column(nullable = false)
+    private int coins = 0;
+
+    @Column(nullable = false)
+    private boolean premiumActive = false;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
         @JsonManagedReference
@@ -90,6 +105,46 @@ public class User {
 
     public void setLevel(int level) {
         this.level = level;
+    }
+
+    public int getCurrentStreak() {
+        return currentStreak;
+    }
+
+    public void setCurrentStreak(int currentStreak) {
+        this.currentStreak = currentStreak;
+    }
+
+    public int getLongestStreak() {
+        return longestStreak;
+    }
+
+    public void setLongestStreak(int longestStreak) {
+        this.longestStreak = longestStreak;
+    }
+
+    public LocalDate getLastTaskCompletedDate() {
+        return lastTaskCompletedDate;
+    }
+
+    public void setLastTaskCompletedDate(LocalDate lastTaskCompletedDate) {
+        this.lastTaskCompletedDate = lastTaskCompletedDate;
+    }
+
+    public int getCoins() {
+        return coins;
+    }
+
+    public void setCoins(int coins) {
+        this.coins = coins;
+    }
+
+    public boolean isPremiumActive() {
+        return premiumActive;
+    }
+
+    public void setPremiumActive(boolean premiumActive) {
+        this.premiumActive = premiumActive;
     }
 
     public List<Task> getTasks() {

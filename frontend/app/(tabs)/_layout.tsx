@@ -75,6 +75,24 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="shop"
+        options={{
+          title: "Shop",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="storefront" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="social"
+        options={{
+          title: "Social",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="account-group" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",

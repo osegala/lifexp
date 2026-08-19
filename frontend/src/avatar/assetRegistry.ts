@@ -20,12 +20,19 @@ export const BASE_BODY_LAYERS: Record<string, ImageSourcePropType> = {
   hairFront: require("../../assets/avatar/base-layers/hair-front.png"),
 };
 
+export const FULL_BODY_IMAGES: Record<"GIRL", ImageSourcePropType> = {
+  GIRL: require("../../assets/avatar/base/full/girl.png"),
+};
+
 export const BACKGROUND_IMAGES: Record<number, ImageSourcePropType> = {
   4: require("../../assets/avatar/backgrounds/forest-transparent.png"),
+  11: require("../../assets/avatar/backgrounds/moonlit-forest.png"),
 };
 
 export const HAT_IMAGES: Record<number, ImageSourcePropType> = {
   1: require("../../assets/avatar/hats/starter-transparent.png"),
+  7: require("../../assets/avatar/hats/knight-helm.png"),
+  8: require("../../assets/avatar/hats/ranger-hood.png"),
 };
 
 export const HAT_LAYER_IMAGES: Record<number, ImageSourcePropType> = {
@@ -45,6 +52,12 @@ export const OUTFIT_LAYER_IMAGES: Record<
     belt: require("../../assets/avatar/outfit-layers/starter/belt.png"),
     accessories: require("../../assets/avatar/outfit-layers/starter/accessories.png"),
   },
+  9: {
+    outfit: require("../../assets/avatar/outfit-layers/royal-armor/outfit.png"),
+  },
+  10: {
+    outfit: require("../../assets/avatar/outfit-layers/village-cloak/outfit.png"),
+  },
 };
 
 export const PET_BEHIND_IMAGES: Record<number, ImageSourcePropType> = {};
@@ -55,6 +68,7 @@ export const PET_FRONT_IMAGES: Record<number, ImageSourcePropType> = {
 
 export const AURA_IMAGES: Record<number, ImageSourcePropType> = {
   6: require("../../assets/avatar/auras/starter.png"),
+  12: require("../../assets/avatar/auras/phoenix-aura.png"),
 };
 
 export const ACCESSORY_IMAGES: Record<number, ImageSourcePropType> = {};

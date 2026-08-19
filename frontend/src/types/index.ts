@@ -6,6 +6,10 @@ export type User = {
   level: number;
   xpToNextLevel: number;
   progressPercent: number;
+  currentStreak: number;
+  longestStreak: number;
+  coins: number;
+  premiumActive: boolean;
 };
 
 export type AuthResponse = {
@@ -27,6 +31,7 @@ export type Task = {
 export type Avatar = {
   id: number;
   baseStyle: string;
+  bodyType: "BOY" | "GIRL";
   equippedHatId: number | null;
   equippedOutfitId: number | null;
   equippedBackgroundId: number | null;
@@ -42,4 +47,65 @@ export type Cosmetic = {
   imageUrl: string;
   unlocked: boolean;
   equipped: boolean;
+};
+
+export type WeeklyQuest = {
+  key: string;
+  title: string;
+  storyText: string;
+  taskTitle: string;
+  category: string;
+  requiredCompletions: number;
+  progress: number;
+  xpReward: number;
+  coinReward: number;
+  startsAt: string;
+  endsAt: string;
+  completed: boolean;
+  claimed: boolean;
+};
+
+export type Achievement = {
+  key: string;
+  title: string;
+  description: string;
+  progress: number;
+  target: number;
+  coinReward: number;
+  cosmeticReward: string;
+  completed: boolean;
+  claimed: boolean;
+};
+
+export type ShopItem = {
+  key: string;
+  cosmeticId: number;
+  name: string;
+  type: string;
+  priceCoins: number;
+  premiumOnly: boolean;
+  owned: boolean;
+};
+
+export type SocialUser = {
+  id: number;
+  username: string;
+  level: number;
+  currentStreak: number;
+};
+
+export type Friendship = {
+  id: number;
+  user: SocialUser;
+  status: "PENDING" | "ACCEPTED" | "BLOCKED";
+  incoming: boolean;
+};
+
+export type ChatMessage = {
+  id: number;
+  sender: SocialUser;
+  recipientId?: number | null;
+  realm: string;
+  body: string;
+  createdAt: string;
 };

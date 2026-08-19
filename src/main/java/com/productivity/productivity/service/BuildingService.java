@@ -90,7 +90,7 @@ public class BuildingService {
                 xpIntoLevel,
                 nextLevelStart - building.getTotalXp(),
                 progressPercent,
-                visualTierForLevel(level)
+                BuildingTierPolicy.visualTierForLevel(level)
         );
     }
 
@@ -108,7 +108,4 @@ public class BuildingService {
         return (int) (40 * Math.pow(level - 1, 1.8));
     }
 
-    private int visualTierForLevel(int level) {
-        return Math.min(5, 1 + ((level - 1) / 5));
-    }
 }

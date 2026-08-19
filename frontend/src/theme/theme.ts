@@ -1,14 +1,14 @@
 export const colors = {
-  background: "#0F172A",
-  card: "#1E293B",
-  cardLight: "#334155",
-  primary: "#8B5CF6",
-  primaryDark: "#6D28D9",
-  accent: "#22C55E",
-  text: "#F8FAFC",
-  mutedText: "#CBD5E1",
-  danger: "#EF4444",
-  border: "#475569",
+  background: "#111713",
+  card: "#1A211C",
+  cardLight: "#242E26",
+  primary: "#9B8352",
+  primaryDark: "#6F5E3E",
+  accent: "#8DAA78",
+  text: "#F2EFE6",
+  mutedText: "#B8B3A6",
+  danger: "#D46F63",
+  border: "#364036",
 };
 
 export const spacing = {
@@ -20,16 +20,16 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 8,
-  md: 14,
-  lg: 22,
+  sm: 6,
+  md: 8,
+  lg: 8,
   pill: 999,
 };
 
 export const shadow = {
   shadowColor: "#000",
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.25,
-  shadowRadius: 8,
-  elevation: 6,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.14,
+  shadowRadius: 4,
+  elevation: 2,
 };

@@ -4,6 +4,7 @@ import {
   AURA_IMAGES,
   BACKGROUND_IMAGES,
   BASE_BODY_LAYERS,
+  FULL_BODY_IMAGES,
   HAT_IMAGES,
   HAT_LAYER_IMAGES,
   OUTFIT_LAYER_IMAGES,
@@ -14,6 +15,7 @@ import {
 import { colors } from "../theme/theme";
 
 type Props = {
+  bodyType?: "BOY" | "GIRL";
   hatId?: number | null;
   outfitId?: number | null;
   backgroundId?: number | null;
@@ -21,9 +23,11 @@ type Props = {
   auraId?: number | null;
   accessoryId?: number | null;
   particleId?: number | null;
+  size?: "compact" | "regular";
 };
 
 export default function AvatarRenderer({
+  bodyType = "BOY",
   hatId,
   outfitId,
   backgroundId,
@@ -31,6 +35,7 @@ export default function AvatarRenderer({
   auraId,
   accessoryId,
   particleId,
+  size = "regular",
 }: Props) {
   const backgroundImage = backgroundId
     ? BACKGROUND_IMAGES[backgroundId]
@@ -46,9 +51,10 @@ export default function AvatarRenderer({
     : undefined;
   const particleImage = particleId ? PARTICLE_IMAGES[particleId] : undefined;
   const hasBoots = Boolean(outfitLayers?.boots);
+  const fullBodyImage = bodyType === "GIRL" ? FULL_BODY_IMAGES.GIRL : undefined;
 
   return (
-    <View style={styles.stage}>
+    <View style={[styles.stage, size === "compact" && styles.compactStage]}>
       {backgroundImage ? (
         <Image source={backgroundImage} style={styles.backgroundImage} />
       ) : (
@@ -71,13 +77,19 @@ export default function AvatarRenderer({
         {outfitLayers?.capeBack && (
           <AvatarLayer source={outfitLayers.capeBack} />
         )}
-        <AvatarLayer source={BASE_BODY_LAYERS.hairBack} />
 
-        <AvatarLayer source={BASE_BODY_LAYERS.torso} />
-        <AvatarLayer source={BASE_BODY_LAYERS.arms} />
-        <AvatarLayer source={BASE_BODY_LAYERS.legs} />
-        {!hasBoots && <AvatarLayer source={BASE_BODY_LAYERS.feet} />}
-        <AvatarLayer source={BASE_BODY_LAYERS.head} />
+        {fullBodyImage ? (
+          <AvatarLayer source={fullBodyImage} />
+        ) : (
+          <>
+            <AvatarLayer source={BASE_BODY_LAYERS.hairBack} />
+            <AvatarLayer source={BASE_BODY_LAYERS.torso} />
+            <AvatarLayer source={BASE_BODY_LAYERS.arms} />
+            <AvatarLayer source={BASE_BODY_LAYERS.legs} />
+            {!hasBoots && <AvatarLayer source={BASE_BODY_LAYERS.feet} />}
+            <AvatarLayer source={BASE_BODY_LAYERS.head} />
+          </>
+        )}
 
         {outfitLayers?.outfit && <AvatarLayer source={outfitLayers.outfit} />}
         {outfitLayers?.boots && <AvatarLayer source={outfitLayers.boots} />}
@@ -87,9 +99,11 @@ export default function AvatarRenderer({
           <AvatarLayer source={outfitLayers.capeFront} />
         )}
 
-        {!outfitLayers && <FallbackOutfit outfitId={outfitId} />}
+        {!outfitLayers && (
+          <FallbackOutfit outfitId={outfitId} bodyType={bodyType} />
+        )}
 
-        <AvatarLayer source={BASE_BODY_LAYERS.hairFront} />
+        {!fullBodyImage && <AvatarLayer source={BASE_BODY_LAYERS.hairFront} />}
 
         {hatImage ? (
           <Image source={hatImage} style={styles.hatImage} />
@@ -127,7 +141,13 @@ function AvatarLayer({ source }: { source: ImageSourcePropType }) {
   return <Image source={source} style={styles.avatarLayer} />;
 }
 
-function FallbackOutfit({ outfitId }: { outfitId?: number | null }) {
+function FallbackOutfit({
+  outfitId,
+  bodyType,
+}: {
+  outfitId?: number | null;
+  bodyType: "BOY" | "GIRL";
+}) {
   if (!outfitId) {
     return null;
   }
@@ -142,6 +162,7 @@ function FallbackOutfit({ outfitId }: { outfitId?: number | null }) {
       <View
         style={[
           styles.fallbackBody,
+          bodyType === "GIRL" && styles.girlFallbackBody,
           outfitId === 3 && styles.scholarRobe,
           outfitId === 4 && styles.goldOutfit,
         ]}
@@ -172,6 +193,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+    maxWidth: "100%",
+  },
+
+  compactStage: {
+    transform: [{ scale: 0.84 }],
+    marginVertical: -28,
   },
 
   backgroundLayer: {
@@ -179,10 +206,10 @@ const styles = StyleSheet.create({
     width: 235,
     height: 290,
     borderRadius: 38,
-    backgroundColor: "#1E3A8A",
-    opacity: 0.35,
-    borderWidth: 2,
-    borderColor: "#38BDF8",
+    backgroundColor: colors.cardLight,
+    opacity: 0.42,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
   backgroundImage: {
@@ -198,9 +225,9 @@ const styles = StyleSheet.create({
     width: 210,
     height: 260,
     borderRadius: 999,
-    backgroundColor: "#FACC15",
-    opacity: 0.16,
-    shadowColor: "#FACC15",
+    backgroundColor: colors.primary,
+    opacity: 0.1,
+    shadowColor: colors.primary,
     shadowOpacity: 1,
     shadowRadius: 28,
   },
@@ -228,7 +255,7 @@ const styles = StyleSheet.create({
     width: 112,
     height: 22,
     borderRadius: 999,
-    backgroundColor: "#020617",
+    backgroundColor: "#070B08",
     opacity: 0.24,
   },
 
@@ -254,37 +281,42 @@ const styles = StyleSheet.create({
     bottom: 72,
     width: 128,
     height: 112,
-    backgroundColor: "#475569",
+    backgroundColor: colors.cardLight,
     borderRadius: 30,
     borderWidth: 5,
-    borderColor: "#64748B",
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 4,
   },
 
+  girlFallbackBody: {
+    width: 118,
+    borderRadius: 34,
+  },
+
   scholarRobe: {
-    backgroundColor: "#6D28D9",
-    borderColor: "#C4B5FD",
+    backgroundColor: colors.primaryDark,
+    borderColor: colors.primary,
   },
 
   goldOutfit: {
-    backgroundColor: "#FACC15",
-    borderColor: "#FEF08A",
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryDark,
   },
 
   robeGem: {
     width: 24,
     height: 24,
     borderRadius: 999,
-    backgroundColor: "#C4B5FD",
+    backgroundColor: colors.primary,
   },
 
   goldGem: {
     width: 24,
     height: 24,
     borderRadius: 999,
-    backgroundColor: "#22C55E",
+    backgroundColor: colors.accent,
   },
 
   fallbackLegs: {
@@ -298,7 +330,7 @@ const styles = StyleSheet.create({
   fallbackLeg: {
     width: 34,
     height: 58,
-    backgroundColor: "#334155",
+    backgroundColor: colors.cardLight,
     borderRadius: 16,
   },
 
@@ -311,7 +343,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     zIndex: 8,
     borderWidth: 3,
-    borderColor: "#C4B5FD",
+    borderColor: colors.primary,
   },
 
   headband: {
@@ -319,7 +351,7 @@ const styles = StyleSheet.create({
     top: 70,
     width: 114,
     height: 16,
-    backgroundColor: "#22C55E",
+    backgroundColor: colors.accent,
     borderRadius: 999,
     zIndex: 8,
   },
@@ -331,9 +363,9 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#1E293B",
+    backgroundColor: colors.card,
     borderWidth: 2,
-    borderColor: "#8B5CF6",
+    borderColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },

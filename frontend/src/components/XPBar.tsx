@@ -20,15 +20,15 @@ export default function XPBar({ progress }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    height: 18,
+    height: 10,
     backgroundColor: colors.cardLight,
-    borderRadius: radius.pill,
+    borderRadius: radius.sm,
     overflow: "hidden",
   },
 
   fill: {
     height: "100%",
     backgroundColor: colors.primary,
-    borderRadius: radius.pill,
+    borderRadius: radius.sm,
   },
 });

@@ -15,6 +15,42 @@ export const TASK_CATEGORIES: Record<TaskCategory, number> = {
   "Personal Growth": 45,
 };
 
+export const TASK_CATEGORY_REWARDS: Record<
+  TaskCategory,
+  { building: string; icon: string; cue: string }
+> = {
+  School: {
+    building: "Library",
+    icon: "bookshelf",
+    cue: "Builds study progress",
+  },
+  Fitness: {
+    building: "Training Grounds",
+    icon: "dumbbell",
+    cue: "Builds fitness progress",
+  },
+  Cleaning: {
+    building: "Home Base",
+    icon: "home-variant",
+    cue: "Builds home progress",
+  },
+  Work: {
+    building: "Workshop",
+    icon: "hammer-wrench",
+    cue: "Builds focus progress",
+  },
+  Health: {
+    building: "Garden",
+    icon: "flower",
+    cue: "Builds care progress",
+  },
+  "Personal Growth": {
+    building: "Hall of Achievements",
+    icon: "trophy",
+    cue: "Builds growth progress",
+  },
+};
+
 export const PREMADE_TASKS = [
   { title: "Study for 30 minutes", category: "School" },
   { title: "Complete homework", category: "School" },

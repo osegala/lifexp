@@ -1,6 +1,7 @@
 export type Avatar = {
   id: number;
   baseStyle: string;
+  bodyType: "BOY" | "GIRL";
   equippedHatId: number | null;
   equippedOutfitId: number | null;
   equippedBackgroundId: number | null;

@@ -1,9 +1,18 @@
 import { View, StyleSheet, ViewProps } from "react-native";
 import { colors, radius, spacing, shadow } from "../theme/theme";
 
-export default function LifeCard({ children, style, ...props }: ViewProps) {
+type Props = ViewProps & {
+  compact?: boolean;
+};
+
+export default function LifeCard({
+  children,
+  compact = false,
+  style,
+  ...props
+}: Props) {
   return (
-    <View style={[styles.card, style]} {...props}>
+    <View style={[styles.card, compact && styles.compact, style]} {...props}>
       {children}
     </View>
   );
@@ -17,5 +26,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     ...shadow,
+  },
+  compact: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
   },
 });

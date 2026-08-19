@@ -65,7 +65,6 @@ public class UserService {
         User savedUser = userRepository.save(user);
 
         avatarService.createDefaultAvatar(savedUser);
-        avatarService.unlockCosmeticsForUser(savedUser);
         buildingService.createDefaultBuildings(savedUser);
 
         String token = jwtService.generateToken(savedUser.getEmail());
@@ -146,6 +145,10 @@ public class UserService {
                 user.getLevel(),
                 xpToNextLevel(user.getTotalXp(), user.getLevel()),
                 calculatedProgressPercent(user.getTotalXp(), user.getLevel()),
+                user.getCurrentStreak(),
+                user.getLongestStreak(),
+                user.getCoins(),
+                user.isPremiumActive(),
                 taskResponses
         );
     }

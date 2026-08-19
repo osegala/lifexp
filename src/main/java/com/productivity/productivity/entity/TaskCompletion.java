@@ -27,6 +27,7 @@ public class TaskCompletion {
 
     private int awardedXp;
 
+    @Enumerated(EnumType.STRING)
     private TaskCategory category;
 
     @Enumerated(EnumType.STRING)

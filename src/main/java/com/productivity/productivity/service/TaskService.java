@@ -39,7 +39,6 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final TaskCompletionRepository taskCompletionRepository;
     private final UserRepository userRepository;
-    private final AvatarService avatarService;
     private final BuildingService buildingService;
     private final CurrentUserService currentUserService;
 
@@ -47,14 +46,12 @@ public class TaskService {
             TaskRepository taskRepository,
             TaskCompletionRepository taskCompletionRepository,
             UserRepository userRepository,
-            AvatarService avatarService,
             BuildingService buildingService,
             CurrentUserService currentUserService
     ) {
         this.taskRepository = taskRepository;
         this.taskCompletionRepository = taskCompletionRepository;
         this.userRepository = userRepository;
-        this.avatarService = avatarService;
         this.buildingService = buildingService;
         this.currentUserService = currentUserService;
     }
@@ -141,17 +138,17 @@ public class TaskService {
 
             int previousLevel = user.getLevel();
             user.setTotalXp(user.getTotalXp() + task.getXpValue());
+            user.setCoins(user.getCoins() + Math.max(5, task.getXpValue() / 5));
+            updateStreak(user, effectiveCompletionDate);
 
             int newLevel = calculateLevel(user.getTotalXp());
             user.setLevel(newLevel);
 
             User savedUser = userRepository.save(user);
-            List<String> unlockedCosmetics = avatarService.unlockCosmeticsForUserWithResult(savedUser);
             BuildingProgressResponse buildingProgress =
                     buildingService.awardTaskXp(savedUser, task.getCategory(), task.getXpValue());
 
             response = mapToTaskResponse(taskRepository.save(task), effectiveCompletionDate);
-            response.setUnlockedCosmetics(unlockedCosmetics);
             response.setBuildingProgress(buildingProgress);
             response.setLeveledUp(newLevel > previousLevel);
             return response;
@@ -230,6 +227,23 @@ public class TaskService {
 
     private int totalXpForLevel(int level) {
         return (int) (15 * Math.pow(level, 2.2));
+    }
+
+    private void updateStreak(User user, LocalDate completionDate) {
+        LocalDate lastCompleted = user.getLastTaskCompletedDate();
+
+        if (lastCompleted == null) {
+            user.setCurrentStreak(1);
+        } else if (lastCompleted.equals(completionDate)) {
+            return;
+        } else if (lastCompleted.plusDays(1).equals(completionDate)) {
+            user.setCurrentStreak(user.getCurrentStreak() + 1);
+        } else {
+            user.setCurrentStreak(1);
+        }
+
+        user.setLastTaskCompletedDate(completionDate);
+        user.setLongestStreak(Math.max(user.getLongestStreak(), user.getCurrentStreak()));
     }
 
     private LocalTime parseScheduledTime(String scheduledTime) {

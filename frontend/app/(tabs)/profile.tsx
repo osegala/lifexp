@@ -39,9 +39,6 @@ export default function ProfileScreen() {
       bounces={false}
       overScrollMode="never"
     >
-      <Text style={styles.title}>Profile</Text>
-      <Text style={styles.subtitle}>Your LifeXP account and progress.</Text>
-
       <LifeCard style={styles.profileCard}>
         <View style={styles.avatarCircle}>
           <Text style={styles.avatarInitial}>
@@ -104,14 +101,14 @@ const styles = StyleSheet.create({
 
   title: {
     color: colors.text,
-    fontSize: 36,
-    fontWeight: "900",
+    fontSize: 30,
+    fontWeight: "700",
   },
 
   subtitle: {
     color: colors.mutedText,
     fontSize: 16,
-    marginTop: -spacing.md,
+    marginTop: 2,
   },
 
   profileCard: {
@@ -122,7 +119,9 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.cardLight,
+    borderWidth: 1,
+    borderColor: colors.border,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: spacing.md,
@@ -130,14 +129,14 @@ const styles = StyleSheet.create({
 
   avatarInitial: {
     color: colors.text,
-    fontSize: 42,
-    fontWeight: "900",
+    fontSize: 36,
+    fontWeight: "700",
   },
 
   username: {
     color: colors.text,
-    fontSize: 26,
-    fontWeight: "900",
+    fontSize: 24,
+    fontWeight: "700",
   },
 
   email: {
@@ -148,13 +147,15 @@ const styles = StyleSheet.create({
 
   cardTitle: {
     color: colors.text,
-    fontSize: 20,
-    fontWeight: "900",
+    fontSize: 18,
+    fontWeight: "700",
     marginBottom: spacing.md,
   },
 
   statRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
     justifyContent: "space-between",
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
@@ -164,14 +165,14 @@ const styles = StyleSheet.create({
   statLabel: {
     color: colors.mutedText,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "500",
   },
 
   statValue: {
     color: colors.text,
     fontSize: 15,
-    fontWeight: "900",
-    maxWidth: "60%",
+    fontWeight: "600",
+    flex: 1,
     textAlign: "right",
   },
 

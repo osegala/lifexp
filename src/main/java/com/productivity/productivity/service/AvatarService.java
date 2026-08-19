@@ -9,7 +9,6 @@ import com.productivity.productivity.repository.CosmeticRepository;
 import com.productivity.productivity.repository.UserCosmeticRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -35,16 +34,12 @@ public class AvatarService {
         User user = currentUserService.getCurrentUser();
         Avatar avatar = getOrCreateAvatar(user);
 
-        unlockCosmeticsForUser(user);
-
         return mapToAvatarResponse(avatar);
     }
 
     public List<CosmeticResponse> getCosmeticsForCurrentUser() {
         User user = currentUserService.getCurrentUser();
         Avatar avatar = getOrCreateAvatar(user);
-
-        unlockCosmeticsForUser(user);
 
         return cosmeticRepository.findAll()
                 .stream()
@@ -63,8 +58,6 @@ public class AvatarService {
         User user = currentUserService.getCurrentUser();
         Avatar avatar = getOrCreateAvatar(user);
 
-        unlockCosmeticsForUser(user);
-
         Cosmetic cosmetic = cosmeticRepository.findById(cosmeticId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cosmetic with ID " + cosmeticId + " not found"));
 
@@ -82,6 +75,19 @@ public class AvatarService {
             case AURA -> avatar.setEquippedAuraId(cosmetic.getId());
         }
 
+        return mapToAvatarResponse(avatarRepository.save(avatar));
+    }
+
+    public AvatarResponse setBodyTypeForCurrentUser(String bodyType) {
+        User user = currentUserService.getCurrentUser();
+        Avatar avatar = getOrCreateAvatar(user);
+        String normalizedBodyType = bodyType == null ? "BOY" : bodyType.trim().toUpperCase();
+
+        if (!normalizedBodyType.equals("BOY") && !normalizedBodyType.equals("GIRL")) {
+            normalizedBodyType = "BOY";
+        }
+
+        avatar.setBodyType(normalizedBodyType);
         return mapToAvatarResponse(avatarRepository.save(avatar));
     }
 
@@ -105,41 +111,11 @@ public class AvatarService {
         };
     }
 
-    public void unlockCosmeticsForUser(User user) {
-        List<Cosmetic> eligibleCosmetics = cosmeticRepository.findByRequiredLevelLessThanEqual(user.getLevel());
-
-        for (Cosmetic cosmetic : eligibleCosmetics) {
-            boolean alreadyUnlocked = userCosmeticRepository.existsByUserIdAndCosmeticId(user.getId(),
-                    cosmetic.getId());
-
-            if (!alreadyUnlocked) {
-                userCosmeticRepository.save(new UserCosmetic(user, cosmetic));
-            }
-        }
-    }
-
-    public List<String> unlockCosmeticsForUserWithResult(User user) {
-        List<Cosmetic> eligibleCosmetics = cosmeticRepository.findByRequiredLevelLessThanEqual(user.getLevel());
-
-        List<String> unlockedNames = new ArrayList<>();
-
-        for (Cosmetic cosmetic : eligibleCosmetics) {
-            boolean alreadyUnlocked = userCosmeticRepository.existsByUserIdAndCosmeticId(user.getId(),
-                    cosmetic.getId());
-
-            if (!alreadyUnlocked) {
-                userCosmeticRepository.save(new UserCosmetic(user, cosmetic));
-                unlockedNames.add(cosmetic.getName());
-            }
-        }
-
-        return unlockedNames;
-    }
-
     private AvatarResponse mapToAvatarResponse(Avatar avatar) {
         return new AvatarResponse(
                 avatar.getId(),
                 avatar.getBaseStyle(),
+                avatar.getBodyType(),
                 avatar.getEquippedHatId(),
                 avatar.getEquippedOutfitId(),
                 avatar.getEquippedBackgroundId(),

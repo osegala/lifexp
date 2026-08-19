@@ -12,6 +12,8 @@ public class Avatar {
 
     private String baseStyle = "DEFAULT";
 
+    private String bodyType = "BOY";
+
     private Long equippedHatId;
     private Long equippedOutfitId;
     private Long equippedBackgroundId;
@@ -30,6 +32,7 @@ public class Avatar {
 
     public Long getId() { return id; }
     public String getBaseStyle() { return baseStyle; }
+    public String getBodyType() { return bodyType; }
     public Long getEquippedHatId() { return equippedHatId; }
     public Long getEquippedOutfitId() { return equippedOutfitId; }
     public Long getEquippedBackgroundId() { return equippedBackgroundId; }
@@ -38,6 +41,7 @@ public class Avatar {
     public User getUser() { return user; }
 
     public void setBaseStyle(String baseStyle) { this.baseStyle = baseStyle; }
+    public void setBodyType(String bodyType) { this.bodyType = bodyType; }
     public void setEquippedHatId(Long equippedHatId) { this.equippedHatId = equippedHatId; }
     public void setEquippedOutfitId(Long equippedOutfitId) { this.equippedOutfitId = equippedOutfitId; }
     public void setEquippedBackgroundId(Long equippedBackgroundId) { this.equippedBackgroundId = equippedBackgroundId; }
