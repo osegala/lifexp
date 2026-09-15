@@ -1,8 +1,14 @@
 package com.productivity.productivity.entity;
 
 public enum CosmeticType {
+    HAIR,
     HAT,
-    OUTFIT,
+    TOP,
+    BOTTOM,
+    BOOTS,
+    CAPE,
+    WEAPON,
+    SHIELD,
     BACKGROUND,
     PET,
     AURA

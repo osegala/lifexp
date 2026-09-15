@@ -7,8 +7,10 @@ import com.productivity.productivity.entity.TaskCategory;
 import com.productivity.productivity.entity.User;
 import com.productivity.productivity.entity.UserBuilding;
 import com.productivity.productivity.repository.UserBuildingRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -75,6 +77,26 @@ public class BuildingService {
         return mapToResponse(building);
     }
 
+    @Transactional
+    public BuildingProgressResponse upgradeBuildingForCurrentUser(BuildingType type) {
+        User user = currentUserService.getCurrentUser();
+        UserBuilding building = userBuildingRepository.findByUserIdAndBuildingTypeForUpdate(user.getId(), type)
+                .orElseGet(() -> userBuildingRepository.save(new UserBuilding(user, type)));
+        int currentTier = building.getVisualTier();
+        int eligibleTier = BuildingTierPolicy.visualTierForLevel(building.getLevel());
+
+        if (currentTier >= 5) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This building is already at its highest tier");
+        }
+
+        if (eligibleTier <= currentTier) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This building has not earned its next upgrade yet");
+        }
+
+        building.setVisualTier(currentTier + 1);
+        return mapToResponse(userBuildingRepository.save(building));
+    }
+
     private BuildingProgressResponse mapToResponse(UserBuilding building) {
         int level = building.getLevel();
         int currentLevelStart = totalXpForLevel(level);
@@ -82,6 +104,8 @@ public class BuildingService {
         int xpIntoLevel = building.getTotalXp() - currentLevelStart;
         int levelRange = nextLevelStart - currentLevelStart;
         int progressPercent = levelRange == 0 ? 100 : (int) ((xpIntoLevel * 100.0) / levelRange);
+        int visualTier = building.getVisualTier();
+        int eligibleVisualTier = BuildingTierPolicy.visualTierForLevel(level);
 
         return new BuildingProgressResponse(
                 building.getBuildingType(),
@@ -90,7 +114,9 @@ public class BuildingService {
                 xpIntoLevel,
                 nextLevelStart - building.getTotalXp(),
                 progressPercent,
-                BuildingTierPolicy.visualTierForLevel(level)
+                visualTier,
+                eligibleVisualTier,
+                eligibleVisualTier > visualTier
         );
     }
 

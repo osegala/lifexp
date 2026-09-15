@@ -27,6 +27,9 @@ public class UserBuilding {
     @Column(nullable = false)
     private int totalXp = 0;
 
+    @Column(nullable = false, columnDefinition = "integer default 1")
+    private int visualTier = 1;
+
     public UserBuilding() {
     }
 
@@ -40,9 +43,11 @@ public class UserBuilding {
     public BuildingType getBuildingType() { return buildingType; }
     public int getLevel() { return level; }
     public int getTotalXp() { return totalXp; }
+    public int getVisualTier() { return visualTier <= 0 ? 1 : visualTier; }
 
     public void setUser(User user) { this.user = user; }
     public void setBuildingType(BuildingType buildingType) { this.buildingType = buildingType; }
     public void setLevel(int level) { this.level = level; }
     public void setTotalXp(int totalXp) { this.totalXp = totalXp; }
+    public void setVisualTier(int visualTier) { this.visualTier = Math.max(1, Math.min(5, visualTier)); }
 }

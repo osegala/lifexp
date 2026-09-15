@@ -30,7 +30,7 @@ public class BuildingInteriorService {
         User user = currentUserService.getCurrentUser();
         UserBuilding building = userBuildingRepository.findByUserIdAndBuildingType(user.getId(), type)
                 .orElseGet(() -> userBuildingRepository.save(new UserBuilding(user, type)));
-        int visualTier = BuildingTierPolicy.visualTierForLevel(building.getLevel());
+        int visualTier = building.getVisualTier();
         boolean unlocked = visualTier >= 5;
         UserBuildingInterior interior = interiorRepository.findByUserIdAndBuildingType(user.getId(), type)
                 .orElseGet(() -> interiorRepository.save(new UserBuildingInterior(user, type)));
@@ -42,7 +42,7 @@ public class BuildingInteriorService {
         User user = currentUserService.getCurrentUser();
         UserBuilding building = userBuildingRepository.findByUserIdAndBuildingType(user.getId(), type)
                 .orElseGet(() -> userBuildingRepository.save(new UserBuilding(user, type)));
-        int visualTier = BuildingTierPolicy.visualTierForLevel(building.getLevel());
+        int visualTier = building.getVisualTier();
 
         if (visualTier < 5) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Building interiors unlock at tier 5");

@@ -72,6 +72,7 @@ public class ShopService {
                 cosmetic.getId(),
                 cosmetic.getName(),
                 cosmetic.getType(),
+                cosmetic.getImageUrl(),
                 price,
                 premiumOnly,
                 owned

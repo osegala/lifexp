@@ -1,4 +1,5 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { isAxiosError } from "axios";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -17,10 +18,10 @@ import { useAuth } from "../src/context/AuthContext";
 import { colors, radius, spacing } from "../src/theme/theme";
 
 const skyImage = require("../assets/base/backgrounds/sky.png");
-const baseImage = require("../assets/base/buildings/home-base/tier-1.png");
+const baseImage = require("../assets/base/buildings/home-base/home-base-level-1.png");
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { login, sessionNotice } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,8 +39,10 @@ export default function LoginScreen() {
       setError("");
       await login(email.trim(), password);
       router.replace("/(tabs)/dashboard");
-    } catch {
-      setError("Login failed. Check your email and password.");
+    } catch (error) {
+      setError(isAxiosError(error) && (!error.response || error.response.status >= 500)
+        ? "Can't connect to LifeXP right now. Please try again."
+        : "Login failed. Check your email and password.");
     } finally {
       setLoading(false);
     }
@@ -99,7 +102,8 @@ export default function LoginScreen() {
           textContentType="password"
         />
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        {!!sessionNotice && !error && <Text accessibilityRole="alert" style={styles.sessionNotice}>{sessionNotice}</Text>}
+        {!!error && <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text>}
 
         <View style={styles.actions}>
           <LifeButton
@@ -182,6 +186,12 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.danger,
     fontWeight: "600",
+    marginTop: spacing.md,
+  },
+  sessionNotice: {
+    color: colors.mutedText,
+    fontSize: 15,
+    lineHeight: 22,
     marginTop: spacing.md,
   },
   actions: {

@@ -1,88 +1,132 @@
-import { useCallback, useState } from "react";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
 
 import { api } from "../../src/api/client";
-import { getCosmeticPreviewSource } from "../../src/avatar/assetRegistry";
+import { getCosmeticPreviewCrop, getCosmeticPreviewSource, getEquippedSceneSource } from "../../src/avatar/assetRegistry";
+import CosmeticImage from "../../src/components/CosmeticImage";
 import AvatarRenderer from "../../src/components/AvatarRenderer";
-import LifeButton from "../../src/components/LifeButton";
 import LifeCard from "../../src/components/LifeCard";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme/theme";
-import { Avatar, Cosmetic } from "../../src/types/avatar";
+import { Avatar, Cosmetic, CosmeticType } from "../../src/types/avatar";
 
-type CosmeticGroupTitle = "Hats" | "Outfits" | "Backgrounds" | "Pets" | "Auras";
+type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+
+type WardrobeSection = {
+  title: string;
+  type: CosmeticType;
+  icon: IconName;
+};
+
+const WARDROBE_SECTIONS: WardrobeSection[] = [
+  { title: "Hair", type: "HAIR", icon: "face-man-shimmer" },
+  { title: "Hats", type: "HAT", icon: "wizard-hat" },
+  { title: "Tops & Dresses", type: "TOP", icon: "tshirt-crew" },
+  { title: "Bottoms", type: "BOTTOM", icon: "human-male" },
+  { title: "Boots", type: "BOOTS", icon: "shoe-formal" },
+  { title: "Scenes", type: "BACKGROUND", icon: "image" },
+  { title: "Pets", type: "PET", icon: "paw" },
+  { title: "Auras", type: "AURA", icon: "star-four-points" },
+];
 
 export default function AvatarScreen() {
   const { user } = useAuth();
+  const { width } = useWindowDimensions();
+  const stackedHero = width < 760;
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [cosmetics, setCosmetics] = useState<Cosmetic[]>([]);
+  const [loading, setLoading] = useState(true);
   const [loadingId, setLoadingId] = useState<number | null>(null);
-  const [selectedSection, setSelectedSection] =
-    useState<CosmeticGroupTitle>("Hats");
+  const [selectedType, setSelectedType] = useState<CosmeticType>("HAIR");
 
-  useFocusEffect(
-    useCallback(() => {
-      loadAvatarData();
-    }, []),
-  );
-
-  async function loadAvatarData() {
+  const loadAvatarData = useCallback(async () => {
     try {
-      const avatarRes = await api.get<Avatar>("/avatar");
-      const cosmeticsRes = await api.get<Cosmetic[]>("/avatar/cosmetics");
+      setLoading(true);
+      const [avatarRes, cosmeticsRes] = await Promise.all([
+        api.get<Avatar>("/avatar"),
+        api.get<Cosmetic[]>("/avatar/cosmetics"),
+      ]);
 
       setAvatar(avatarRes.data);
       setCosmetics(cosmeticsRes.data);
     } catch (error) {
       console.log("Avatar load error:", error);
-      Alert.alert("Error", "Could not load avatar.");
+      Alert.alert("Character", "Could not load your wardrobe.");
+    } finally {
+      setLoading(false);
     }
-  }
+  }, []);
 
-  async function equipCosmetic(cosmeticId: number) {
+  useFocusEffect(
+    useCallback(() => {
+      loadAvatarData();
+    }, [loadAvatarData]),
+  );
+
+  async function toggleCosmetic(cosmetic: Cosmetic) {
+    if (!cosmetic.unlocked) {
+      return;
+    }
+
     try {
-      setLoadingId(cosmeticId);
+      setLoadingId(cosmetic.id);
+      const response = await api.put<Avatar>(
+        cosmetic.equipped ? "/avatar/unequip" : "/avatar/equip",
+        {
+          cosmeticId: cosmetic.id,
+        },
+      );
 
-      await api.put("/avatar/equip", {
-        cosmeticId,
-      });
-
-      await loadAvatarData();
+      setAvatar(response.data);
+      setCosmetics((current) =>
+        current.map((candidate) => ({
+          ...candidate,
+          equipped: isEquipped(response.data, candidate),
+        })),
+      );
     } catch (error) {
       console.log("Equip error:", error);
-      Alert.alert("Error", "Could not equip cosmetic.");
+      Alert.alert("Character", "Could not equip that item.");
     } finally {
       setLoadingId(null);
     }
   }
 
-  const hats = cosmetics.filter((c) => c.type === "HAT");
-  const outfits = cosmetics.filter((c) => c.type === "OUTFIT");
-  const backgrounds = cosmetics.filter((c) => c.type === "BACKGROUND");
-  const pets = cosmetics.filter((c) => c.type === "PET");
-  const auras = cosmetics.filter((c) => c.type === "AURA");
-  const currentLevel = user?.level ?? 1;
-  const nextUnlock = cosmetics
-    .filter((cosmetic) => !cosmetic.unlocked)
-    .sort((a, b) => a.requiredLevel - b.requiredLevel)[0];
-  const sections: { title: CosmeticGroupTitle; cosmetics: Cosmetic[] }[] = [
-    { title: "Hats", cosmetics: hats },
-    { title: "Outfits", cosmetics: outfits },
-    { title: "Backgrounds", cosmetics: backgrounds },
-    { title: "Pets", cosmetics: pets },
-    { title: "Auras", cosmetics: auras },
-  ];
   const activeSection =
-    sections.find((section) => section.title === selectedSection) ?? sections[0];
+    WARDROBE_SECTIONS.find((section) => section.type === selectedType) ??
+    WARDROBE_SECTIONS[0];
+  const activeCosmetics = useMemo(
+    () => cosmetics.filter((cosmetic) => cosmetic.type === selectedType),
+    [cosmetics, selectedType],
+  );
+  const equippedCosmetics = cosmetics.filter((cosmetic) => cosmetic.equipped);
+  const backgroundImage = getEquippedSceneSource(cosmetics, avatar?.equippedBackgroundId, "BACKGROUND");
+  const mobileGridWidth = width - spacing.lg * 2;
+  const cardWidth = width >= 900 ? 210 : width >= 620 ? 190
+    : mobileGridWidth >= 300 + spacing.md
+      ? (mobileGridWidth - spacing.md) / 2
+      : mobileGridWidth;
+
+  if (loading && !avatar) {
+    return (
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={styles.loadingText}>Opening your wardrobe…</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -92,107 +136,174 @@ export default function AvatarScreen() {
       bounces={false}
       overScrollMode="never"
     >
-      <LifeCard style={styles.avatarCard}>
-        <AvatarRenderer
-          hatId={avatar?.equippedHatId}
-          outfitId={avatar?.equippedOutfitId}
-          backgroundId={avatar?.equippedBackgroundId}
-          petId={avatar?.equippedPetId}
-          auraId={avatar?.equippedAuraId}
-          bodyType={avatar?.bodyType}
-          size="compact"
-        />
+      <LifeCard style={[styles.heroCard, stackedHero && styles.stackedHeroCard]}>
+        <View style={[styles.previewShell, stackedHero && styles.stackedPreviewShell]}>
+          <View style={styles.previewGlow} />
+          {backgroundImage && (
+            <Image source={backgroundImage} style={styles.previewBackground} resizeMode="stretch" />
+          )}
+          <AvatarRenderer
+            showBackground={false}
+            hairId={avatar?.equippedHairId}
+            hatId={avatar?.equippedHatId}
+            topId={avatar?.equippedTopId}
+            bottomId={avatar?.equippedBottomId}
+            bootsId={avatar?.equippedBootsId}
+            capeId={avatar?.equippedCapeId}
+            weaponId={avatar?.equippedWeaponId}
+            shieldId={avatar?.equippedShieldId}
+            backgroundId={avatar?.equippedBackgroundId}
+            petId={avatar?.equippedPetId}
+            auraId={avatar?.equippedAuraId}
+            bodyType={avatar?.bodyType}
+            cosmetics={cosmetics}
+          />
+        </View>
 
-        <Text style={styles.currentLevel}>Hero Level {currentLevel}</Text>
-        {nextUnlock ? (
-          <Text style={styles.unlockHint}>
-            Next unlock: {nextUnlock.name} at level {nextUnlock.requiredLevel}.
+        <View style={[styles.heroCopy, stackedHero && styles.stackedHeroCopy]}>
+          <Text style={styles.eyebrow}>CHARACTER WARDROBE</Text>
+          <Text style={styles.heroTitle}>{user?.username ?? "Adventurer"}</Text>
+          <Text style={styles.heroLevel}>Hero Level {user?.level ?? 1}</Text>
+          <Text style={styles.heroDescription}>
+            Every outfit and hairstyle fits both characters. Mix pieces to
+            build your hero; dresses cover your saved bottoms while worn.
           </Text>
-        ) : (
-          <Text style={styles.unlockHint}>All visible cosmetics unlocked.</Text>
-        )}
+
+          <View style={styles.equippedList}>
+            {equippedCosmetics.slice(0, 6).map((cosmetic) => (
+              <View key={cosmetic.id} style={styles.equippedChip}>
+                <View style={styles.equippedDot} />
+                <Text numberOfLines={1} style={styles.equippedChipText}>
+                  {cosmetic.name}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
       </LifeCard>
 
-      <View style={styles.sectionTabs}>
-        {sections.map((section) => (
-          <Pressable
-            key={section.title}
-            onPress={() => setSelectedSection(section.title)}
-            style={[
-              styles.sectionTab,
-              selectedSection === section.title && styles.selectedSectionTab,
-            ]}
-          >
-            <Text
-              style={[
-                styles.sectionTabText,
-                selectedSection === section.title &&
-                  styles.selectedSectionTabText,
-              ]}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.sectionTabs}
+      >
+        {WARDROBE_SECTIONS.map((section) => {
+          const selected = section.type === selectedType;
+          const count = cosmetics.filter(
+            (cosmetic) => cosmetic.type === section.type,
+          ).length;
+
+          return (
+            <Pressable
+              key={section.type}
+              onPress={() => setSelectedType(section.type)}
+              style={[styles.sectionTab, selected && styles.selectedSectionTab]}
             >
-              {section.title}
-            </Text>
-          </Pressable>
-        ))}
+              <MaterialCommunityIcons
+                name={section.icon}
+                size={18}
+                color={selected ? colors.background : colors.mutedText}
+              />
+              <Text
+                style={[
+                  styles.sectionTabText,
+                  selected && styles.selectedSectionTabText,
+                ]}
+              >
+                {section.title}
+              </Text>
+              {count > 0 && (
+                <View
+                  style={[
+                    styles.countBadge,
+                    selected && styles.selectedCountBadge,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.countBadgeText,
+                      selected && styles.selectedCountBadgeText,
+                    ]}
+                  >
+                    {count}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <View style={styles.sectionHeading}>
+        <View>
+          <Text style={styles.sectionTitle}>{activeSection.title}</Text>
+          <Text style={styles.sectionSubtitle}>
+            {activeCosmetics.length} option
+            {activeCosmetics.length === 1 ? "" : "s"} in this collection
+          </Text>
+        </View>
+        {loading && <ActivityIndicator color={colors.accent} />}
       </View>
 
-      <CosmeticSection
-        title={activeSection.title}
-        cosmetics={activeSection.cosmetics}
-        loadingId={loadingId}
-        currentLevel={currentLevel}
-        onEquip={equipCosmetic}
-      />
+      <View style={styles.cosmeticGrid}>
+        {activeCosmetics.length === 0 ? (
+          <LifeCard compact style={styles.emptyCard}>
+            <MaterialCommunityIcons
+              name={activeSection.icon}
+              size={34}
+              color={colors.mutedText}
+            />
+            <Text style={styles.emptyTitle}>More gear is on the way</Text>
+            <Text style={styles.emptyText}>
+              This wardrobe shelf is ready for future rewards.
+            </Text>
+          </LifeCard>
+        ) : (
+          activeCosmetics.map((cosmetic) => (
+            <CosmeticCard
+              key={cosmetic.id}
+              cosmetic={cosmetic}
+              width={cardWidth}
+              loading={loadingId === cosmetic.id}
+              currentLevel={user?.level ?? 1}
+              onEquip={toggleCosmetic}
+            />
+          ))
+        )}
+      </View>
     </ScrollView>
   );
 }
 
-function CosmeticSection({
-  title,
-  cosmetics,
-  onEquip,
-  loadingId,
-  currentLevel,
-}: {
-  title: string;
-  cosmetics: Cosmetic[];
-  onEquip: (id: number) => void;
-  loadingId: number | null;
-  currentLevel: number;
-}) {
-  return (
-    <LifeCard compact>
-      <Text style={styles.sectionTitle}>{title}</Text>
-
-      <View style={styles.cosmeticContainer}>
-        {cosmetics.length === 0 && (
-          <Text style={styles.emptyText}>No cosmetics found.</Text>
-        )}
-
-        {cosmetics.map((cosmetic) => (
-          <CosmeticCard
-            key={cosmetic.id}
-            cosmetic={cosmetic}
-            loading={loadingId === cosmetic.id}
-            currentLevel={currentLevel}
-            onEquip={onEquip}
-          />
-        ))}
-      </View>
-    </LifeCard>
-  );
+function isEquipped(avatar: Avatar, cosmetic: Cosmetic) {
+  const ids: Partial<Record<CosmeticType, number | null>> = {
+    HAIR: avatar.equippedHairId,
+    HAT: avatar.equippedHatId,
+    TOP: avatar.equippedTopId,
+    BOTTOM: avatar.equippedBottomId,
+    BOOTS: avatar.equippedBootsId,
+    CAPE: avatar.equippedCapeId,
+    WEAPON: avatar.equippedWeaponId,
+    SHIELD: avatar.equippedShieldId,
+    BACKGROUND: avatar.equippedBackgroundId,
+    PET: avatar.equippedPetId,
+    AURA: avatar.equippedAuraId,
+  };
+  return ids[cosmetic.type] === cosmetic.id;
 }
 
 function CosmeticCard({
   cosmetic,
+  width,
   loading,
   currentLevel,
   onEquip,
 }: {
   cosmetic: Cosmetic;
+  width: number;
   loading: boolean;
   currentLevel: number;
-  onEquip: (id: number) => void;
+  onEquip: (cosmetic: Cosmetic) => void;
 }) {
   const previewSource = getCosmeticPreviewSource(cosmetic);
   const levelsAway = Math.max(0, cosmetic.requiredLevel - currentLevel);
@@ -201,51 +312,74 @@ function CosmeticCard({
     <View
       style={[
         styles.cosmeticCard,
+        { width },
         cosmetic.equipped && styles.equippedCard,
-        !cosmetic.unlocked && styles.lockedCard,
       ]}
     >
-      <View style={styles.previewBox}>
+      <View style={styles.itemPreview}>
         {previewSource ? (
-          <Image source={previewSource} style={styles.previewImage} />
-        ) : (
-          <Text style={styles.previewFallback}>{cosmetic.type[0]}</Text>
-        )}
-      </View>
-
-      <View style={styles.cosmeticInfo}>
-        <Text style={styles.cosmeticName}>{cosmetic.name}</Text>
-
-        <Text style={styles.cosmeticMeta}>
-          {cosmetic.unlocked
-            ? `Unlocked at level ${cosmetic.requiredLevel}`
-            : `${levelsAway} level${levelsAway === 1 ? "" : "s"} away`}
-        </Text>
-
-        <Text
-          style={[
-            styles.status,
-            cosmetic.equipped && styles.equippedStatus,
-            !cosmetic.unlocked && styles.lockedStatus,
-          ]}
-        >
-          {cosmetic.equipped
-            ? "Equipped"
-            : cosmetic.unlocked
-              ? "Unlocked"
-              : "Locked"}
-        </Text>
-      </View>
-
-      <View style={styles.cosmeticAction}>
-        {cosmetic.unlocked && !cosmetic.equipped && (
-          <LifeButton
-            title={loading ? "Equipping..." : "Equip"}
-            onPress={() => onEquip(cosmetic.id)}
-            disabled={loading}
+          <CosmeticImage
+            source={previewSource}
+            crop={getCosmeticPreviewCrop(cosmetic)}
+            style={styles.previewImage}
           />
+        ) : (
+          <MaterialCommunityIcons name="hanger" size={34} color={colors.mutedText} />
+        )}
+
+        {cosmetic.equipped && (
+          <View style={styles.equippedBadge}>
+            <MaterialCommunityIcons name="check" size={14} color={colors.background} />
+            <Text style={styles.equippedBadgeText}>Equipped</Text>
+          </View>
+        )}
+
+        {!cosmetic.unlocked && (
+          <View style={styles.lockBadge}>
+            <MaterialCommunityIcons name="lock" size={14} color={colors.text} />
+          </View>
         )}
       </View>
+
+      <Text numberOfLines={1} style={styles.cosmeticName}>
+        {cosmetic.name}
+      </Text>
+      <Text style={styles.cosmeticMeta}>
+        {cosmetic.unlocked
+          ? "In your collection"
+          : levelsAway > 0
+            ? `Unlocks in ${levelsAway} level${levelsAway === 1 ? "" : "s"}`
+            : "Available in the Shop"}
+      </Text>
+
+      <Pressable
+        onPress={() => onEquip(cosmetic)}
+        disabled={!cosmetic.unlocked || loading}
+        style={({ pressed }) => [
+          styles.equipButton,
+          cosmetic.equipped && styles.unequipButton,
+          !cosmetic.unlocked && styles.lockedButton,
+          pressed && styles.pressedButton,
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={colors.background} />
+        ) : (
+          <Text
+            style={[
+              styles.equipButtonText,
+              !cosmetic.unlocked &&
+                styles.disabledButtonText,
+            ]}
+          >
+            {cosmetic.equipped
+              ? "Unequip"
+              : cosmetic.unlocked
+                ? "Equip"
+                : "Locked"}
+          </Text>
+        )}
+      </Pressable>
     </View>
   );
 }
@@ -255,167 +389,311 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-
+  loadingScreen: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.md,
+    backgroundColor: colors.background,
+  },
+  loadingText: {
+    color: colors.mutedText,
+    fontWeight: "600",
+  },
   content: {
+    width: "100%",
+    maxWidth: 1160,
+    alignSelf: "center",
     padding: spacing.lg,
     paddingBottom: 120,
     gap: spacing.lg,
   },
-
-  title: {
-    color: colors.text,
-    fontSize: 30,
-    fontWeight: "700",
-  },
-
-  subtitle: {
-    color: colors.mutedText,
-    fontSize: 16,
-    marginTop: 2,
-  },
-
-  avatarCard: {
-    alignItems: "center",
-  },
-
-  currentLevel: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: "700",
-    marginTop: spacing.md,
-  },
-
-  unlockHint: {
-    color: colors.mutedText,
-    fontWeight: "500",
-    marginTop: spacing.xs,
-    textAlign: "center",
-  },
-
-  sectionTabs: {
+  heroCard: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xl,
+    overflow: "hidden",
   },
-
+  stackedHeroCard: {
+    flexDirection: "column",
+    flexWrap: "nowrap",
+    justifyContent: "flex-start",
+  },
+  previewShell: {
+    width: 330,
+    height: 440,
+    maxWidth: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.lg,
+    backgroundColor: "#101D2B",
+    borderWidth: 1,
+    borderColor: "#35516A",
+    overflow: "hidden",
+  },
+  stackedPreviewShell: {
+    width: "100%",
+    maxWidth: 330,
+    alignSelf: "center",
+  },
+  previewGlow: {
+    position: "absolute",
+    top: 70,
+    width: 220,
+    height: 260,
+    borderRadius: 999,
+    backgroundColor: "#2A67A8",
+    opacity: 0.2,
+  },
+  previewBackground: {
+    ...StyleSheet.absoluteFill,
+    width: "100%",
+    height: "100%",
+  },
+  heroCopy: {
+    flex: 1,
+    minWidth: 260,
+    maxWidth: 470,
+  },
+  stackedHeroCopy: {
+    flex: 0,
+    flexBasis: "auto",
+    flexShrink: 0,
+    minWidth: 0,
+    width: "100%",
+    alignSelf: "center",
+  },
+  eyebrow: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.8,
+  },
+  heroTitle: {
+    color: colors.text,
+    fontSize: 34,
+    fontWeight: "800",
+    marginTop: spacing.xs,
+  },
+  heroLevel: {
+    color: colors.primary,
+    fontSize: 17,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  heroDescription: {
+    color: colors.mutedText,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: spacing.md,
+  },
+  equippedList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.lg,
+  },
+  equippedChip: {
+    maxWidth: 170,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.cardLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+  },
+  equippedDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+  },
+  equippedChipText: {
+    flexShrink: 1,
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  sectionTabs: {
+    gap: spacing.sm,
+    paddingRight: spacing.lg,
+  },
   sectionTab: {
     minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.pill,
     backgroundColor: colors.cardLight,
-    alignItems: "center",
-    justifyContent: "center",
     paddingHorizontal: spacing.md,
   },
-
   selectedSectionTab: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
-
   sectionTabText: {
     color: colors.mutedText,
-    fontWeight: "600",
-  },
-
-  selectedSectionTabText: {
-    color: colors.text,
-  },
-
-  sectionTitle: {
-    color: colors.text,
-    fontSize: 20,
+    fontSize: 13,
     fontWeight: "700",
-    marginBottom: spacing.md,
   },
-
-  cosmeticContainer: {
-    gap: spacing.md,
+  selectedSectionTabText: {
+    color: colors.background,
   },
-
-  cosmeticCard: {
-    backgroundColor: colors.cardLight,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+  countBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+    paddingHorizontal: 5,
+  },
+  selectedCountBadge: {
+    backgroundColor: "rgba(10, 18, 14, 0.18)",
+  },
+  countBadgeText: {
+    color: colors.mutedText,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  selectedCountBadgeText: {
+    color: colors.background,
+  },
+  sectionHeading: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionTitle: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: "800",
+  },
+  sectionSubtitle: {
+    color: colors.mutedText,
+    fontSize: 13,
+    marginTop: 3,
+  },
+  cosmeticGrid: {
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.md,
   },
-
-  previewBox: {
-    width: 62,
-    height: 62,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
+  cosmeticCard: {
+    minWidth: 150,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.card,
+    padding: spacing.sm,
+  },
+  equippedCard: {
+    borderColor: colors.accent,
+    backgroundColor: "#172820",
+  },
+  itemPreview: {
+    width: "100%",
+    aspectRatio: 1,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: radius.md,
+    backgroundColor: "#101A23",
     overflow: "hidden",
   },
-
   previewImage: {
-    width: 58,
-    height: 58,
-    resizeMode: "contain",
+    width: "96%",
+    height: "96%",
   },
-
-  previewFallback: {
-    color: colors.mutedText,
-    fontSize: 20,
-    fontWeight: "700",
+  equippedBadge: {
+    position: "absolute",
+    left: 8,
+    top: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
   },
-
-  cosmeticInfo: {
-    flex: 1,
-    minWidth: 145,
+  equippedBadgeText: {
+    color: colors.background,
+    fontSize: 9,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
-
-  cosmeticAction: {
-    minWidth: 96,
-    alignItems: "flex-end",
+  lockBadge: {
+    position: "absolute",
+    right: 8,
+    top: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(10, 18, 14, 0.8)",
   },
-
-  equippedCard: {
-    borderColor: colors.primary,
-    borderWidth: 1,
-  },
-
-  lockedCard: {
-    opacity: 0.72,
-  },
-
   cosmeticName: {
     color: colors.text,
-    fontSize: 17,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "800",
+    marginTop: spacing.sm,
   },
-
   cosmeticMeta: {
+    minHeight: 34,
     color: colors.mutedText,
-    marginTop: 4,
-    fontWeight: "500",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
   },
-
-  status: {
-    color: colors.accent,
-    marginTop: 6,
-    fontWeight: "600",
+  equipButton: {
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
+    marginTop: spacing.sm,
   },
-
-  equippedStatus: {
-    color: colors.primary,
+  unequipButton: {
+    backgroundColor: "#7A3E46",
   },
-
-  lockedStatus: {
+  lockedButton: {
+    backgroundColor: colors.cardLight,
+  },
+  pressedButton: {
+    opacity: 0.78,
+  },
+  equipButtonText: {
+    color: colors.background,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  disabledButtonText: {
     color: colors.mutedText,
   },
-
+  emptyCard: {
+    width: "100%",
+    minHeight: 180,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "800",
+    marginTop: spacing.sm,
+  },
   emptyText: {
     color: colors.mutedText,
+    textAlign: "center",
+    marginTop: 4,
   },
 });

@@ -21,6 +21,7 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
         migrateTasks();
         migrateTaskCompletions();
         migrateUserBuildings();
+        migrateCosmetics();
         migrateUserCosmetics();
         migrateUsers();
         migrateAvatars();
@@ -49,6 +50,13 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
 
     private void migrateAvatars() {
         jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS body_type varchar(255)");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_hair_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_top_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_bottom_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_boots_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_cape_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_weapon_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_shield_id bigint");
         jdbcTemplate.execute("UPDATE avatars SET body_type = 'BOY' WHERE body_type IS NULL");
     }
 
@@ -221,6 +229,155 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
         jdbcTemplate.execute("""
                 CREATE UNIQUE INDEX IF NOT EXISTS uk_user_cosmetics_user_cosmetic
                 ON user_cosmetics(user_id, cosmetic_id)
+                """);
+    }
+
+    private void migrateCosmetics() {
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_hair_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_hat_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_cape_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_weapon_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_shield_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_background_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_pet_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_aura_id bigint");
+        jdbcTemplate.execute("ALTER TABLE avatars ADD COLUMN IF NOT EXISTS equipped_outfit_id bigint");
+        jdbcTemplate.execute("ALTER TABLE cosmetics DROP CONSTRAINT IF EXISTS cosmetics_type_check");
+        jdbcTemplate.execute("""
+                UPDATE cosmetics
+                SET name = 'Moss Golem',
+                    required_level = 5,
+                    image_url = 'avatar-v2/pets/moss-golem'
+                WHERE image_url = 'avatar/pets/tiny-dragon'
+                """);
+        jdbcTemplate.execute("""
+                UPDATE cosmetics
+                SET name = 'Seraphic Light',
+                    required_level = 6,
+                    image_url = 'avatar-v2/auras/seraphic-light'
+                WHERE image_url = 'avatar/auras/golden'
+                """);
+        jdbcTemplate.execute("""
+                UPDATE cosmetics
+                SET name = 'Phoenix Flame',
+                    required_level = 12,
+                    image_url = 'avatar-v2/auras/phoenix-flame'
+                WHERE image_url = 'avatar/auras/phoenix'
+                """);
+
+        jdbcTemplate.execute("""
+                UPDATE avatars
+                SET equipped_hair_id = NULL
+                WHERE equipped_hair_id IN (
+                    SELECT id FROM cosmetics
+                    WHERE image_url = 'avatar-v2/hair/adventurer-brown'
+                )
+                """);
+        jdbcTemplate.execute("""
+                UPDATE avatars
+                SET equipped_hat_id = NULL
+                WHERE equipped_hat_id IN (
+                    SELECT id FROM cosmetics
+                    WHERE image_url IN (
+                        'avatar/legacy/hats/starter-cap',
+                        'avatar/legacy/hats/gym-headband',
+                        'avatar/legacy/hats/knight-helm',
+                        'avatar/legacy/hats/ranger-hood',
+                        'avatar-v2/hats/azure-mage-hat'
+                    )
+                )
+                """);
+        jdbcTemplate.execute("""
+                UPDATE avatars
+                SET equipped_cape_id = NULL
+                WHERE equipped_cape_id IN (
+                    SELECT id FROM cosmetics
+                    WHERE image_url = 'avatar-v2/capes/azure-cape'
+                )
+                """);
+        jdbcTemplate.execute("""
+                UPDATE avatars
+                SET equipped_shield_id = NULL
+                WHERE equipped_shield_id IN (
+                    SELECT id FROM cosmetics
+                    WHERE image_url = 'avatar-v2/shields/azure-shield'
+                )
+                """);
+        jdbcTemplate.execute("""
+                UPDATE avatars
+                SET equipped_weapon_id = NULL
+                WHERE equipped_weapon_id IN (
+                    SELECT id FROM cosmetics
+                    WHERE image_url = 'avatar-v2/weapons/azure-sword'
+                )
+                """);
+        jdbcTemplate.execute("UPDATE avatars SET equipped_outfit_id = NULL");
+        jdbcTemplate.execute("""
+                UPDATE avatars
+                SET equipped_background_id = NULL
+                WHERE equipped_background_id IN (
+                    SELECT id FROM cosmetics
+                    WHERE image_url IN (
+                        'avatar/backgrounds/forest',
+                        'avatar/backgrounds/moonlit-forest'
+                    )
+                )
+                """);
+        jdbcTemplate.execute("""
+                DELETE FROM user_cosmetics
+                WHERE cosmetic_id IN (
+                    SELECT id FROM cosmetics
+                    WHERE type IN ('FULL_SET', 'OUTFIT')
+                       OR image_url IN (
+                           'avatar-v2/hair/adventurer-brown',
+                           'avatar/legacy/hats/starter-cap',
+                           'avatar/legacy/hats/gym-headband',
+                           'avatar/legacy/hats/knight-helm',
+                           'avatar/legacy/hats/ranger-hood',
+                           'avatar-v2/hats/azure-mage-hat',
+                           'avatar-v2/capes/azure-cape',
+                           'avatar-v2/weapons/azure-sword',
+                           'avatar-v2/shields/azure-shield',
+                           'avatar/backgrounds/forest',
+                           'avatar/backgrounds/moonlit-forest'
+                       )
+                )
+                """);
+        jdbcTemplate.execute("""
+                DELETE FROM cosmetics
+                WHERE type IN ('FULL_SET', 'OUTFIT')
+                   OR image_url IN (
+                       'avatar-v2/hair/adventurer-brown',
+                       'avatar/legacy/hats/starter-cap',
+                       'avatar/legacy/hats/gym-headband',
+                       'avatar/legacy/hats/knight-helm',
+                       'avatar/legacy/hats/ranger-hood',
+                       'avatar-v2/hats/azure-mage-hat',
+                       'avatar-v2/capes/azure-cape',
+                       'avatar-v2/weapons/azure-sword',
+                       'avatar-v2/shields/azure-shield',
+                       'avatar/backgrounds/forest',
+                       'avatar/backgrounds/moonlit-forest'
+                   )
+                """);
+        jdbcTemplate.execute("ALTER TABLE avatars DROP COLUMN IF EXISTS equipped_outfit_id");
+
+        jdbcTemplate.execute("""
+                ALTER TABLE cosmetics
+                ADD CONSTRAINT cosmetics_type_check
+                CHECK (type IN (
+                    'HAIR',
+                    'HAT',
+                    'TOP',
+                    'BOTTOM',
+                    'BOOTS',
+                    'CAPE',
+                    'WEAPON',
+                    'SHIELD',
+                    'BACKGROUND',
+                    'PET',
+                    'AURA'
+                ))
                 """);
     }
 }

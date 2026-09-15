@@ -15,12 +15,11 @@ import LifeButton from "../src/components/LifeButton";
 import LifeCard from "../src/components/LifeCard";
 import LifeInput from "../src/components/LifeInput";
 import AvatarRenderer from "../src/components/AvatarRenderer";
-import { api } from "../src/api/client";
 import { useAuth } from "../src/context/AuthContext";
 import { colors, radius, spacing } from "../src/theme/theme";
 
 const skyImage = require("../assets/base/backgrounds/sky.png");
-const baseImage = require("../assets/base/buildings/library/tier-1.png");
+const baseImage = require("../assets/base/buildings/library/library-level-1.png");
 
 export default function RegisterScreen() {
   const { register } = useAuth();
@@ -49,8 +48,7 @@ export default function RegisterScreen() {
     try {
       setLoading(true);
       setError("");
-      await register(trimmedUsername, trimmedEmail, password);
-      await api.put("/avatar/body-type", { bodyType });
+      await register(trimmedUsername, trimmedEmail, password, bodyType);
       router.replace("/(tabs)/dashboard");
     } catch {
       setError("Could not create that account. Try a different email or username.");
@@ -132,13 +130,19 @@ export default function RegisterScreen() {
           {(["BOY", "GIRL"] as const).map((choice) => (
             <Pressable
               key={choice}
+              accessibilityRole="radio"
+              accessibilityLabel={choice === "BOY" ? "Boy Hero" : "Girl Hero"}
+              accessibilityState={{ checked: bodyType === choice }}
+              aria-checked={bodyType === choice}
               onPress={() => setBodyType(choice)}
               style={[
                 styles.avatarChoice,
                 bodyType === choice && styles.selectedAvatarChoice,
               ]}
             >
-              <AvatarRenderer bodyType={choice} size="compact" />
+              <View style={styles.avatarPreview}>
+                <AvatarRenderer bodyType={choice} />
+              </View>
               <Text
                 style={[
                   styles.avatarChoiceText,
@@ -151,7 +155,9 @@ export default function RegisterScreen() {
           ))}
         </View>
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        <Text style={styles.helperText}>Both characters can wear every outfit and hairstyle.</Text>
+
+        {!!error && <Text style={styles.errorText}>{error}</Text>}
 
         <View style={styles.actions}>
           <LifeButton
@@ -259,10 +265,14 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primaryDark,
   },
+  avatarPreview: {
+    width: 240,
+    maxWidth: "100%",
+  },
   avatarChoiceText: {
     color: colors.mutedText,
     fontWeight: "700",
-    marginTop: -54,
+    marginTop: spacing.xs,
   },
   selectedAvatarChoiceText: {
     color: colors.text,

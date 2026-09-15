@@ -1,131 +1,54 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import {
-  getToken,
-  setToken as saveToken,
-  deleteToken,
-} from "../utils/tokenStorage";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { AppState, Platform } from "react-native";
+import * as tokenStorage from "../utils/tokenStorage";
 import { api } from "../api/client";
-import { AuthResponse, User } from "../types";
+import { AuthSession } from "../auth/session";
 
-type AuthContextType = {
-  user: User | null;
-  token: string | null;
-  loading: boolean;
-  dashboardRefreshKey: number;
-  triggerDashboardRefresh: () => void;
-  login: (email: string, password: string) => Promise<void>;
-  register: (
-    username: string,
-    email: string,
-    password: string,
-  ) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshUser: () => Promise<boolean>;
-};
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+function useSessionValue() {
+  const [session] = useState(() => new AuthSession(api, tokenStorage));
+  const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot, session.getSnapshot);
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
 
-  async function loadToken() {
-    try {
-      const savedToken = await getToken();
-
-      if (savedToken) {
-        setToken(savedToken);
-
-        const response = await api.get<User>("/users/me");
-        setUser(response.data);
-      }
-    } catch {
-      await deleteToken();
-      setToken(null);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => session.start(), [session]);
 
   useEffect(() => {
-    loadToken();
-  }, []);
-
-  async function login(email: string, password: string) {
-    const response = await api.post<AuthResponse>("/users/login", {
-      email,
-      password,
+    const retry = () => {
+      const current = session.getSnapshot();
+      if (!current.loading && (current.token || current.sessionError)) void session.retrySession();
+    };
+    const subscription = AppState.addEventListener("change", state => {
+      if (state === "active") retry();
     });
+    if (Platform.OS === "web") window.addEventListener("online", retry);
+    return () => {
+      subscription.remove();
+      if (Platform.OS === "web") window.removeEventListener("online", retry);
+    };
+  }, [session]);
 
-    await saveToken(response.data.token);
-    setToken(response.data.token);
-    setUser(response.data.user);
-  }
+  const triggerDashboardRefresh = useCallback(() => setDashboardRefreshKey(value => value + 1), []);
 
-  async function register(username: string, email: string, password: string) {
-    const response = await api.post<AuthResponse>("/users/register", {
-      username,
-      email,
-      password,
-    });
+  return useMemo(() => ({
+    ...snapshot,
+    dashboardRefreshKey,
+    triggerDashboardRefresh,
+    login: session.login,
+    register: session.register,
+    logout: session.logout,
+    refreshUser: session.refreshUser,
+    retrySession: session.retrySession,
+  }), [snapshot, dashboardRefreshKey, triggerDashboardRefresh, session]);
+}
 
-    await saveToken(response.data.token);
-    setToken(response.data.token);
-    setUser(response.data.user);
-  }
+const AuthContext = createContext<ReturnType<typeof useSessionValue> | undefined>(undefined);
 
-  async function refreshUser() {
-    try {
-      const response = await api.get("/users/me");
-      setUser(response.data);
-      return true;
-    } catch (error) {
-      console.log("Refresh user error:", error);
-      await deleteToken();
-      setToken(null);
-      setUser(null);
-      return false;
-    }
-  }
-
-  async function logout() {
-    await deleteToken();
-    setToken(null);
-    setUser(null);
-  }
-
-  function triggerDashboardRefresh() {
-    setDashboardRefreshKey((prev) => prev + 1);
-  }
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        loading,
-        dashboardRefreshKey,
-        triggerDashboardRefresh,
-        login,
-        register,
-        logout,
-        refreshUser,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const value = useSessionValue();
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
-  }
-
+  if (!context) throw new Error("useAuth must be used inside AuthProvider");
   return context;
 }

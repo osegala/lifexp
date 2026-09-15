@@ -1,6 +1,7 @@
-import { useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { useCallback, useState } from "react";
+import { Alert, View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { router, useFocusEffect } from "expo-router";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { useAuth } from "../../src/context/AuthContext";
 import LifeCard from "../../src/components/LifeCard";
@@ -10,6 +11,7 @@ import { colors, spacing } from "../../src/theme/theme";
 
 export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -18,8 +20,16 @@ export default function ProfileScreen() {
   );
 
   async function handleLogout() {
-    await logout();
-    router.replace({ pathname: "/login" });
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+      router.replace({ pathname: "/login" });
+    } catch {
+      Alert.alert("Could not sign out", "Your saved sign-in couldn't be removed. Please try again.");
+    } finally {
+      setLoggingOut(false);
+    }
   }
 
   const totalXp = user?.totalXp ?? 0;
@@ -39,6 +49,19 @@ export default function ProfileScreen() {
       bounces={false}
       overScrollMode="never"
     >
+      <View style={styles.header}>
+        <Text accessibilityRole="header" style={styles.title}>Profile</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back to Home"
+          onPress={() => router.navigate("/(tabs)/dashboard")}
+          style={({ pressed }) => [styles.homeButton, pressed && styles.buttonPressed]}
+        >
+          <MaterialCommunityIcons name="arrow-left" color={colors.primary} size={22} />
+          <Text style={styles.homeButtonText}>Home</Text>
+        </Pressable>
+      </View>
+
       <LifeCard style={styles.profileCard}>
         <View style={styles.avatarCircle}>
           <Text style={styles.avatarInitial}>
@@ -82,7 +105,7 @@ export default function ProfileScreen() {
         </View>
       </LifeCard>
 
-      <LifeButton title="Logout" variant="danger" onPress={handleLogout} />
+      <LifeButton title={loggingOut ? "Signing out…" : "Logout"} variant="danger" onPress={handleLogout} disabled={loggingOut} />
     </ScrollView>
   );
 }
@@ -105,10 +128,36 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  subtitle: {
-    color: colors.mutedText,
-    fontSize: 16,
-    marginTop: 2,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    flexWrap: "wrap",
+  },
+
+  homeButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+
+  homeButtonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+
+  buttonPressed: {
+    backgroundColor: colors.cardLight,
   },
 
   profileCard: {

@@ -158,6 +158,8 @@ public class SocialService {
         int xpIntoLevel = building.getTotalXp() - currentLevelStart;
         int levelRange = nextLevelStart - currentLevelStart;
         int progressPercent = levelRange == 0 ? 100 : (int) ((xpIntoLevel * 100.0) / levelRange);
+        int visualTier = building.getVisualTier();
+        int eligibleVisualTier = BuildingTierPolicy.visualTierForLevel(level);
         return new BuildingProgressResponse(
                 building.getBuildingType(),
                 level,
@@ -165,7 +167,9 @@ public class SocialService {
                 xpIntoLevel,
                 nextLevelStart - building.getTotalXp(),
                 progressPercent,
-                BuildingTierPolicy.visualTierForLevel(level)
+                visualTier,
+                eligibleVisualTier,
+                eligibleVisualTier > visualTier
         );
     }
 

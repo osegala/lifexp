@@ -349,9 +349,11 @@ const styles = StyleSheet.create({
     top: 12,
     width: 92,
     height: 82,
+    transform: [{ rotate: "180deg" }],
   },
   lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    inset: 0,
     backgroundColor: "rgba(17, 23, 19, 0.78)",
     alignItems: "center",
     justifyContent: "center",

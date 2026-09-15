@@ -32,8 +32,14 @@ export type Avatar = {
   id: number;
   baseStyle: string;
   bodyType: "BOY" | "GIRL";
+  equippedHairId: number | null;
   equippedHatId: number | null;
-  equippedOutfitId: number | null;
+  equippedTopId: number | null;
+  equippedBottomId: number | null;
+  equippedBootsId: number | null;
+  equippedCapeId: number | null;
+  equippedWeaponId: number | null;
+  equippedShieldId: number | null;
   equippedBackgroundId: number | null;
   equippedPetId: number | null;
   equippedAuraId: number | null;
@@ -72,7 +78,7 @@ export type Achievement = {
   progress: number;
   target: number;
   coinReward: number;
-  cosmeticReward: string;
+  cosmeticReward: string | null;
   completed: boolean;
   claimed: boolean;
 };
@@ -82,6 +88,7 @@ export type ShopItem = {
   cosmeticId: number;
   name: string;
   type: string;
+  imageUrl: string;
   priceCoins: number;
   premiumOnly: boolean;
   owned: boolean;

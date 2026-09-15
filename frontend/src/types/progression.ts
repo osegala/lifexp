@@ -14,6 +14,8 @@ export type BuildingProgress = {
   xpToNextLevel: number;
   progressPercent: number;
   visualTier: number;
+  eligibleVisualTier: number;
+  upgradeAvailable: boolean;
 };
 
 export type BaseProgress = {

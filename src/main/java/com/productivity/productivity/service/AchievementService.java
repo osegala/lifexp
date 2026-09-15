@@ -17,10 +17,10 @@ public class AchievementService {
     private record AchievementDefinition(String key, String title, String description, long target, int coinReward, String cosmeticReward) {}
 
     private static final List<AchievementDefinition> ACHIEVEMENTS = List.of(
-            new AchievementDefinition("first-quest", "First Quest", "Complete your first quest.", 1, 20, "Starter Cap"),
-            new AchievementDefinition("week-of-work", "Town Regular", "Complete 7 quests total.", 7, 60, "Gym Headband"),
-            new AchievementDefinition("ten-day-streak", "Signal Fire", "Reach a 10 day streak.", 10, 120, "Golden Aura"),
-            new AchievementDefinition("tier-five-building", "Master Builder", "Upgrade any building to visual tier 5.", 5, 200, "Tiny Dragon Pet")
+            new AchievementDefinition("first-quest", "First Quest", "Complete your first quest.", 1, 20, null),
+            new AchievementDefinition("week-of-work", "Town Regular", "Complete 7 quests total.", 7, 60, null),
+            new AchievementDefinition("ten-day-streak", "Signal Fire", "Reach a 10 day streak.", 10, 120, "Seraphic Light"),
+            new AchievementDefinition("tier-five-building", "Master Builder", "Upgrade any building to visual tier 5.", 5, 200, "Moss Golem")
     );
 
     private final CurrentUserService currentUserService;
@@ -96,7 +96,7 @@ public class AchievementService {
             case "ten-day-streak" -> user.getLongestStreak();
             case "tier-five-building" -> userBuildingRepository.findByUserIdOrderByBuildingTypeAsc(user.getId())
                     .stream()
-                    .mapToInt(building -> BuildingTierPolicy.visualTierForLevel(building.getLevel()))
+                    .mapToInt(UserBuilding::getVisualTier)
                     .max()
                     .orElse(1);
             default -> 0;
@@ -104,6 +104,8 @@ public class AchievementService {
     }
 
     private void unlockCosmeticReward(User user, String cosmeticName) {
+        if (cosmeticName == null) return;
+
         cosmeticRepository.findAll()
                 .stream()
                 .filter(cosmetic -> cosmetic.getName().equals(cosmeticName))

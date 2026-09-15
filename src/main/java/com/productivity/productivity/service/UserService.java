@@ -64,7 +64,7 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
 
-        avatarService.createDefaultAvatar(savedUser);
+        avatarService.createDefaultAvatar(savedUser, request.getBodyType());
         buildingService.createDefaultBuildings(savedUser);
 
         String token = jwtService.generateToken(savedUser.getEmail());

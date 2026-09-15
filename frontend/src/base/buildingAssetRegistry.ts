@@ -10,7 +10,7 @@ import { BuildingType} from "../types/progression";
  *
  * TO ADD ART:
  * 1. Drop a transparent PNG into:
- *      frontend/assets/base/buildings/<slug>/tier-<n>.png
+ *      frontend/assets/base/buildings/<slug>/<slug>-level-<n>.png
  *    where <slug> is one of the BUILDING_SLUGS values below and
  *    <n> is 1-5. Match the avatar assets' square canvas convention
  *    (e.g. 1024x1024 or 1254x1254) so scaling stays consistent.
@@ -42,46 +42,46 @@ type TierImageMap = Partial<Record<BuildingTier, ImageSourcePropType>>;
 
 export const BUILDING_TIER_IMAGES: Record<BuildingType, TierImageMap> = {
     "Home Base": {
-        1: require("../../assets/base/buildings/home-base/tier-1.png"),
-        2: require("../../assets/base/buildings/home-base/tier-2.png"),
-        3: require("../../assets/base/buildings/home-base/tier-3.png"),
-        4: require("../../assets/base/buildings/home-base/tier-4.png"),
-        5: require("../../assets/base/buildings/home-base/tier-5.png"),
+        1: require("../../assets/base/buildings/home-base/home-base-level-1.png"),
+        2: require("../../assets/base/buildings/home-base/home-base-level-2.png"),
+        3: require("../../assets/base/buildings/home-base/home-base-level-3.png"),
+        4: require("../../assets/base/buildings/home-base/home-base-level-4.png"),
+        5: require("../../assets/base/buildings/home-base/home-base-level-5.png"),
     },
     Workshop: {
-        1: require("../../assets/base/buildings/workshop/tier-1.png"),
-        2: require("../../assets/base/buildings/workshop/tier-2.png"),
-        3: require("../../assets/base/buildings/workshop/tier-3.png"),
-        4: require("../../assets/base/buildings/workshop/tier-4.png"),
-        5: require("../../assets/base/buildings/workshop/tier-5.png"),
+        1: require("../../assets/base/buildings/workshop/workshop-level-1.png"),
+        2: require("../../assets/base/buildings/workshop/workshop-level-2.png"),
+        3: require("../../assets/base/buildings/workshop/workshop-level-3.png"),
+        4: require("../../assets/base/buildings/workshop/workshop-level-4.png"),
+        5: require("../../assets/base/buildings/workshop/workshop-level-5.png"),
     },
     Library: {
-        1: require("../../assets/base/buildings/library/tier-1.png"),
-        2: require("../../assets/base/buildings/library/tier-2.png"),
-        3: require("../../assets/base/buildings/library/tier-3.png"),
-        4: require("../../assets/base/buildings/library/tier-4.png"),
-        5: require("../../assets/base/buildings/library/tier-5.png"),
+        1: require("../../assets/base/buildings/library/library-level-1.png"),
+        2: require("../../assets/base/buildings/library/library-level-2.png"),
+        3: require("../../assets/base/buildings/library/library-level-3.png"),
+        4: require("../../assets/base/buildings/library/library-level-4.png"),
+        5: require("../../assets/base/buildings/library/library-level-5.png"),
     },
     "Training Grounds": {
-        1: require("../../assets/base/buildings/training-grounds/tier-1.png"),
-        2: require("../../assets/base/buildings/training-grounds/tier-2.png"),
-        3: require("../../assets/base/buildings/training-grounds/tier-3.png"),
-        4: require("../../assets/base/buildings/training-grounds/tier-4.png"),
-        5: require("../../assets/base/buildings/training-grounds/tier-5.png"),
+        1: require("../../assets/base/buildings/training-grounds/training-grounds-level-1.png"),
+        2: require("../../assets/base/buildings/training-grounds/training-grounds-level-2.png"),
+        3: require("../../assets/base/buildings/training-grounds/training-grounds-level-3.png"),
+        4: require("../../assets/base/buildings/training-grounds/training-grounds-level-4.png"),
+        5: require("../../assets/base/buildings/training-grounds/training-grounds-level-5.png"),
     },
     Garden: {
-        1: require("../../assets/base/buildings/garden/tier-1.png"),
-        2: require("../../assets/base/buildings/garden/tier-2.png"),
-        3: require("../../assets/base/buildings/garden/tier-3.png"),
-        4: require("../../assets/base/buildings/garden/tier-4.png"),
-        5: require("../../assets/base/buildings/garden/tier-5.png"),
+        1: require("../../assets/base/buildings/garden/garden-level-1.png"),
+        2: require("../../assets/base/buildings/garden/garden-level-2.png"),
+        3: require("../../assets/base/buildings/garden/garden-level-3.png"),
+        4: require("../../assets/base/buildings/garden/garden-level-4.png"),
+        5: require("../../assets/base/buildings/garden/garden-level-5.png"),
     },
     "Hall of Achievements": {
-        1: require("../../assets/base/buildings/hall-of-achievement/tier-1.png"),
-        2: require("../../assets/base/buildings/hall-of-achievement/tier-2.png"),
-        3: require("../../assets/base/buildings/hall-of-achievement/tier-3.png"),
-        4: require("../../assets/base/buildings/hall-of-achievement/tier-4.png"),   
-        5: require("../../assets/base/buildings/hall-of-achievement/tier-5.png"),
+        1: require("../../assets/base/buildings/hall-of-achievement/hall-of-achievement-level-1.png"),
+        2: require("../../assets/base/buildings/hall-of-achievement/hall-of-achievement-level-2.png"),
+        3: require("../../assets/base/buildings/hall-of-achievement/hall-of-achievement-level-3.png"),
+        4: require("../../assets/base/buildings/hall-of-achievement/hall-of-achievement-level-4.png"),
+        5: require("../../assets/base/buildings/hall-of-achievement/hall-of-achievement-level-5.png"),
     },
 };
 
@@ -118,8 +118,10 @@ export const BASE_BACKGROUND_IMAGES: {
     sky: ImageSourcePropType | undefined;
     ground: ImageSourcePropType | undefined;
     kingdomMap: ImageSourcePropType | undefined;
+    tiledGround: ImageSourcePropType | undefined;
 } = {
     sky: require("../../assets/base/backgrounds/sky.png"),
     ground: require("../../assets/base/backgrounds/ground.png"),
     kingdomMap: require("../../assets/base/backgrounds/kingdom-map.png"),
+    tiledGround: require("../../assets/base/backgrounds/tiled-ground.png"),
 };

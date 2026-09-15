@@ -96,9 +96,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account-cog" color={color} size={size} />
-          ),
+          href: null,
         }}
       />
     </Tabs>

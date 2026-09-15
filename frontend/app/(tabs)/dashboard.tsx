@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import { router, useFocusEffect } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { api } from "../../src/api/client";
@@ -11,19 +11,12 @@ import XPBar from "../../src/components/XPBar";
 import AvatarRenderer from "../../src/components/AvatarRenderer";
 import { colors, spacing } from "../../src/theme/theme";
 import { Achievement, WeeklyQuest } from "../../src/types";
-
-type Avatar = {
-  equippedHatId: number | null;
-  equippedOutfitId: number | null;
-  equippedBackgroundId: number | null;
-  equippedPetId: number | null;
-  equippedAuraId: number | null;
-  bodyType?: "BOY" | "GIRL";
-};
+import { Avatar, Cosmetic } from "../../src/types/avatar";
 
 export default function DashboardScreen() {
   const { user, refreshUser } = useAuth();
   const [avatar, setAvatar] = useState<Avatar | null>(null);
+  const [cosmetics, setCosmetics] = useState<Cosmetic[]>([]);
   const [weeklyQuest, setWeeklyQuest] = useState<WeeklyQuest | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [questBusy, setQuestBusy] = useState(false);
@@ -38,11 +31,16 @@ export default function DashboardScreen() {
             return;
           }
 
-          const res = await api.get<Avatar>("/avatar");
-          setAvatar(res.data);
-          const questRes = await api.get<WeeklyQuest>("/weekly-quests/current");
+          const [avatarRes, cosmeticsRes, questRes, achievementRes] =
+            await Promise.all([
+              api.get<Avatar>("/avatar"),
+              api.get<Cosmetic[]>("/avatar/cosmetics"),
+              api.get<WeeklyQuest>("/weekly-quests/current"),
+              api.get<Achievement[]>("/achievements"),
+            ]);
+          setAvatar(avatarRes.data);
+          setCosmetics(cosmeticsRes.data);
           setWeeklyQuest(questRes.data);
-          const achievementRes = await api.get<Achievement[]>("/achievements");
           setAchievements(achievementRes.data);
         } catch (error) {
           console.log("Dashboard load error:", error);
@@ -110,14 +108,34 @@ export default function DashboardScreen() {
       bounces={false}
       overScrollMode="never"
     >
+      <View style={styles.header}>
+        <Text accessibilityRole="header" style={styles.title}>Home</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Profile"
+          onPress={() => router.navigate("/(tabs)/profile")}
+          style={({ pressed }) => [styles.profileButton, pressed && styles.buttonPressed]}
+        >
+          <MaterialCommunityIcons name="account-cog" color={colors.primary} size={22} />
+          <Text style={styles.profileButtonText}>Profile</Text>
+        </Pressable>
+      </View>
+
       <LifeCard style={styles.heroCard}>
         <AvatarRenderer
+          hairId={avatar?.equippedHairId}
           hatId={avatar?.equippedHatId}
-          outfitId={avatar?.equippedOutfitId}
+          topId={avatar?.equippedTopId}
+          bottomId={avatar?.equippedBottomId}
+          bootsId={avatar?.equippedBootsId}
+          capeId={avatar?.equippedCapeId}
+          weaponId={avatar?.equippedWeaponId}
+          shieldId={avatar?.equippedShieldId}
           backgroundId={avatar?.equippedBackgroundId}
           petId={avatar?.equippedPetId}
           auraId={avatar?.equippedAuraId}
           bodyType={avatar?.bodyType}
+          cosmetics={cosmetics}
           size="compact"
         />
 
@@ -242,10 +260,36 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  subtitle: {
-    color: colors.mutedText,
-    fontSize: 16,
-    marginTop: 2,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    flexWrap: "wrap",
+  },
+
+  profileButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+
+  profileButtonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+
+  buttonPressed: {
+    backgroundColor: colors.cardLight,
   },
 
   heroCard: {

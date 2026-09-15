@@ -1,401 +1,231 @@
-import { Image, ImageSourcePropType, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
+
 import {
-  ACCESSORY_IMAGES,
-  AURA_IMAGES,
-  BACKGROUND_IMAGES,
-  BASE_BODY_LAYERS,
-  FULL_BODY_IMAGES,
-  HAT_IMAGES,
-  HAT_LAYER_IMAGES,
-  OUTFIT_LAYER_IMAGES,
-  PARTICLE_IMAGES,
-  PET_BEHIND_IMAGES,
-  PET_FRONT_IMAGES,
+  BASE_BODY_SPRITES,
+  DEFAULT_CHARACTER_SPRITES,
+  getEquippedCharacterSprites,
+  getEquippedSceneSource,
+  resolveSpriteSet,
 } from "../avatar/assetRegistry";
+import type { ResolvedCharacterSprite } from "../avatar/assetRegistry";
+import CharacterSpriteLayers from "./CharacterSpriteLayers";
+import {
+  CHARACTER_CANVAS,
+  CHARACTER_LAYER_PRIORITY,
+  SHOW_CHARACTER_LAYER_DEBUG,
+} from "../avatar/cosmeticCatalog";
+import { Cosmetic } from "../types/avatar";
 import { colors } from "../theme/theme";
 
 type Props = {
   bodyType?: "BOY" | "GIRL";
+  hairId?: number | null;
   hatId?: number | null;
-  outfitId?: number | null;
+  topId?: number | null;
+  bottomId?: number | null;
+  bootsId?: number | null;
+  capeId?: number | null;
+  weaponId?: number | null;
+  shieldId?: number | null;
   backgroundId?: number | null;
   petId?: number | null;
   auraId?: number | null;
-  accessoryId?: number | null;
-  particleId?: number | null;
+  cosmetics?: Cosmetic[];
+  showBackground?: boolean;
   size?: "compact" | "regular";
 };
 
 export default function AvatarRenderer({
   bodyType = "BOY",
+  hairId,
   hatId,
-  outfitId,
+  topId,
+  bottomId,
+  bootsId,
+  capeId,
+  weaponId,
+  shieldId,
   backgroundId,
   petId,
   auraId,
-  accessoryId,
-  particleId,
+  cosmetics,
+  showBackground = true,
   size = "regular",
 }: Props) {
-  const backgroundImage = backgroundId
-    ? BACKGROUND_IMAGES[backgroundId]
-    : undefined;
-  const hatImage = hatId ? HAT_IMAGES[hatId] : undefined;
-  const hatLayerImage = hatId ? HAT_LAYER_IMAGES[hatId] : undefined;
-  const outfitLayers = outfitId ? OUTFIT_LAYER_IMAGES[outfitId] : undefined;
-  const petBehindImage = petId ? PET_BEHIND_IMAGES[petId] : undefined;
-  const petFrontImage = petId ? PET_FRONT_IMAGES[petId] : undefined;
-  const auraImage = auraId ? AURA_IMAGES[auraId] : undefined;
-  const accessoryImage = accessoryId
-    ? ACCESSORY_IMAGES[accessoryId]
-    : undefined;
-  const particleImage = particleId ? PARTICLE_IMAGES[particleId] : undefined;
-  const hasBoots = Boolean(outfitLayers?.boots);
-  const fullBodyImage = bodyType === "GIRL" ? FULL_BODY_IMAGES.GIRL : undefined;
+  const backgroundImage = getEquippedSceneSource(
+    cosmetics,
+    backgroundId,
+    "BACKGROUND",
+  );
+  const auraImage = getEquippedSceneSource(cosmetics, auraId, "AURA");
+  const petImage = getEquippedSceneSource(cosmetics, petId, "PET");
+
+  const equippedSprites = [
+    ...getEquippedCharacterSprites(cosmetics, capeId, "CAPE"),
+    ...getEquippedCharacterSprites(cosmetics, hairId, "HAIR"),
+    ...getEquippedCharacterSprites(cosmetics, hatId, "HAT"),
+    ...getEquippedCharacterSprites(cosmetics, weaponId, "WEAPON"),
+    ...getEquippedCharacterSprites(cosmetics, shieldId, "SHIELD"),
+    ...resolveSpriteSet(`base-body:${bodyType}`, BASE_BODY_SPRITES[bodyType]),
+    ...(cosmetics === undefined
+      ? resolveSpriteSet("registration-default", DEFAULT_CHARACTER_SPRITES)
+      : []),
+    ...getEquippedCharacterSprites(cosmetics, bottomId, "BOTTOM"),
+    ...getEquippedCharacterSprites(cosmetics, bootsId, "BOOTS"),
+    ...getEquippedCharacterSprites(cosmetics, topId, "TOP"),
+  ];
+  const coveredBodyRegions = new Set(
+    equippedSprites.flatMap(({ covers }) => covers ?? []),
+  );
+  const characterSprites = sortCharacterSprites(
+    equippedSprites.filter(
+      ({ region }) => region === undefined || !coveredBodyRegions.has(region),
+    ),
+  );
+
+  if (__DEV__ && SHOW_CHARACTER_LAYER_DEBUG) {
+    console.info(
+      [
+        "Character render order:",
+        ...characterSprites.map(
+          ({ key, layer }) =>
+            `${CHARACTER_LAYER_PRIORITY[layer]} ${layer} (${key})`,
+        ),
+      ].join("\n"),
+    );
+  }
 
   return (
     <View style={[styles.stage, size === "compact" && styles.compactStage]}>
-      {backgroundImage ? (
-        <Image source={backgroundImage} style={styles.backgroundImage} />
+      {showBackground && (backgroundImage ? (
+        <Image
+          source={backgroundImage}
+          style={styles.backgroundImage}
+          resizeMode="cover"
+        />
       ) : (
-        backgroundId && <View style={styles.backgroundLayer} />
-      )}
+        <View style={styles.backgroundLayer} />
+      ))}
 
       {auraImage ? (
-        <Image source={auraImage} style={styles.auraImage} />
+        <Image source={auraImage} style={styles.auraImage} resizeMode="contain" />
       ) : (
-        auraId && <View style={styles.auraGlow} />
+        <View style={styles.auraGlow} />
       )}
 
-      {petBehindImage && (
-        <Image source={petBehindImage} style={styles.petBehindImage} />
-      )}
+      <View style={styles.shadow} />
 
-      <View style={styles.character}>
-        <View style={styles.shadow} />
-
-        {outfitLayers?.capeBack && (
-          <AvatarLayer source={outfitLayers.capeBack} />
-        )}
-
-        {fullBodyImage ? (
-          <AvatarLayer source={fullBodyImage} />
-        ) : (
-          <>
-            <AvatarLayer source={BASE_BODY_LAYERS.hairBack} />
-            <AvatarLayer source={BASE_BODY_LAYERS.torso} />
-            <AvatarLayer source={BASE_BODY_LAYERS.arms} />
-            <AvatarLayer source={BASE_BODY_LAYERS.legs} />
-            {!hasBoots && <AvatarLayer source={BASE_BODY_LAYERS.feet} />}
-            <AvatarLayer source={BASE_BODY_LAYERS.head} />
-          </>
-        )}
-
-        {outfitLayers?.outfit && <AvatarLayer source={outfitLayers.outfit} />}
-        {outfitLayers?.boots && <AvatarLayer source={outfitLayers.boots} />}
-        {outfitLayers?.gloves && <AvatarLayer source={outfitLayers.gloves} />}
-        {outfitLayers?.belt && <AvatarLayer source={outfitLayers.belt} />}
-        {outfitLayers?.capeFront && (
-          <AvatarLayer source={outfitLayers.capeFront} />
-        )}
-
-        {!outfitLayers && (
-          <FallbackOutfit outfitId={outfitId} bodyType={bodyType} />
-        )}
-
-        {!fullBodyImage && <AvatarLayer source={BASE_BODY_LAYERS.hairFront} />}
-
-        {hatImage ? (
-          <Image source={hatImage} style={styles.hatImage} />
-        ) : hatLayerImage ? (
-          <AvatarLayer source={hatLayerImage} />
-        ) : (
-          <FallbackHat hatId={hatId} />
-        )}
-
-        {outfitLayers?.accessories && (
-          <AvatarLayer source={outfitLayers.accessories} />
-        )}
-
-        {accessoryImage && <AvatarLayer source={accessoryImage} />}
+      <View
+        style={styles.characterCanvas}
+        accessibilityLabel={`Character render order: ${characterSprites
+          .map(({ layer }) => layer)
+          .join(", ")}`}
+      >
+        <CharacterSpriteLayers sprites={characterSprites} />
       </View>
 
-      {petFrontImage ? (
-        <Image source={petFrontImage} style={styles.petImage} />
+      {petImage ? (
+        <Image source={petImage} style={styles.petImage} resizeMode="contain" />
       ) : (
         petId && (
-          <View style={styles.pet}>
-            <Text style={styles.petText}>🐉</Text>
+          <View style={styles.petFallback}>
+            <Text style={styles.petFallbackText}>🐉</Text>
           </View>
         )
-      )}
-
-      {particleImage && (
-        <Image source={particleImage} style={styles.particleImage} />
       )}
     </View>
   );
 }
 
-function AvatarLayer({ source }: { source: ImageSourcePropType }) {
-  return <Image source={source} style={styles.avatarLayer} />;
-}
-
-function FallbackOutfit({
-  outfitId,
-  bodyType,
-}: {
-  outfitId?: number | null;
-  bodyType: "BOY" | "GIRL";
-}) {
-  if (!outfitId) {
-    return null;
-  }
-
-  return (
-    <>
-      <View style={styles.fallbackLegs}>
-        <View style={styles.fallbackLeg} />
-        <View style={styles.fallbackLeg} />
-      </View>
-
-      <View
-        style={[
-          styles.fallbackBody,
-          bodyType === "GIRL" && styles.girlFallbackBody,
-          outfitId === 3 && styles.scholarRobe,
-          outfitId === 4 && styles.goldOutfit,
-        ]}
-      >
-        {outfitId === 3 && <View style={styles.robeGem} />}
-        {outfitId === 4 && <View style={styles.goldGem} />}
-      </View>
-    </>
-  );
-}
-
-function FallbackHat({ hatId }: { hatId?: number | null }) {
-  if (hatId === 1) {
-    return <View style={styles.starterCap} />;
-  }
-
-  if (hatId === 2) {
-    return <View style={styles.headband} />;
-  }
-
-  return null;
+function sortCharacterSprites(sprites: ResolvedCharacterSprite[]) {
+  return [...sprites].sort((left, right) => {
+    const priorityDifference =
+      CHARACTER_LAYER_PRIORITY[left.layer] -
+      CHARACTER_LAYER_PRIORITY[right.layer];
+    return priorityDifference || left.key.localeCompare(right.key);
+  });
 }
 
 const styles = StyleSheet.create({
   stage: {
-    width: 260,
-    height: 340,
+    width: 320,
+    aspectRatio: CHARACTER_CANVAS.aspectRatio,
+    maxWidth: "100%",
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    maxWidth: "100%",
+    overflow: "visible",
   },
-
   compactStage: {
-    transform: [{ scale: 0.84 }],
-    marginVertical: -28,
+    transform: [{ scale: 0.78 }],
+    marginVertical: -48,
   },
-
   backgroundLayer: {
     position: "absolute",
-    width: 235,
-    height: 290,
-    borderRadius: 38,
+    width: "100%",
+    height: "100%",
+    borderRadius: 42,
     backgroundColor: colors.cardLight,
-    opacity: 0.42,
+    opacity: 0.34,
     borderWidth: 1,
     borderColor: colors.border,
   },
-
   backgroundImage: {
     position: "absolute",
-    width: 245,
-    height: 300,
-    borderRadius: 38,
-    resizeMode: "cover",
+    width: "100%",
+    height: "100%",
+    borderRadius: 42,
   },
-
   auraGlow: {
     position: "absolute",
-    width: 210,
-    height: 260,
+    width: 230,
+    height: 330,
     borderRadius: 999,
     backgroundColor: colors.primary,
-    opacity: 0.1,
-    shadowColor: colors.primary,
-    shadowOpacity: 1,
-    shadowRadius: 28,
+    opacity: 0.08,
   },
-
   auraImage: {
     position: "absolute",
-    width: 245,
-    height: 245,
-    resizeMode: "contain",
-    opacity: 0.78,
+    width: "100%",
+    height: "100%",
+    opacity: 0.72,
   },
-
-  character: {
-    width: 210,
-    height: 290,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-    transform: [{ translateY: 18 }],
-  },
-
   shadow: {
     position: "absolute",
-    bottom: 58,
-    width: 112,
-    height: 22,
+    bottom: 18,
+    width: 132,
+    height: 20,
     borderRadius: 999,
     backgroundColor: "#070B08",
     opacity: 0.24,
   },
-
-  avatarLayer: {
+  characterCanvas: {
+    position: "relative",
+    width: "100%",
+    height: "100%",
+    overflow: "visible",
+  },
+  petImage: {
     position: "absolute",
-    width: 210,
-    height: 290,
-    resizeMode: "contain",
-    zIndex: 3,
+    right: 2,
+    bottom: 28,
+    width: 94,
+    height: 94,
   },
-
-  hatImage: {
+  petFallback: {
     position: "absolute",
-    top: 18,
-    width: 150,
-    height: 96,
-    resizeMode: "contain",
-    zIndex: 6,
-  },
-
-  fallbackBody: {
-    position: "absolute",
-    bottom: 72,
-    width: 128,
-    height: 112,
-    backgroundColor: colors.cardLight,
-    borderRadius: 30,
-    borderWidth: 5,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 4,
-  },
-
-  girlFallbackBody: {
-    width: 118,
-    borderRadius: 34,
-  },
-
-  scholarRobe: {
-    backgroundColor: colors.primaryDark,
-    borderColor: colors.primary,
-  },
-
-  goldOutfit: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primaryDark,
-  },
-
-  robeGem: {
-    width: 24,
-    height: 24,
-    borderRadius: 999,
-    backgroundColor: colors.primary,
-  },
-
-  goldGem: {
-    width: 24,
-    height: 24,
-    borderRadius: 999,
-    backgroundColor: colors.accent,
-  },
-
-  fallbackLegs: {
-    position: "absolute",
-    bottom: 46,
-    flexDirection: "row",
-    gap: 14,
-    zIndex: 2,
-  },
-
-  fallbackLeg: {
-    width: 34,
+    right: 16,
+    bottom: 34,
+    width: 58,
     height: 58,
-    backgroundColor: colors.cardLight,
-    borderRadius: 16,
-  },
-
-  starterCap: {
-    position: "absolute",
-    top: 46,
-    width: 108,
-    height: 28,
-    backgroundColor: colors.primary,
-    borderRadius: 999,
-    zIndex: 8,
-    borderWidth: 3,
-    borderColor: colors.primary,
-  },
-
-  headband: {
-    position: "absolute",
-    top: 70,
-    width: 114,
-    height: 16,
-    backgroundColor: colors.accent,
-    borderRadius: 999,
-    zIndex: 8,
-  },
-
-  pet: {
-    position: "absolute",
-    right: 18,
-    bottom: 44,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    borderRadius: 29,
     backgroundColor: colors.card,
     borderWidth: 2,
     borderColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  petText: {
+  petFallbackText: {
     fontSize: 32,
-  },
-
-  petImage: {
-    position: "absolute",
-    right: 12,
-    bottom: 28,
-    width: 86,
-    height: 86,
-    resizeMode: "contain",
-  },
-
-  petBehindImage: {
-    position: "absolute",
-    left: 14,
-    bottom: 38,
-    width: 72,
-    height: 72,
-    resizeMode: "contain",
-  },
-
-  particleImage: {
-    position: "absolute",
-    width: 260,
-    height: 340,
-    resizeMode: "contain",
   },
 });

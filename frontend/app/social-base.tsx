@@ -36,12 +36,12 @@ const BUILDING_META: Record<BuildingType, { icon: IconName; color: string }> = {
 };
 
 const BUILDING_MAP_POSITIONS: Record<BuildingType, ViewStyle> = {
-  "Hall of Achievements": { left: "31%", top: "14%", width: "38%", height: 148 },
-  Library: { left: "8%", top: "29%", width: "32%", height: 126 },
-  "Training Grounds": { right: "7%", top: "27%", width: "38%", height: 148 },
-  Garden: { left: "31%", top: "47%", width: "34%", height: 122 },
-  "Home Base": { left: "9%", bottom: "10%", width: "34%", height: 138 },
-  Workshop: { right: "9%", bottom: "9%", width: "34%", height: 136 },
+  "Hall of Achievements": { left: "31%", top: "10%", width: "38%", height: 160 },
+  Library: { left: "10%", top: "31%", width: "33%", height: 132 },
+  "Training Grounds": { right: "8%", top: "30%", width: "38%", height: 154 },
+  Garden: { left: "32%", top: "49%", width: "34%", height: 128 },
+  "Home Base": { left: "13%", bottom: "8%", width: "35%", height: 146 },
+  Workshop: { right: "13%", bottom: "8%", width: "35%", height: 144 },
 };
 
 const BASE_MAP_CAMERA = {
@@ -267,7 +267,8 @@ const styles = StyleSheet.create({
     height: "122%",
   },
   mapVignette: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    inset: 0,
     backgroundColor: "rgba(17, 23, 19, 0.08)",
   },
   mapStage: {
@@ -281,7 +282,7 @@ const styles = StyleSheet.create({
   },
   buildingNode: {
     width: "100%",
-    height: "78%",
+    height: "84%",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
@@ -292,6 +293,7 @@ const styles = StyleSheet.create({
   buildingImage: {
     width: "100%",
     height: "100%",
+    transform: [{ rotate: "180deg" }],
   },
   nodeName: {
     color: colors.text,

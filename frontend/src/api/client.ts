@@ -1,7 +1,6 @@
 import { create } from "axios";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
-import { getToken } from "../utils/tokenStorage";
 
 type ExpoConstantsWithManifest = typeof Constants & {
   manifest2?: {
@@ -27,14 +26,4 @@ export const API_BASE_URL =
 
 export const api = create({
   baseURL: API_BASE_URL,
-});
-
-api.interceptors.request.use(async (config) => {
-  const token = await getToken();
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  return config;
 });

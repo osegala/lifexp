@@ -35,6 +35,11 @@ public class AvatarController {
         return avatarService.equipCosmeticForCurrentUser(request.getCosmeticId());
     }
 
+    @PutMapping("/unequip")
+    public AvatarResponse unequipCosmetic(@Valid @RequestBody EquipCosmeticRequest request) {
+        return avatarService.unequipCosmeticForCurrentUser(request.getCosmeticId());
+    }
+
     @PutMapping("/body-type")
     public AvatarResponse setBodyType(@Valid @RequestBody SetAvatarBodyTypeRequest request) {
         return avatarService.setBodyTypeForCurrentUser(request.getBodyType());
