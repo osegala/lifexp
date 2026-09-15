@@ -13,15 +13,23 @@ import java.util.Date;
 @Service
 public class JwtService {
     
-    @Value("${app.jwt.secret}")
-    private String jwtSecret;
+    private final SecretKey signingKey;
+    private final long jwtExpiration;
 
-    @Value("${app.jwt.expiration}")
-    private long jwtExpiration;
-
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-    }   
+    public JwtService(
+            @Value("${app.jwt.secret}") String jwtSecret,
+            @Value("${app.jwt.expiration}") long jwtExpiration
+    ) {
+        if (jwtSecret == null || jwtSecret.isBlank()
+                || jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalArgumentException("JWT_SECRET must contain at least 32 bytes of random secret material.");
+        }
+        if (jwtExpiration <= 0) {
+            throw new IllegalArgumentException("JWT expiration must be positive.");
+        }
+        this.signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        this.jwtExpiration = jwtExpiration;
+    }
 
     public String generateToken(String email) {
         Date now = new Date();
@@ -31,7 +39,7 @@ public class JwtService {
                 .subject(email)
                 .issuedAt(now)
                 .expiration(expirationDate)
-                .signWith(getSigningKey())
+                .signWith(signingKey)
                 .compact();                
     }
 
@@ -50,7 +58,7 @@ public class JwtService {
 
     private Claims extractClaims(String token) {
         return Jwts.parser()
-                .verifyWith(getSigningKey())
+                .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();

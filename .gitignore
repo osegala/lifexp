@@ -37,7 +37,7 @@ build/
 .vscode/
 
 # Node / Expo
-frontend/node_modules/
+node_modules/
 frontend/.expo/
 frontend/dist/
 
@@ -46,7 +46,23 @@ frontend/dist/
 
 # Env files
 .env
-.env.local
+.env.*
+!.env.example
+!.env.*.example
+application-local.properties
+application-local.yml
+application-local.yaml
+
+# Private credentials and signing material
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+service-account*.json
+*-service-account.json
 
 # Logs
 *.log

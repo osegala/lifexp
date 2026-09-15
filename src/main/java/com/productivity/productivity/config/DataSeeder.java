@@ -2,40 +2,29 @@ package com.productivity.productivity.config;
 
 import com.productivity.productivity.entity.Cosmetic;
 import com.productivity.productivity.entity.CosmeticType;
-import com.productivity.productivity.entity.BuildingType;
-import com.productivity.productivity.entity.User;
-import com.productivity.productivity.entity.UserBuilding;
 import com.productivity.productivity.repository.CosmeticRepository;
-import com.productivity.productivity.repository.UserBuildingRepository;
 import com.productivity.productivity.repository.UserRepository;
 import com.productivity.productivity.service.AvatarService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
-@Order(Ordered.LOWEST_PRECEDENCE)
+@Order(Ordered.LOWEST_PRECEDENCE - 1)
 public class DataSeeder implements CommandLineRunner {
 
     private final CosmeticRepository cosmeticRepository;
     private final UserRepository userRepository;
-    private final UserBuildingRepository userBuildingRepository;
-    private final PasswordEncoder passwordEncoder;
     private final AvatarService avatarService;
 
     public DataSeeder(
             CosmeticRepository cosmeticRepository,
             UserRepository userRepository,
-            UserBuildingRepository userBuildingRepository,
-            PasswordEncoder passwordEncoder,
             AvatarService avatarService
     ) {
         this.cosmeticRepository = cosmeticRepository;
         this.userRepository = userRepository;
-        this.userBuildingRepository = userBuildingRepository;
-        this.passwordEncoder = passwordEncoder;
         this.avatarService = avatarService;
     }
 
@@ -136,7 +125,6 @@ public class DataSeeder implements CommandLineRunner {
         seedCosmetic("Verdant Warden Hat", CosmeticType.HAT, 1, "avatar-v2/hats/verdant-warden-hat");
         seedCosmetic("Celestial Acolyte Hat", CosmeticType.HAT, 1, "avatar-v2/hats/celestial-acolyte-hat");
         seedCosmetic("Royal Bard Hat", CosmeticType.HAT, 1, "avatar-v2/hats/royal-bard-hat");
-        seedTierSixTester();
         userRepository.findAll().forEach(avatarService::initializeStarterWardrobe);
 
         System.out.println("Cosmetics seeded successfully.");
@@ -155,37 +143,4 @@ public class DataSeeder implements CommandLineRunner {
         cosmeticRepository.save(cosmetic);
     }
 
-    private void seedTierSixTester() {
-        User user = userRepository.findByEmail("tier6@lifexp.test")
-                .or(() -> userRepository.findByUsername("TierSixTester"))
-                .orElseGet(User::new);
-
-        user.setUsername("TierSixTester");
-        user.setEmail("tier6@lifexp.test");
-        user.setPassword(passwordEncoder.encode("password"));
-        user.setLevel(Math.max(user.getLevel(), 36));
-        user.setTotalXp(Math.max(user.getTotalXp(), totalUserXpForLevel(36)));
-        user.setCoins(Math.max(user.getCoins(), 1000));
-
-        User savedUser = userRepository.save(user);
-        int tierSixXp = totalXpForLevel(36);
-
-        for (BuildingType type : BuildingType.values()) {
-            UserBuilding building = userBuildingRepository
-                    .findByUserIdAndBuildingType(savedUser.getId(), type)
-                    .orElseGet(() -> new UserBuilding(savedUser, type));
-            building.setLevel(36);
-            building.setTotalXp(tierSixXp);
-            building.setVisualTier(5);
-            userBuildingRepository.save(building);
-        }
-    }
-
-    private int totalXpForLevel(int level) {
-        return (int) (40 * Math.pow(level - 1, 1.8));
-    }
-
-    private int totalUserXpForLevel(int level) {
-        return (int) (15 * Math.pow(level, 2.2));
-    }
 }
