@@ -1,0 +1,109 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local-validation:
+    name: Local backend validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v3
+        with:
+          use-installer: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show tool versions
+        run: |
+          node --version
+          sam --version
+
+      - name: Check JavaScript syntax
+        run: find functions layers shared seeds scripts tests -name '*.mjs' -exec node --check {} \;
+
+      - name: Run unit tests
+        run: node --test
+
+      - name: Validate SAM template
+        run: sam validate --lint
+
+      - name: Build SAM application
+        run: sam build
+
+  deployed-dev-read-only:
+    name: Deployed DEV read-only integration
+    needs: local-validation
+    if: >-
+      vars.EVRENTHIA_DEV_CI_ROLE_ARN != '' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Configure short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ vars.EVRENTHIA_DEV_CI_ROLE_ARN }}
+          role-session-name: evrenthia-ci-${{ github.run_id }}
+          aws-region: us-east-2
+          mask-aws-account-id: true
+
+      - name: Show tool versions
+        run: |
+          node --version
+          aws --version
+
+      - name: Run deployed DEV read-only integration tests
+        env:
+          EVRENTHIA_TEST_EMAIL: ${{ secrets.EVRENTHIA_TEST_EMAIL }}
+          EVRENTHIA_TEST_PASSWORD: ${{ secrets.EVRENTHIA_TEST_PASSWORD }}
+          EVRENTHIA_AWS_REGION: us-east-2
+          EVRENTHIA_STACK_NAME: evrenthia-dev
+        run: node scripts/integration-test-dev.mjs --read-only
