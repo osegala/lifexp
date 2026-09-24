@@ -17,6 +17,7 @@ export type EnvironmentConfig = {
 };
 
 export const AWS_REGION = "us-east-2";
+export const DEV_API_URL = "https://yjt7uh5r62.execute-api.us-east-2.amazonaws.com";
 export const DEV_COGNITO_USER_POOL_ID = "us-east-2_GeLguitkg";
 export const DEV_COGNITO_CLIENT_ID = "2d934f22a9lvbppn6m9liistj";
 export const PROD_API_URL = "https://ifzeath0p5.execute-api.us-east-2.amazonaws.com";
@@ -83,7 +84,7 @@ export function resolveEnvironment(values: PublicEnvironment): EnvironmentConfig
       throw new Error("Production frontend configuration does not match the production backend.");
     }
   } else if (
-    normalizedApiUrl === PROD_API_URL ||
+    normalizedApiUrl !== DEV_API_URL ||
     cognitoUserPoolId !== DEV_COGNITO_USER_POOL_ID ||
     cognitoClientId !== DEV_COGNITO_CLIENT_ID
   ) {

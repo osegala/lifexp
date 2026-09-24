@@ -11,6 +11,7 @@
       "env": {
         "EXPO_PUBLIC_APP_ENV": "dev",
         "EXPO_PUBLIC_AWS_REGION": "us-east-2",
+        "EXPO_PUBLIC_API_URL": "https://yjt7uh5r62.execute-api.us-east-2.amazonaws.com",
         "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-2_GeLguitkg",
         "EXPO_PUBLIC_COGNITO_CLIENT_ID": "2d934f22a9lvbppn6m9liistj"
       }

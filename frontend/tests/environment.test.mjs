@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
   AWS_REGION,
+  DEV_API_URL,
   DEV_COGNITO_CLIENT_ID,
   DEV_COGNITO_USER_POOL_ID,
   PROD_API_URL,
@@ -25,7 +26,7 @@ function sourceFiles(directory) {
 const devValues = {
   EXPO_PUBLIC_APP_ENV: "dev",
   EXPO_PUBLIC_AWS_REGION: AWS_REGION,
-  EXPO_PUBLIC_API_URL: "https://dev123.execute-api.us-east-2.amazonaws.com",
+  EXPO_PUBLIC_API_URL: DEV_API_URL,
   EXPO_PUBLIC_COGNITO_USER_POOL_ID: DEV_COGNITO_USER_POOL_ID,
   EXPO_PUBLIC_COGNITO_CLIENT_ID: DEV_COGNITO_CLIENT_ID,
 };
@@ -62,6 +63,7 @@ test("canonical environment configuration loads the exact production backend", (
 test("development and production resources cannot be cross-wired", () => {
   for (const override of [
     { EXPO_PUBLIC_API_URL: PROD_API_URL },
+    { EXPO_PUBLIC_API_URL: "https://anotherdev.execute-api.us-east-2.amazonaws.com" },
     { EXPO_PUBLIC_COGNITO_USER_POOL_ID: PROD_COGNITO_USER_POOL_ID },
     { EXPO_PUBLIC_COGNITO_CLIENT_ID: PROD_COGNITO_CLIENT_ID },
   ]) {
@@ -102,9 +104,29 @@ test("auth and API modules consume the one canonical runtime configuration", () 
 
 test("EAS production selects only the approved public production configuration", () => {
   const eas = JSON.parse(read("eas.json"));
-  assert.equal(eas.build.development.env.EXPO_PUBLIC_APP_ENV, "dev");
+  assert.deepEqual(eas.build.development.env, devValues);
+  assert.equal(eas.build.development.developmentClient, true);
+  assert.equal(eas.build.development.distribution, "internal");
   assert.equal(eas.build.preview.env.EXPO_PUBLIC_APP_ENV, "dev");
   assert.deepEqual(eas.build.production.env, prodValues);
+});
+
+test("the Expo app includes an SDK-compatible development client and stable native IDs", () => {
+  const packageJson = JSON.parse(read("package.json"));
+  const app = JSON.parse(read("app.json")).expo;
+  assert.match(packageJson.dependencies["expo-dev-client"], /^~57\./);
+  assert.equal(app.ios.bundleIdentifier, "com.osegssteam.owen");
+  assert.equal(app.android.package, "com.osegssteam.owen");
+});
+
+test("the documented local environment uses the exact development backend", () => {
+  const example = Object.fromEntries(
+    read(".env.example")
+      .split("\n")
+      .filter(line => line && !line.startsWith("#"))
+      .map(line => line.split("=")),
+  );
+  assert.deepEqual(example, devValues);
 });
 
 test("frontend source embeds no credential variables and makes no LIVE-delivery assumption", () => {

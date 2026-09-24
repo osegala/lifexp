@@ -1,24 +1,41 @@
-# Welcome to your Expo app 👋
+# Evrenthia Expo frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This Expo app uses AWS Amplify v6 for Cognito authentication and the Evrenthia SAM API for authenticated application data.
 
-## Get started
+## Local development against DEV
 
-1. Install dependencies
+1. Install dependencies:
 
    ```bash
    npm install
    ```
 
-2. Start the app
+2. Create the ignored local environment file:
 
    ```bash
    cp .env.example .env.local
-   # Replace EXPO_PUBLIC_API_URL with the evrenthia-dev DevApiUrl output.
-   npx expo start
    ```
 
-The app defaults to the `dev` environment and fails fast when its public backend configuration is missing, malformed, or mixes development and production resources. Local `.env` files are gitignored; only public examples are committed.
+   `.env.example` contains the approved public DEV API and Cognito identifiers. Do not put passwords, tokens, AWS credentials, or test-user credentials in `.env.local`.
+
+3. After installing a development build on the device, start Metro:
+
+   ```bash
+   npx expo start --dev-client
+   ```
+
+Expo Go is not supported for this project. AWS Amplify's React Native support and `expo-secure-store` use native modules, so use a development build.
+
+For the first development build, run one of these commands separately. These commands contact EAS and are intentionally not part of normal local validation:
+
+```bash
+eas build --profile development --platform ios
+eas build --profile development --platform android
+```
+
+An EAS-signed development build for a physical iPhone requires access to an Apple Developer Program team and registered device provisioning. The Android internal-distribution build can be downloaded and installed directly on a test device after allowing installation from that source.
+
+Use a fresh test email address controlled by the developer for on-device Cognito signup and email confirmation. Never commit that address's password or confirmation code.
 
 ## Backend environments
 
@@ -30,15 +47,24 @@ All backend selection flows through `src/config/environment.ts`. The required cl
 - `EXPO_PUBLIC_COGNITO_USER_POOL_ID` — the matching user pool
 - `EXPO_PUBLIC_COGNITO_CLIENT_ID` — the matching public app client
 
-To run locally against development, copy `.env.example` to `.env.local`, replace its API placeholder with the `DevApiUrl` output from `evrenthia-dev`, and start Expo. To test production locally, copy `.env.production.example` to `.env.local` and restart Expo with a cleared Metro cache. Production is selected only by `EXPO_PUBLIC_APP_ENV=prod`, and the app rejects any production/dev cross-wiring.
+The local `.env.local` and EAS `development` profile use exactly:
+
+- API: `https://yjt7uh5r62.execute-api.us-east-2.amazonaws.com`
+- Region: `us-east-2`
+- Cognito user pool: `us-east-2_GeLguitkg`
+- Cognito app client: `2d934f22a9lvbppn6m9liistj`
+
+The app fails fast if development uses any other API or if development and production resources are mixed. To test production locally, copy `.env.production.example` to `.env.local` and restart Expo with a cleared Metro cache. Production is selected only by `EXPO_PUBLIC_APP_ENV=prod`; its existing EAS profile and public identifiers are unchanged.
 
 Every `EXPO_PUBLIC_` value is embedded in the client bundle and readable by app users. Never put passwords, Cognito tokens, authorization headers, AWS credentials, production smoke-test credentials, or other secrets in these variables or in the mobile repository.
 
-The EAS `development` and `preview` profiles explicitly select `dev`; their deployed dev API URL must be configured in the corresponding EAS environment before a future build. The `production` profile contains only the approved public production identifiers and selects `prod`. It is ready to consume that configuration during a later, separately approved production build; this repository change does not build, publish, submit, or update the app.
+The EAS `development` profile is an internal development-client build and contains the approved DEV public configuration. The `preview` profile also selects `dev` and may source its API URL from its EAS environment. The `production` profile contains only the approved public production identifiers and selects `prod`. Building, publishing, submitting, or updating production requires separate approval.
 
-No Expo device-token registration currently exists in the frontend. It may later register devices through the production `/devices` API, but production notification delivery currently remains `DRY_RUN`. Enabling actual push delivery requires a separate approved backend change.
+No Expo device-token registration currently exists in the frontend. It may later register devices through the production `/devices` API, but production notification delivery remains `DRY_RUN`. Enabling actual push delivery requires a separate approved backend change.
 
-AWS Amplify v6 manages Cognito sessions and refresh tokens. Its native React Native support requires a development build rather than Expo Go.
+## Auth and API behavior
+
+AWS Amplify v6 manages Cognito sessions and refresh tokens. Signup and confirmation use email and an emailed code. Authenticated API requests use the Cognito ID token as a bearer token; raw passwords are passed only to Cognito and are not stored by application code.
 
 The active task, goals, achievements, world, shop, inventory, entitlement, and profile screens use the routes in `backend/template.yaml`. Weekly progress is read from `/goals`; rewards are granted by task completion and have no client-side claim action. Premium status is read-only through `/entitlements`, and no development entitlement setter is present.
 
@@ -46,35 +72,6 @@ Social, visiting another player's base, and building-interior customization are 
 
 Avatar body type is appearance-only state saved locally with SecureStore. It is not part of `PROFILE`, is not sent to Cognito, and is never included in `PATCH /me`; only `displayName` and `timeZone` are editable profile fields in the app. Owned cosmetics and equipped slots come from `/inventory`.
 
-In the output, you'll find options to open the app in a
+## Native configuration
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The current native configuration uses iOS bundle identifier `com.osegssteam.owen` and Android package `com.osegssteam.owen`. No camera, location, or push-notification permission is requested by the current feature set. Do not change signing credentials as part of local development setup.

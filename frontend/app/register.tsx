@@ -15,6 +15,7 @@ import LifeButton from "../src/components/LifeButton";
 import LifeCard from "../src/components/LifeCard";
 import LifeInput from "../src/components/LifeInput";
 import AvatarRenderer from "../src/components/AvatarRenderer";
+import { authErrorMessage } from "../src/auth/errors";
 import { useAuth } from "../src/context/AuthContext";
 import { colors, radius, spacing } from "../src/theme/theme";
 import { setLocalBodyType } from "../src/avatar/localAppearance";
@@ -59,8 +60,8 @@ export default function RegisterScreen() {
         await login(trimmedEmail, password);
         router.replace("/(tabs)/dashboard");
       }
-    } catch {
-      setError("Could not create that account. Try a different email or username.");
+    } catch (error) {
+      setError(authErrorMessage(error, "signUp"));
     } finally {
       setLoading(false);
     }
@@ -77,8 +78,8 @@ export default function RegisterScreen() {
       setError("");
       await confirmRegistration(email.trim(), confirmationCode.trim(), password);
       router.replace("/(tabs)/dashboard");
-    } catch {
-      setError("Could not confirm that account. Check the code and try again.");
+    } catch (error) {
+      setError(authErrorMessage(error, "confirm"));
     } finally {
       setLoading(false);
     }

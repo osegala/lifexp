@@ -1,5 +1,4 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { isAxiosError } from "axios";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -15,6 +14,7 @@ import LifeButton from "../src/components/LifeButton";
 import LifeCard from "../src/components/LifeCard";
 import LifeInput from "../src/components/LifeInput";
 import { useAuth } from "../src/context/AuthContext";
+import { authErrorMessage } from "../src/auth/errors";
 import { colors, radius, spacing } from "../src/theme/theme";
 
 const skyImage = require("../assets/base/backgrounds/sky.png");
@@ -40,9 +40,7 @@ export default function LoginScreen() {
       await login(email.trim(), password);
       router.replace("/(tabs)/dashboard");
     } catch (error) {
-      setError(isAxiosError(error) && (!error.response || error.response.status >= 500)
-        ? "Can't connect to LifeXP right now. Please try again."
-        : "Login failed. Check your email and password.");
+      setError(authErrorMessage(error, "signIn"));
     } finally {
       setLoading(false);
     }
