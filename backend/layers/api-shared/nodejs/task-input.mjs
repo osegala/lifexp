@@ -1,6 +1,7 @@
 import { ApiError } from "./http.mjs";
+import { isTaskSize } from "./task-rewards.mjs";
 
-const EDITABLE_FIELDS = new Set(["title", "description", "repeatType", "repeatDays", "active"]);
+const EDITABLE_FIELDS = new Set(["title", "description", "repeatType", "repeatDays", "active", "taskSize"]);
 export const PROTECTED_TASK_FIELDS = new Set([
     "completed", "completedAt", "currentStreak", "bestStreak", "lastCompletedDate",
     "lastCompletedAt", "xpReward", "coinReward", "timeZone", "archived", "archivedAt"
@@ -72,6 +73,18 @@ function normalizeRepeatDays(value) {
     return days;
 }
 
+function normalizeTaskSize(value) {
+    const taskSize = typeof value === "string" ? value.toUpperCase() : "";
+    if (!isTaskSize(taskSize)) {
+        invalid(
+            "INVALID_TASK_SIZE",
+            "taskSize must be QUICK, SMALL, NORMAL, CHALLENGING, or BIG.",
+            "taskSize"
+        );
+    }
+    return taskSize;
+}
+
 function validateSchedule(repeatType, repeatDays) {
     if (repeatType === "WEEKLY" && repeatDays.length === 0) {
         invalid("INVALID_REPEAT_DAYS", "repeatDays is required for WEEKLY tasks.", "repeatDays", "REQUIRED");
@@ -92,6 +105,7 @@ export function validateTaskCreate(body) {
     return {
         title: normalizeTitle(body.title, true),
         description: normalizeDescription(body.description) ?? null,
+        taskSize: normalizeTaskSize(body.taskSize ?? "NORMAL"),
         repeatType,
         repeatDays,
         active: body.active ?? true
@@ -105,6 +119,7 @@ export function validateTaskPatch(body, existing) {
     const patch = {};
     if (Object.hasOwn(body, "title")) patch.title = normalizeTitle(body.title, false);
     if (Object.hasOwn(body, "description")) patch.description = normalizeDescription(body.description);
+    if (Object.hasOwn(body, "taskSize")) patch.taskSize = normalizeTaskSize(body.taskSize);
     if (Object.hasOwn(body, "active")) {
         if (typeof body.active !== "boolean") invalid("VALIDATION_ERROR", "active must be a boolean.", "active");
         patch.active = body.active;

@@ -40,12 +40,12 @@ import {
     requiredString,
     unauthorized
 } from "/opt/nodejs/http.mjs";
+import { levelInfo } from "/opt/nodejs/leveling.mjs";
+import { resolveTaskReward } from "/opt/nodejs/task-rewards.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
 const DEFAULTS = {
-    xp: Number(process.env.DEFAULT_TASK_XP ?? 10),
-    coins: Number(process.env.DEFAULT_TASK_COINS ?? 1),
     dailyTarget: Number(process.env.DAILY_TASK_TARGET ?? 3),
     weeklyTarget: Number(process.env.WEEKLY_TASK_TARGET ?? 15),
     dailyWorldPoints: Number(process.env.DAILY_WORLD_POINTS_REWARD ?? 25),
@@ -57,10 +57,6 @@ function numberValue(attribute, fallback = 0) {
     return Number.isFinite(value) ? value : fallback;
 }
 
-function optionalNumber(attribute) {
-    return attribute?.N == null ? undefined : numberValue(attribute);
-}
-
 function repeatDays(item) {
     if (item.repeatDays?.L) {
         return item.repeatDays.L.map((value) => value.S).filter(Boolean);
@@ -69,10 +65,16 @@ function repeatDays(item) {
 }
 
 function taskFrom(item, taskId) {
+    const reward = resolveTaskReward({
+        taskSize: item.taskSize?.S,
+        xpReward: item.xpReward?.N,
+        coinReward: item.coinReward?.N
+    });
     return {
         taskId: item.taskId?.S ?? taskId,
         title: item.title?.S ?? "",
         description: item.description?.S ?? null,
+        taskSize: reward.taskSize,
         repeatType: item.repeatType?.S ?? "NONE",
         repeatDays: repeatDays(item),
         active: item.active?.BOOL !== false,
@@ -83,8 +85,8 @@ function taskFrom(item, taskId) {
         bestStreak: numberValue(item.bestStreak),
         lastCompletedDate: item.lastCompletedDate?.S ?? null,
         lastCompletedAt: item.lastCompletedAt?.S ?? null,
-        xpReward: optionalNumber(item.xpReward),
-        coinReward: optionalNumber(item.coinReward),
+        xpReward: reward.xp,
+        coinReward: reward.coins,
         createdAt: item.createdAt?.S ?? null,
         updatedAt: item.updatedAt?.S ?? null
     };
@@ -325,6 +327,7 @@ function completionResponse(task, profile, plan, timeZone, today, now, weekStart
             taskId: task.taskId,
             title: task.title,
             description: task.description,
+            taskSize: task.taskSize,
             repeatType: task.repeatType,
             repeatDays: task.repeatDays,
             active: task.active,
@@ -456,8 +459,8 @@ async function complete(userPk, taskId) {
             buildingCatalogItems.map(buildingCatalogFromItem),
             playerBuildingsFromItems(playerBuildingItems)
         );
-        const baseXp = Math.max(0, task.xpReward ?? DEFAULTS.xp);
-        const baseCoins = Math.max(0, task.coinReward ?? DEFAULTS.coins);
+        const baseXp = task.xpReward;
+        const baseCoins = task.coinReward;
         let plan;
 
         try {
@@ -470,6 +473,8 @@ async function complete(userPk, taskId) {
                 today,
                 now,
                 defaults: DEFAULTS,
+                baseReward: { xp: baseXp, coins: baseCoins },
+                progressionForXp: levelInfo,
                 rewardBonuses: {
                     xp: percentageBonus(baseXp, effects.taskXpBonusPercent),
                     coins: percentageBonus(baseCoins, effects.taskCoinBonusPercent),

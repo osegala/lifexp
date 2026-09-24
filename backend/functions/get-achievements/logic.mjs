@@ -1,21 +1,3 @@
-export function levelInfo(totalXp) {
-    let level = 1;
-    let xpIntoLevel = totalXp;
-
-    while (xpIntoLevel >= 100 + ((level - 1) * 50)) {
-        xpIntoLevel -= 100 + ((level - 1) * 50);
-        level++;
-    }
-
-    const xpForNextLevel = 100 + ((level - 1) * 50);
-    return {
-        level,
-        xpIntoLevel,
-        xpForNextLevel,
-        xpToNextLevel: xpForNextLevel - xpIntoLevel
-    };
-}
-
 export function buildAchievements(catalog, earnedById) {
     return catalog
         .filter((achievement) => achievement.active)

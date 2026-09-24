@@ -53,7 +53,9 @@ export default function DashboardScreen() {
 
       <LifeCard>
         <Text style={styles.heroTitle}>{user?.username ?? "Adventurer"}</Text>
-        <Text style={styles.heroMeta}>Level {user?.level ?? 1} · {user?.totalXp ?? 0} XP</Text>
+        <Text style={styles.heroMeta}>
+          Level {user?.level ?? 1} · {user?.xpIntoLevel ?? 0} / {user?.xpForNextLevel ?? 100} XP
+        </Text>
         <View style={styles.progress}><XPBar progress={(user?.progressPercent ?? 0) / 100} /></View>
       </LifeCard>
 

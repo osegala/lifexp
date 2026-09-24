@@ -14,6 +14,7 @@ import {
     unauthorized
 } from "/opt/nodejs/http.mjs";
 import { validateTaskCreate } from "/opt/nodejs/task-input.mjs";
+import { rewardForTaskSize } from "/opt/nodejs/task-rewards.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -38,6 +39,7 @@ export const handler = async (event) => {
     const taskId = randomUUID();
     const now = new Date().toISOString();
     const { repeatType, repeatDays } = input;
+    const reward = rewardForTaskSize(input.taskSize);
     const userPk = `USER#${userId}`;
     const item = {
         PK: { S: userPk },
@@ -45,14 +47,15 @@ export const handler = async (event) => {
         entityType: { S: "TASK" },
         taskId: { S: taskId },
         title: { S: input.title },
+        taskSize: { S: input.taskSize },
         repeatType: { S: repeatType },
         repeatDays: { L: repeatDays.map((day) => ({ S: day })) },
         active: { BOOL: input.active },
         completed: { BOOL: false },
         currentStreak: { N: "0" },
         bestStreak: { N: "0" },
-        xpReward: { N: "10" },
-        coinReward: { N: "1" },
+        xpReward: { N: String(reward.xp) },
+        coinReward: { N: String(reward.coins) },
         createdAt: { S: now },
         updatedAt: { S: now }
     };
@@ -72,14 +75,15 @@ export const handler = async (event) => {
             taskId,
             title: item.title.S,
             description: item.description?.S ?? null,
+            taskSize: input.taskSize,
             repeatType,
             repeatDays,
             active: item.active.BOOL,
             completed: false,
             currentStreak: 0,
             bestStreak: 0,
-            xpReward: 10,
-            coinReward: 1,
+            xpReward: reward.xp,
+            coinReward: reward.coins,
             createdAt: now,
             updatedAt: now
         });

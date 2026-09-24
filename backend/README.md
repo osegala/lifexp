@@ -402,7 +402,7 @@ Lambda-controlled failures use one JSON envelope:
 
 `details` is omitted unless structured field or business context is useful. Clients should branch on stable `error.code` values and use `error.message` only as a user-friendly fallback. Validation and malformed input use 400; missing Lambda authentication uses 401; authorization failures use 403; missing owned resources use 404; duplicate or stale state uses 409; and unexpected failures use a sanitized 500 `INTERNAL_ERROR`. JSON responses include `Content-Type: application/json`; 204 responses have no body.
 
-Mutable endpoints reject unsupported fields. Task rewards/completion/streaks, profile progression, shop pricing and unlocks, building costs/effects/levels, equipment categories, and achievements remain server-authoritative. Malformed JSON is always `INVALID_JSON`; field validation uses `VALIDATION_ERROR` or a more specific stable domain code such as `INVALID_REPEAT_TYPE`, `INVALID_TIME_ZONE`, or `INSUFFICIENT_COINS`.
+Mutable endpoints reject unsupported fields. Task rewards/completion/streaks, profile progression, shop pricing and unlocks, building costs/effects/levels, equipment categories, and achievements remain server-authoritative. Malformed JSON is always `INVALID_JSON`; field validation uses `VALIDATION_ERROR` or a more specific stable domain code such as `INVALID_REPEAT_TYPE`, `INVALID_TASK_SIZE`, `INVALID_TIME_ZONE`, or `INSUFFICIENT_COINS`.
 
 The shared handler boundary logs unexpected exceptions internally without returning stack traces, AWS errors, table names, tokens, DynamoDB expressions, or other implementation details. Expected 4xx validation and business errors are returned without noisy exception logging. Authentication failures rejected by API Gateway before Lambda invocation may retain API Gateway's native response shape; normalizing those would require a separate gateway-level architecture change.
 
@@ -421,7 +421,11 @@ Building effects are trusted catalog data under `CATALOG#BUILDINGS`. Each buildi
 
 `WORLD_AREA_UNLOCK` and `ACHIEVEMENT_DISPLAY_SLOTS` are display/unlock metadata in v1. `PET_SLOTS` is supported by the resolver but has no seeded building effect yet. Flat daily and weekly World Point bonus types are also supported but currently unseeded.
 
-Task bonuses use `floor(baseReward × bonusPercent / 100)`. The stored task `xpReward` and `coinReward` remain unchanged base values; profile totals, daily/weekly statistics, and completion history receive the actual base-plus-bonus totals. Existing `rewards.xp` and `rewards.coins` response fields remain total awards, with additive `base`, `bonuses`, and `total` detail.
+Task sizes map to server-owned base rewards: `QUICK` 10 XP/1 coin, `SMALL` 20/2, `NORMAL` 35/4, `CHALLENGING` 50/6, and `BIG` 75/10. New tasks default to `NORMAL`. A legacy task without `taskSize` is inferred from a matching stored XP value (so the old 10 XP default becomes `QUICK`); otherwise it safely resolves to `NORMAL`. No data migration is required.
+
+Task bonuses use `floor(baseReward × bonusPercent / 100)`. Stored `xpReward` and `coinReward` mirror the selected size, but completion recalculates the canonical base reward from `taskSize`; profile totals, daily/weekly statistics, and completion history receive the actual base-plus-bonus totals. Existing `rewards.xp` and `rewards.coins` response fields remain total awards, with additive `base`, `bonuses`, and `total` detail.
+
+`PROFILE.xp` remains lifetime XP. Level requirements use `round(100 × level^1.35)`, and API progression fields expose the current level plus `xpIntoLevel`, `xpForNextLevel`, and `xpToNextLevel`. Overflow is carried through any number of level-ups.
 
 Shop pricing uses `floor(catalogPrice × (100 − discountPercent) / 100)`. `GET /shop` returns both `price` and `effectivePrice`; purchase recalculates the offer from the building catalog. Library reductions produce `effectiveRequiredLevel`, never below 1, while achievement requirements are unchanged.
 

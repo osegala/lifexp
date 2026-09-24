@@ -68,24 +68,6 @@ function isScheduledOn(task, date) {
     return !task.completed;
 }
 
-export function levelInfo(totalXp) {
-    let level = 1;
-    let xpIntoLevel = totalXp;
-
-    while (xpIntoLevel >= 100 + ((level - 1) * 50)) {
-        xpIntoLevel -= 100 + ((level - 1) * 50);
-        level++;
-    }
-
-    const xpForNextLevel = 100 + ((level - 1) * 50);
-    return {
-        level,
-        xpIntoLevel,
-        xpForNextLevel,
-        xpToNextLevel: xpForNextLevel - xpIntoLevel
-    };
-}
-
 function goalProgress(stats, target, reward) {
     const tasksCompleted = stats.tasksCompleted + 1;
     const awarded = !stats.goalRewarded && tasksCompleted >= target;
@@ -107,6 +89,8 @@ export function planCompletion({
     today,
     now,
     defaults,
+    baseReward,
+    progressionForXp,
     rewardBonuses = {}
 }) {
     const recurring = task.repeatType === "DAILY" || task.repeatType === "WEEKLY";
@@ -124,8 +108,8 @@ export function planCompletion({
         throw new CompletionError(400, "TASK_NOT_DUE", "Task is not due today.");
     }
 
-    const baseXp = Math.max(0, task.xpReward ?? defaults.xp);
-    const baseCoins = Math.max(0, task.coinReward ?? defaults.coins);
+    const baseXp = Math.max(0, Number(baseReward.xp) || 0);
+    const baseCoins = Math.max(0, Number(baseReward.coins) || 0);
     const bonusXp = Math.max(0, rewardBonuses.xp ?? 0);
     const bonusCoins = Math.max(0, rewardBonuses.coins ?? 0);
     const xp = baseXp + bonusXp;
@@ -141,8 +125,8 @@ export function planCompletion({
         defaults.weeklyWorldPoints + Math.max(0, rewardBonuses.weeklyWorldPoints ?? 0)
     );
     const worldPoints = daily.worldPoints + weekly.worldPoints;
-    const previousLevel = levelInfo(profile.xp).level;
-    const progression = levelInfo(profile.xp + xp);
+    const previousLevel = progressionForXp(profile.xp).level;
+    const progression = progressionForXp(profile.xp + xp);
     const tasksCompleted = profile.tasksCompleted + 1;
     const playerCoins = profile.coins + coins;
     const playerWorldPoints = profile.worldPoints + worldPoints;

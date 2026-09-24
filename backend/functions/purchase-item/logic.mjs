@@ -7,16 +7,6 @@ export class PurchaseError extends Error {
     }
 }
 
-export function levelFromXp(totalXp) {
-    let level = 1;
-    let remainingXp = Math.max(0, Number(totalXp) || 0);
-    while (remainingXp >= 100 + ((level - 1) * 50)) {
-        remainingXp -= 100 + ((level - 1) * 50);
-        level += 1;
-    }
-    return level;
-}
-
 export function planPurchase(catalog, profile, {
     owned = false,
     hasRequiredAchievement = true,
@@ -40,7 +30,7 @@ export function planPurchase(catalog, profile, {
     const price = Number(offer?.effectivePrice ?? catalogPrice);
     const discountPercent = Number(offer?.discountPercent ?? 0);
     const effectiveRequiredLevel = Number(offer?.effectiveRequiredLevel ?? requiredLevel);
-    const playerLevel = levelFromXp(profile.xp);
+    const playerLevel = Number(profile.level ?? 1);
     if (playerLevel < effectiveRequiredLevel) {
         throw new PurchaseError(403, "ITEM_LOCKED", "Required level not reached.", {
             requiredLevel,

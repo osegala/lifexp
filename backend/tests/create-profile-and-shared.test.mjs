@@ -5,7 +5,7 @@ import {
     isDuplicateProfileError,
     profilePutRequest
 } from "../functions/create-profile/logic.mjs";
-import { levelInfo } from "../shared/leveling.mjs";
+import { levelInfo, xpRequiredForNextLevel } from "../shared/leveling.mjs";
 import { isoWeekId, isValidTimeZone, localDate, weekday } from "../shared/dates.mjs";
 import { attributeValue, loadSeedItems } from "../seeds/seed-catalogs.mjs";
 
@@ -64,9 +64,11 @@ test("shared leveling and date utilities preserve the existing contracts", () =>
     assert.deepEqual(levelInfo(100), {
         level: 2,
         xpIntoLevel: 0,
-        xpForNextLevel: 150,
-        xpToNextLevel: 150
+        xpForNextLevel: 255,
+        xpToNextLevel: 255
     });
+    assert.equal(xpRequiredForNextLevel(1), 100);
+    assert.equal(xpRequiredForNextLevel(2), 255);
     assert.equal(localDate(new Date("2026-09-23T02:00:00.000Z"), "America/New_York"), "2026-09-22");
     assert.equal(weekday("2026-09-23"), "WED");
     assert.equal(isoWeekId("2026-09-23"), "2026-W39");

@@ -1215,8 +1215,6 @@ Resources:
 
       Environment:
         Variables:
-          DEFAULT_TASK_XP: "10"
-          DEFAULT_TASK_COINS: "1"
           DAILY_TASK_TARGET: "3"
           WEEKLY_TASK_TARGET: "15"
           DAILY_WORLD_POINTS_REWARD: "25"

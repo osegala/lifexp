@@ -67,6 +67,33 @@ test("task screen uses the SAM task methods and server-owned completion contract
   assert.doesNotMatch(tasks, /dueDate|scheduledTime|repeatEndsAt|xpReward\s*:|coinReward\s*:/);
 });
 
+test("task creation renders every task size, defaults to NORMAL, and submits no custom rewards", () => {
+  const tasks = read("app/(tabs)/tasks.tsx");
+  for (const [value, label, xp] of [
+    ["QUICK", "Quick", 10],
+    ["SMALL", "Small", 20],
+    ["NORMAL", "Normal", 35],
+    ["CHALLENGING", "Challenging", 50],
+    ["BIG", "Big", 75],
+  ]) {
+    assert.match(tasks, new RegExp(`value: "${value}", label: "${label}", xp: ${xp}`));
+  }
+  assert.match(tasks, /useState<TaskSize>\("NORMAL"\)/);
+  assert.match(tasks, /description: description\.trim\(\) \|\| null,\s*taskSize,/);
+  assert.doesNotMatch(tasks, /<LifeInput[^>]*placeholder=["'][^"']*(?:XP|coin)|xpReward\s*:|coinReward\s*:/i);
+});
+
+test("dashboard and profile XP bars use backend per-level progression", () => {
+  const dashboard = read("app/(tabs)/dashboard.tsx");
+  const profile = read("app/(tabs)/profile.tsx");
+
+  assert.match(dashboard, /user\?\.xpIntoLevel/);
+  assert.match(dashboard, /user\?\.xpForNextLevel/);
+  assert.match(profile, /xpIntoLevel \/ xpForNextLevel/);
+  assert.match(profile, /<XPBar progress=\{xpProgress\}/);
+  assert.doesNotMatch(profile, /level \* 100|totalXp %/);
+});
+
 test("weekly progress uses GET goals and has no client claim mutation", () => {
   const dashboard = read("app/(tabs)/dashboard.tsx");
   assert.match(dashboard, /api\.get<GoalsResponse>\(apiRoutes\.goals\)/);

@@ -1,14 +1,3 @@
-export function levelFromXp(totalXp) {
-    let level = 1;
-    let remainingXp = Math.max(0, Number(totalXp) || 0);
-
-    while (remainingXp >= 100 + ((level - 1) * 50)) {
-        remainingXp -= 100 + ((level - 1) * 50);
-        level += 1;
-    }
-    return level;
-}
-
 export function buildShopItems(catalog, ownedIds, achievementIds, coins, level) {
     return catalog
         .filter((item) => item.active !== false)

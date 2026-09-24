@@ -23,6 +23,7 @@ import {
     requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
+import { resolveTaskReward } from "/opt/nodejs/task-rewards.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -59,11 +60,17 @@ function taskResponse(item, today, timeZone) {
     const completedToday = wasCompletedOn(item, today, timeZone);
     const scheduled = isScheduledOn(item, today, completedToday);
     const completed = item.completed?.BOOL === true;
+    const reward = resolveTaskReward({
+        taskSize: item.taskSize?.S,
+        xpReward: item.xpReward?.N,
+        coinReward: item.coinReward?.N
+    });
 
     return {
         taskId: item.taskId?.S ?? item.SK.S.slice("TASK#".length),
         title: item.title?.S ?? "",
         description: item.description?.S ?? null,
+        taskSize: reward.taskSize,
         repeatType: item.repeatType?.S ?? "NONE",
         repeatDays: repeatDays(item),
         active: item.active?.BOOL !== false,
@@ -76,8 +83,8 @@ function taskResponse(item, today, timeZone) {
         isDueToday: scheduled && !completedToday,
         currentStreak: effectiveCurrentStreak(item, today),
         bestStreak: Number(item.bestStreak?.N ?? 0),
-        xpReward: Number(item.xpReward?.N ?? 10),
-        coinReward: Number(item.coinReward?.N ?? 1),
+        xpReward: reward.xp,
+        coinReward: reward.coins,
         lastCompletedDate: item.lastCompletedDate?.S ?? null,
         lastCompletedAt: item.lastCompletedAt?.S ?? null,
         createdAt: item.createdAt?.S ?? null,

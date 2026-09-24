@@ -297,6 +297,8 @@ test("profile mapping preserves progression and premium state", () => {
     timeZone: profile.timeZone,
     totalXp: 200,
     level: 3,
+    xpIntoLevel: 50,
+    xpForNextLevel: 200,
     xpToNextLevel: 150,
     progressPercent: 25,
     currentStreak: 0,

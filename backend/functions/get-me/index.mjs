@@ -11,60 +11,13 @@ import {
     requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
+import { levelInfo as progressionForXp } from "/opt/nodejs/leveling.mjs";
 
 const client =
     new DynamoDBClient({});
 
 const TABLE_NAME =
     process.env.TABLE_NAME;
-
-
-// ======================================================
-// LEVELING
-// ======================================================
-
-function xpRequiredForNextLevel(level) {
-
-    return 100 + ((level - 1) * 50);
-}
-
-
-function getLevelFromXp(totalXp) {
-
-    let level = 1;
-    let remainingXp = totalXp;
-
-
-    while (
-        remainingXp >=
-        xpRequiredForNextLevel(level)
-    ) {
-
-        remainingXp -=
-            xpRequiredForNextLevel(level);
-
-        level++;
-    }
-
-
-    const xpForNextLevel =
-        xpRequiredForNextLevel(level);
-
-
-    return {
-
-        level,
-
-        xpIntoLevel:
-            remainingXp,
-
-        xpForNextLevel,
-
-        xpToNextLevel:
-            xpForNextLevel -
-            remainingXp
-    };
-}
 
 
 // ======================================================
@@ -100,7 +53,7 @@ async (event) => {
 
 
         const levelInfo =
-            getLevelFromXp(
+            progressionForXp(
                 totalXp
             );
 

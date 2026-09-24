@@ -313,11 +313,17 @@ async function taskLifecycle(api, reporter, cleanup, runId, skipCompletion) {
     const patchedTitle = `${originalTitle} updated`;
     const task = await reporter.step("create disposable one-time task", async () => {
         const result = assertStatus(await api("POST", "/tasks", {
-            body: { title: originalTitle, description: `Disposable integration task ${runId}`, repeatType: "NONE" }
+            body: {
+                title: originalTitle,
+                description: `Disposable integration task ${runId}`,
+                taskSize: "NORMAL",
+                repeatType: "NONE"
+            }
         }), 201, "create task");
         assertTruthy(result.body.taskId, "created taskId");
-        assertEqual(result.body.xpReward, 10, "server task xpReward");
-        assertEqual(result.body.coinReward, 1, "server task coinReward");
+        assertEqual(result.body.taskSize, "NORMAL", "server taskSize");
+        assertEqual(result.body.xpReward, 35, "server task xpReward");
+        assertEqual(result.body.coinReward, 4, "server task coinReward");
         cleanup.add(`archive task ${result.body.taskId}`, archiveCleanup(api, result.body.taskId));
         return result.body;
     });

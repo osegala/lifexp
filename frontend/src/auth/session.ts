@@ -45,6 +45,8 @@ export function userFromProfile(
     timeZone: profile.timeZone ?? "UTC",
     totalXp: profile.xp,
     level: profile.level,
+    xpIntoLevel: profile.xpIntoLevel,
+    xpForNextLevel: profile.xpForNextLevel,
     xpToNextLevel: profile.xpToNextLevel,
     progressPercent: profile.xpForNextLevel > 0
       ? Math.floor((profile.xpIntoLevel / profile.xpForNextLevel) * 100)

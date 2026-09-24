@@ -10,7 +10,7 @@ import LifeCard from "../../src/components/LifeCard";
 import LifeInput from "../../src/components/LifeInput";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme/theme";
-import type { Task, TasksResponse } from "../../src/types";
+import type { Task, TaskSize, TasksResponse } from "../../src/types";
 
 type RepeatType = Task["repeatType"];
 type CompletionResponse = {
@@ -18,12 +18,20 @@ type CompletionResponse = {
 };
 
 const WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const TASK_SIZE_OPTIONS: { value: TaskSize; label: string; xp: number }[] = [
+  { value: "QUICK", label: "Quick", xp: 10 },
+  { value: "SMALL", label: "Small", xp: 20 },
+  { value: "NORMAL", label: "Normal", xp: 35 },
+  { value: "CHALLENGING", label: "Challenging", xp: 50 },
+  { value: "BIG", label: "Big", xp: 75 },
+];
 
 export default function TasksScreen() {
   const { refreshUser, triggerDashboardRefresh } = useAuth();
   const [data, setData] = useState<TasksResponse | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [taskSize, setTaskSize] = useState<TaskSize>("NORMAL");
   const [repeatType, setRepeatType] = useState<RepeatType>("NONE");
   const [repeatDays, setRepeatDays] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,12 +66,14 @@ export default function TasksScreen() {
       await api.post(apiRoutes.tasks, {
         title: title.trim(),
         description: description.trim() || null,
+        taskSize,
         repeatType,
         repeatDays: repeatType === "WEEKLY" ? repeatDays : [],
         active: true,
       });
       setTitle("");
       setDescription("");
+      setTaskSize("NORMAL");
       setRepeatType("NONE");
       setRepeatDays([]);
       await loadTasks();
@@ -115,6 +125,21 @@ export default function TasksScreen() {
         <Text style={styles.cardTitle}>Add a task</Text>
         <LifeInput placeholder="Task title" value={title} onChangeText={setTitle} />
         <LifeInput placeholder="Description (optional)" value={description} onChangeText={setDescription} />
+        <Text style={styles.optionLabel}>Task size</Text>
+        <View style={styles.sizeOptions}>
+          {TASK_SIZE_OPTIONS.map((option) => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: taskSize === option.value }}
+              key={option.value}
+              onPress={() => setTaskSize(option.value)}
+              style={[styles.sizeChip, taskSize === option.value && styles.selectedChip]}
+            >
+              <Text style={[styles.chipText, taskSize === option.value && styles.selectedChipText]}>{option.label}</Text>
+              <Text style={[styles.sizeReward, taskSize === option.value && styles.selectedChipText]}>+{option.xp} XP</Text>
+            </Pressable>
+          ))}
+        </View>
         <View style={styles.options}>
           {(["NONE", "DAILY", "WEEKLY"] as RepeatType[]).map((value) => (
             <Pressable
@@ -153,8 +178,11 @@ export default function TasksScreen() {
               <Text style={styles.taskTitle}>{task.title}</Text>
               {task.description ? <Text style={styles.description}>{task.description}</Text> : null}
               <Text style={styles.meta}>
+                {TASK_SIZE_OPTIONS.find((option) => option.value === task.taskSize)?.label ?? "Normal"}
+                {` · +${task.xpReward} XP · +${task.coinReward} coin${task.coinReward === 1 ? "" : "s"}`}
+              </Text>
+              <Text style={styles.meta}>
                 {task.repeatType}{task.repeatDays.length ? ` · ${task.repeatDays.join(", ")}` : ""}
-                {` · +${task.xpReward} XP · +${task.coinReward} coin`}
               </Text>
               {task.repeatType !== "NONE" ? (
                 <Text style={styles.meta}>Streak {task.currentStreak} · best {task.bestStreak}</Text>
@@ -186,11 +214,15 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.md },
   title: { color: colors.text, fontSize: 30, fontWeight: "700" },
   cardTitle: { color: colors.text, fontSize: 18, fontWeight: "700", marginBottom: spacing.sm },
+  optionLabel: { color: colors.text, fontWeight: "700", marginTop: spacing.sm },
   options: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginVertical: spacing.sm },
+  sizeOptions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginVertical: spacing.sm },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  sizeChip: { minWidth: "30%", flexGrow: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, alignItems: "center" },
   day: { width: 40, height: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   selectedChip: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.mutedText, fontWeight: "700" },
+  sizeReward: { color: colors.accent, fontSize: 12, marginTop: 2 },
   selectedChipText: { color: colors.background },
   summary: { color: colors.mutedText },
   taskRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },

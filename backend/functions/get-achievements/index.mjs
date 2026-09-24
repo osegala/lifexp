@@ -5,8 +5,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import {
     achievementSummary,
-    buildAchievements,
-    levelInfo
+    buildAchievements
 } from "./logic.mjs";
 import {
     achievementCatalogFromItem,
@@ -26,6 +25,7 @@ import {
     requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
+import { levelInfo } from "/opt/nodejs/leveling.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;

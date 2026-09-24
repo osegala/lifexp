@@ -5,6 +5,8 @@ export type User = {
   timeZone: string;
   totalXp: number;
   level: number;
+  xpIntoLevel: number;
+  xpForNextLevel: number;
   xpToNextLevel: number;
   progressPercent: number;
   currentStreak: number;
@@ -13,10 +15,13 @@ export type User = {
   premiumActive: boolean;
 };
 
+export type TaskSize = "QUICK" | "SMALL" | "NORMAL" | "CHALLENGING" | "BIG";
+
 export type Task = {
   taskId: string;
   title: string;
   description: string | null;
+  taskSize: TaskSize;
   repeatType: "NONE" | "DAILY" | "WEEKLY";
   repeatDays: string[];
   active: boolean;

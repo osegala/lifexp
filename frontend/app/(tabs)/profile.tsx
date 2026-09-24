@@ -97,12 +97,9 @@ export default function ProfileScreen() {
 
   const totalXp = user?.totalXp ?? 0;
   const level = user?.level ?? 1;
-
-  const xpForCurrentLevel = level * 100;
-  const xpProgress = Math.min(
-    (totalXp % xpForCurrentLevel) / xpForCurrentLevel,
-    1,
-  );
+  const xpIntoLevel = user?.xpIntoLevel ?? 0;
+  const xpForNextLevel = user?.xpForNextLevel ?? 100;
+  const xpProgress = Math.min(xpIntoLevel / xpForNextLevel, 1);
 
   return (
     <ScrollView
@@ -152,6 +149,7 @@ export default function ProfileScreen() {
         <View style={styles.xpBarWrapper}>
           <XPBar progress={xpProgress} />
         </View>
+        <Text style={styles.helper}>{xpIntoLevel} / {xpForNextLevel} XP</Text>
       </LifeCard>
 
       <LifeCard>

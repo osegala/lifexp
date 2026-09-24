@@ -31,6 +31,7 @@ import {
     unauthorized,
     validateBodyFields
 } from "/opt/nodejs/http.mjs";
+import { levelFromXp } from "/opt/nodejs/leveling.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -129,7 +130,11 @@ export const handler = async (event) => {
         try {
             plan = planPurchase(
                 catalog,
-                { xp: Number(activeProfile.xp?.N ?? 0), coins: Number(activeProfile.coins?.N ?? 0) },
+                {
+                    xp: Number(activeProfile.xp?.N ?? 0),
+                    level: levelFromXp(activeProfile.xp?.N),
+                    coins: Number(activeProfile.coins?.N ?? 0)
+                },
                 {
                     owned: Boolean(ownedItem),
                     hasRequiredAchievement: !catalog?.requiredAchievement || earnedAchievementIds.has(catalog.requiredAchievement),

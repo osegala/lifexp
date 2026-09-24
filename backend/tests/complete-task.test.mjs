@@ -7,6 +7,8 @@ import {
     planCompletion
 } from "../functions/complete-task/logic.mjs";
 import { evaluateAchievementAwards } from "../layers/progression-shared/nodejs/achievements.mjs";
+import { levelInfo } from "../layers/api-shared/nodejs/leveling.mjs";
+import { resolveTaskReward } from "../layers/api-shared/nodejs/task-rewards.mjs";
 
 const today = "2026-09-22";
 const now = "2026-09-22T14:00:00.000Z";
@@ -33,20 +35,22 @@ const emptyStats = {
 };
 
 function plan(overrides = {}) {
+    const task = {
+        taskId: "task-1",
+        taskSize: "QUICK",
+        repeatType: "DAILY",
+        repeatDays: [],
+        active: true,
+        completed: false,
+        currentStreak: 0,
+        bestStreak: 0,
+        lastCompletedDate: null,
+        xpReward: 10,
+        coinReward: 1,
+        ...overrides.task
+    };
     return planCompletion({
-        task: {
-            taskId: "task-1",
-            repeatType: "DAILY",
-            repeatDays: [],
-            active: true,
-            completed: false,
-            currentStreak: 0,
-            bestStreak: 0,
-            lastCompletedDate: null,
-            xpReward: 10,
-            coinReward: 1,
-            ...overrides.task
-        },
+        task,
         profile: { ...profile, ...overrides.profile },
         dailyStats: { ...emptyStats, ...overrides.dailyStats },
         weeklyStats: { ...emptyStats, ...overrides.weeklyStats },
@@ -56,6 +60,8 @@ function plan(overrides = {}) {
         today,
         now,
         defaults,
+        baseReward: resolveTaskReward(task),
+        progressionForXp: levelInfo,
         rewardBonuses: overrides.rewardBonuses
     });
 }
@@ -112,6 +118,32 @@ test("DAILY completion increments a current streak or resets it after a miss", (
     assert.equal(reset.taskBestStreak, 6);
 });
 
+test("QUICK and BIG completions use canonical rewards, not stored reward fields", () => {
+    const quick = plan({ task: { taskSize: "QUICK", xpReward: 999, coinReward: 999 } });
+    const big = plan({ task: { taskSize: "BIG", xpReward: 1, coinReward: 1 } });
+
+    assert.deepEqual(quick.rewardBreakdown.base, { xp: 10, coins: 1 });
+    assert.deepEqual(big.rewardBreakdown.base, { xp: 75, coins: 10 });
+    assert.equal(quick.player.xp, profile.xp + 10);
+    assert.equal(big.player.xp, profile.xp + 75);
+    assert.equal(big.player.coins, profile.coins + 10);
+});
+
+test("completion preserves lifetime XP while resetting the per-level bar with overflow", () => {
+    const result = plan({
+        task: { taskSize: "SMALL" },
+        profile: { xp: 90 }
+    });
+
+    assert.equal(result.player.xp, 110);
+    assert.equal(result.progression.totalXp, 110);
+    assert.equal(result.progression.level, 2);
+    assert.equal(result.progression.xpIntoLevel, 10);
+    assert.equal(result.progression.xpForNextLevel, 255);
+    assert.equal(result.progression.xpToNextLevel, 245);
+    assert.equal(result.progression.leveledUp, true);
+});
+
 test("earned catalog achievements are skipped and real catalog IDs are returned", () => {
     const catalog = [
         {
@@ -149,19 +181,19 @@ test("earned catalog achievements are skipped and real catalog IDs are returned"
 });
 
 test("building bonuses award floored totals without changing catalog base rewards", () => {
-    const task = { xpReward: 100, coinReward: 20 };
+    const task = { taskSize: "BIG", xpReward: 100, coinReward: 20 };
     const result = plan({
         task,
         rewardBonuses: { xp: 5, coins: 2 }
     });
 
     assert.deepEqual(result.rewardBreakdown, {
-        base: { xp: 100, coins: 20 },
+        base: { xp: 75, coins: 10 },
         bonuses: { xp: 5, coins: 2 },
-        total: { xp: 105, coins: 22 }
+        total: { xp: 80, coins: 12 }
     });
-    assert.equal(result.player.xp, profile.xp + 105);
-    assert.equal(result.player.coins, profile.coins + 22);
+    assert.equal(result.player.xp, profile.xp + 80);
+    assert.equal(result.player.coins, profile.coins + 12);
     assert.equal(task.xpReward, 100);
     assert.equal(task.coinReward, 20);
     assert.equal(buildCompletionHistory({
@@ -171,7 +203,7 @@ test("building bonuses award floored totals without changing catalog base reward
         now,
         today,
         timeZone: "UTC"
-    }).xpEarned, 105);
+    }).xpEarned, 80);
 });
 
 test("daily and weekly stats receive actual base-plus-bonus rewards", () => {

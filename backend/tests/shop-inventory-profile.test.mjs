@@ -6,6 +6,7 @@ import { cosmeticOffer } from "../layers/progression-shared/nodejs/building-effe
 import { planEquip, EquipError } from "../functions/equip-item/logic.mjs";
 import { planUnequip, UnequipError } from "../functions/unequip-item/logic.mjs";
 import { validateProfilePatch, ProfilePatchError } from "../functions/update-me/logic.mjs";
+import { levelFromXp } from "../layers/api-shared/nodejs/leveling.mjs";
 
 const catalogItem = {
     itemId: "moon-hat",
@@ -28,21 +29,21 @@ test("shop reports catalog-derived lock, affordability, and ownership states", (
 
 test("locked item cannot be purchased", () => {
     assert.throws(
-        () => planPurchase({ ...catalogItem, requiredLevel: 3 }, { xp: 0, coins: 100 }),
+        () => planPurchase({ ...catalogItem, requiredLevel: 3 }, { xp: 0, level: 1, coins: 100 }),
         (error) => error instanceof PurchaseError && error.statusCode === 403
     );
 });
 
 test("insufficient coins cannot purchase", () => {
     assert.throws(
-        () => planPurchase(catalogItem, { xp: 0, coins: 24 }),
+        () => planPurchase(catalogItem, { xp: 0, level: 1, coins: 24 }),
         (error) => error instanceof PurchaseError && error.statusCode === 400
     );
 });
 
 test("owned item cannot be purchased twice", () => {
     assert.throws(
-        () => planPurchase(catalogItem, { xp: 0, coins: 100 }, { owned: true }),
+        () => planPurchase(catalogItem, { xp: 0, level: 1, coins: 100 }, { owned: true }),
         (error) => error instanceof PurchaseError && error.statusCode === 409
     );
 });
@@ -50,7 +51,7 @@ test("owned item cannot be purchased twice", () => {
 test("purchase always uses the server catalog price", () => {
     const clientBody = { itemId: "moon-hat", price: 1, effectivePrice: 0, discountPercent: 100 };
     const offer = cosmeticOffer(catalogItem, { shopDiscountPercent: 10 });
-    const plan = planPurchase(catalogItem, { xp: 0, coins: 100 }, { offer });
+    const plan = planPurchase(catalogItem, { xp: 0, level: 1, coins: 100 }, { offer });
     assert.equal(clientBody.price, 1);
     assert.equal(plan.catalogPrice, 25);
     assert.equal(plan.price, 22);
@@ -60,7 +61,8 @@ test("purchase always uses the server catalog price", () => {
 test("purchase uses the server-resolved effective level requirement", () => {
     const levelFiveItem = { ...catalogItem, requiredLevel: 5 };
     const offer = cosmeticOffer(levelFiveItem, { cosmeticLevelRequirementReduction: 1 });
-    const plan = planPurchase(levelFiveItem, { xp: 450, coins: 100 }, { offer });
+    const xp = 796;
+    const plan = planPurchase(levelFiveItem, { xp, level: levelFromXp(xp), coins: 100 }, { offer });
 
     assert.equal(plan.playerLevel, 4);
     assert.equal(plan.requiredLevel, 5);

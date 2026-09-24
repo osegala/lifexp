@@ -1,5 +1,5 @@
 import { DynamoDBClient, GetItemCommand, QueryCommand } from "@aws-sdk/client-dynamodb";
-import { buildShopItems, levelFromXp } from "./logic.mjs";
+import { buildShopItems } from "./logic.mjs";
 import {
     buildingCatalogFromItem,
     cosmeticOffer,
@@ -15,6 +15,7 @@ import {
     requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
+import { levelFromXp } from "/opt/nodejs/leveling.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;

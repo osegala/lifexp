@@ -31,6 +31,8 @@ import {
 } from "../functions/complete-task/logic.mjs";
 import { planPurchase, PurchaseError } from "../functions/purchase-item/logic.mjs";
 import { planUpgrade, UpgradeError } from "../functions/upgrade-building/logic.mjs";
+import { levelInfo } from "../layers/api-shared/nodejs/leveling.mjs";
+import { resolveTaskReward } from "../layers/api-shared/nodejs/task-rewards.mjs";
 
 function body(response) {
     return JSON.parse(response.body);
@@ -70,6 +72,7 @@ test("task create validation rejects missing, blank, invalid, duplicate, and pro
     assert.deepEqual(validateTaskCreate({ title: "  Task  ", repeatType: "WEEKLY", repeatDays: ["mon"] }), {
         title: "Task",
         description: null,
+        taskSize: "NORMAL",
         repeatType: "WEEKLY",
         repeatDays: ["MON"],
         active: true
@@ -129,6 +132,7 @@ test("purchase and building business failures expose stable codes", () => {
 test("archived and duplicate task completion states retain stable conflict codes", () => {
     const input = {
         task: {
+            taskSize: "QUICK",
             repeatType: "DAILY",
             repeatDays: [],
             active: true,
@@ -147,6 +151,8 @@ test("archived and duplicate task completion states retain stable conflict codes
         now: "2026-09-23T12:00:00.000Z",
         defaults: { xp: 10, coins: 1, dailyTarget: 3, weeklyTarget: 15, dailyWorldPoints: 25, weeklyWorldPoints: 100 }
     };
+    input.baseReward = resolveTaskReward(input.task);
+    input.progressionForXp = levelInfo;
 
     expectCode(() => planCompletion({ ...input, task: { ...input.task, archived: true } }), CompletionError, "TASK_ARCHIVED", 409);
     expectCode(() => planCompletion({ ...input, completionExists: true }), CompletionError, "TASK_ALREADY_COMPLETED", 409);
