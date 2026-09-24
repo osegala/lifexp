@@ -245,6 +245,38 @@ test("HTTP authorizer uses the stack-managed Cognito resources", () => {
     assert.match(template, /audience:\n\s+- Ref: EvrenthiaDevUserPoolClient/);
 });
 
+test("Cognito deletion protection is parameterized without changing identity behavior", () => {
+    assert.match(
+        template,
+        /CognitoDeletionProtection:\n    Type: String\n    Default: INACTIVE\n    AllowedValues:\n      - ACTIVE\n      - INACTIVE/
+    );
+
+    const pool = resourceBlock("EvrenthiaDevUserPool");
+    assert.match(pool, /DeletionPolicy: Retain/);
+    assert.match(pool, /UpdateReplacePolicy: Retain/);
+    assert.match(pool, /UserPoolName:\n\s+Fn::Sub: "\$\{FunctionNamePrefix\}-Users"/);
+    assert.match(pool, /DeletionProtection:\n\s+Ref: CognitoDeletionProtection/);
+    assert.match(pool, /UsernameAttributes:\n\s+- email/);
+    assert.match(pool, /UsernameConfiguration:\n\s+CaseSensitive: false/);
+    assert.match(pool, /AutoVerifiedAttributes:\n\s+- email/);
+    assert.match(pool, /AdminCreateUserConfig:\n\s+AllowAdminCreateUserOnly: false/);
+    assert.match(pool, /Schema:\n\s+- Name: email\n\s+AttributeDataType: String\n\s+Mutable: true\n\s+Required: true/);
+    assert.match(pool, /MinimumLength: 8/);
+    assert.match(pool, /RequireLowercase: true/);
+    assert.match(pool, /RequireNumbers: true/);
+    assert.match(pool, /RequireSymbols: true/);
+    assert.match(pool, /RequireUppercase: true/);
+    assert.match(pool, /TemporaryPasswordValidityDays: 7/);
+    assert.match(pool, /LambdaConfig:\n\s+PostConfirmation:\n\s+Fn::GetAtt:\n\s+- CreateProfileFunction\n\s+- Arn/);
+    assert.doesNotMatch(pool, /MfaConfiguration:/);
+
+    const client = resourceBlock("EvrenthiaDevUserPoolClient");
+    assert.match(client, /GenerateSecret: false/);
+    assert.match(client, /PreventUserExistenceErrors: ENABLED/);
+    assert.match(client, /ExplicitAuthFlows:\n\s+- ALLOW_USER_PASSWORD_AUTH\n\s+- ALLOW_USER_SRP_AUTH\n\s+- ALLOW_REFRESH_TOKEN_AUTH/);
+    assert.match(client, /SupportedIdentityProviders:\n\s+- COGNITO/);
+});
+
 test("CreateProfile is attached to the managed pool with scoped invoke permission", () => {
     assert.match(template, /LambdaConfig:\n\s+PostConfirmation:\n\s+Fn::GetAtt:\n\s+- CreateProfileFunction\n\s+- Arn/);
     assert.match(template, /CreateProfileInvokePermission:[\s\S]*?SourceArn:\n\s+Fn::GetAtt:\n\s+- EvrenthiaDevUserPool\n\s+- Arn/);
@@ -282,6 +314,7 @@ test("development and production SAM configurations are isolated", () => {
     assert.match(dev, /stack_name = "evrenthia-dev"/);
     assert.match(dev, /FunctionNamePrefix=\\"Evrenthia-Dev\\"/);
     assert.match(dev, /LogRetentionDays=\\"14\\"/);
+    assert.match(dev, /CognitoDeletionProtection=\\"INACTIVE\\"/);
     assert.match(prod, /stack_name = "evrenthia-prod"/);
     assert.match(prod, /s3_prefix = "evrenthia-prod"/);
     assert.match(prod, /region = "us-east-2"/);
@@ -291,6 +324,7 @@ test("development and production SAM configurations are isolated", () => {
     assert.match(prod, /FunctionNamePrefix=\\"Evrenthia-Prod\\"/);
     assert.match(prod, /LogRetentionDays=\\"30\\"/);
     assert.match(prod, /PushDeliveryMode=\\"DRY_RUN\\"/);
+    assert.match(prod, /CognitoDeletionProtection=\\"ACTIVE\\"/);
     assert.doesNotMatch(prod, /profile\s*=|Evrenthia-Dev|evrenthia-dev/);
 });
 

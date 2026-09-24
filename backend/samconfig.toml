@@ -8,7 +8,7 @@ region = "us-east-2"
 profile = "evrenthia-admin"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "EnvironmentName=\"dev\" FunctionNamePrefix=\"Evrenthia-Dev\" LogRetentionDays=\"14\" PushDeliveryMode=\"DRY_RUN\""
+parameter_overrides = "EnvironmentName=\"dev\" FunctionNamePrefix=\"Evrenthia-Dev\" LogRetentionDays=\"14\" PushDeliveryMode=\"DRY_RUN\" CognitoDeletionProtection=\"INACTIVE\""
 image_repositories = []
 
 [default.global.parameters]
@@ -21,7 +21,7 @@ s3_prefix = "evrenthia-prod"
 region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "EnvironmentName=\"prod\" FunctionNamePrefix=\"Evrenthia-Prod\" LogRetentionDays=\"30\" PushDeliveryMode=\"DRY_RUN\""
+parameter_overrides = "EnvironmentName=\"prod\" FunctionNamePrefix=\"Evrenthia-Prod\" LogRetentionDays=\"30\" PushDeliveryMode=\"DRY_RUN\" CognitoDeletionProtection=\"ACTIVE\""
 image_repositories = []
 
 [prod.global.parameters]

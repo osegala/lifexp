@@ -118,6 +118,7 @@ The template accepts:
 - `FunctionNamePrefix` — physical resource prefix; current value is `Evrenthia-Dev`
 - `LogRetentionDays` — environment-specific CloudWatch Logs retention; dev uses 14 and prod is configured for 30
 - `PushDeliveryMode` — `DRY_RUN` or `LIVE`; the template and both environment configs default explicitly to `DRY_RUN`
+- `CognitoDeletionProtection` — `ACTIVE` or `INACTIVE`; dev explicitly remains `INACTIVE`, while production is configured `ACTIVE`
 - `BudgetNotificationEmail` — optional budget subscriber; empty by default
 
 The stack creates its table from `FunctionNamePrefix`. Every Lambda receives that table through `TABLE_NAME`, every DynamoDB policy references the managed table ARN, and the HTTP authorizer resolves its issuer and audience from the same stack's Cognito pool and client. Physical Lambda, layer, log-group, EventBridge-rule, alarm, dashboard, and budget names also use the prefix. CloudFormation logical IDs retain `Dev` solely to avoid replacing existing development resources; they do not control physical production names.
@@ -136,7 +137,9 @@ To create a reviewable CloudFormation change set without executing it:
 sam deploy --config-env default --no-execute-changeset
 ```
 
-The `[prod]` SAM configuration reserves stack `evrenthia-prod`, prefix/table `Evrenthia-Prod`, region `us-east-2`, 30-day log retention, and `DRY_RUN` notifications. It contains no AWS profile or credentials; a future operator must deliberately select approved production credentials through local SSO/profile configuration or another short-lived credential source.
+The `[prod]` SAM configuration reserves stack `evrenthia-prod`, prefix/table `Evrenthia-Prod`, region `us-east-2`, 30-day log retention, `DRY_RUN` notifications, and `ACTIVE` Cognito deletion protection. It contains no AWS profile or credentials; a future operator must deliberately select approved production credentials through local SSO/profile configuration or another short-lived credential source.
+
+Production Cognito deletion protection helps prevent accidental direct deletion of the user pool. Disabling or deleting that pool should require a deliberate configuration change to `CognitoDeletionProtection=INACTIVE` first. This guardrail does not replace backups or broader identity-data retention and recovery planning.
 
 ## Production deployment checklist
 
@@ -146,10 +149,10 @@ Production deployment is not performed or automated by this repository phase. Th
 2. From `backend/`, run `node --test`.
 3. Run `sam validate --lint --config-env prod --template-file template.yaml`.
 4. Run `sam build --config-env prod --template-file template.yaml`.
-5. Review `[prod.deploy.parameters]`, especially `EnvironmentName=prod`, `FunctionNamePrefix=Evrenthia-Prod`, `LogRetentionDays=30`, `PushDeliveryMode=DRY_RUN`, the region, budget email, alarm thresholds, and schedule.
+5. Review `[prod.deploy.parameters]`, especially `EnvironmentName=prod`, `FunctionNamePrefix=Evrenthia-Prod`, `LogRetentionDays=30`, `PushDeliveryMode=DRY_RUN`, `CognitoDeletionProtection=ACTIVE`, the region, budget email, alarm thresholds, and schedule.
 6. **Documentation only—do not run during repository preparation:** use `sam deploy --config-env prod --no-execute-changeset` to create a reviewable production change set without executing it. Do not approve unexpected changes.
 7. Verify every proposed table, function, layer, log group, schedule, alarm, dashboard, and budget name is production-specific.
-8. Verify the change set creates a new Cognito pool and app client and references no development IDs or users.
+8. Verify the change set updates the existing stack-owned production Cognito pool in place to deletion protection `ACTIVE`, creates no replacement pool or app client, and references no development IDs or users.
 9. Verify it creates the separate `Evrenthia-Prod` DynamoDB table and contains no import or data-copy resource.
 10. Verify `NotificationWorker` receives `PUSH_DELIVERY_MODE=DRY_RUN` before any execution is approved.
 11. After the backend is verified, preview only the static catalog seed with `node seeds/seed-catalogs.mjs --table Evrenthia-Prod --region us-east-2 --profile <production-profile>`. Inspect the cosmetics, achievements, and buildings counts before a separately approved `--write`; never seed profiles, tasks, history, devices, reminders, entitlements, or test records.

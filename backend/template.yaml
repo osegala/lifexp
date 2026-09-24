@@ -45,6 +45,14 @@ Parameters:
       - LIVE
     Description: Notification delivery mode; DRY_RUN is the safe default for every environment.
 
+  CognitoDeletionProtection:
+    Type: String
+    Default: INACTIVE
+    AllowedValues:
+      - ACTIVE
+      - INACTIVE
+    Description: Cognito user pool deletion protection; production should normally use ACTIVE.
+
   BudgetNotificationEmail:
     Type: String
     Default: ""
@@ -473,6 +481,8 @@ Resources:
     Properties:
       UserPoolName:
         Fn::Sub: "${FunctionNamePrefix}-Users"
+      DeletionProtection:
+        Ref: CognitoDeletionProtection
       UsernameAttributes:
         - email
       UsernameConfiguration:
