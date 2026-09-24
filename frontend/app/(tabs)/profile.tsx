@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -11,13 +11,16 @@ import { colors, spacing } from "../../src/theme/theme";
 import LifeInput from "../../src/components/LifeInput";
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
+import { clearLocalAccountData } from "../../src/storage/localAccountData";
 
 export default function ProfileScreen() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, clearDeletedAccountSession, refreshUser } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
   const [displayName, setDisplayName] = useState(user?.username ?? "");
   const [timeZone, setTimeZone] = useState(user?.timeZone ?? "UTC");
   const [saving, setSaving] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const deletionPending = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -59,6 +62,37 @@ export default function ProfileScreen() {
     } finally {
       setLoggingOut(false);
     }
+  }
+
+  async function deleteAccount() {
+    if (deletionPending.current) return;
+    deletionPending.current = true;
+    setDeletingAccount(true);
+    try {
+      await api.delete(apiRoutes.me);
+      await Promise.allSettled([
+        clearLocalAccountData(),
+        clearDeletedAccountSession(),
+      ]);
+      router.replace({ pathname: "/login" });
+    } catch (error) {
+      Alert.alert("Account not deleted", apiError(error, "Could not delete your account. Please try again.").message);
+    } finally {
+      deletionPending.current = false;
+      setDeletingAccount(false);
+    }
+  }
+
+  function confirmAccountDeletion() {
+    if (deletionPending.current) return;
+    Alert.alert(
+      "Delete Account",
+      "This permanently deletes your Evrenthia account and all associated game data. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete My Account", style: "destructive", onPress: () => void deleteAccount() },
+      ],
+    );
   }
 
   const totalXp = user?.totalXp ?? 0;
@@ -139,6 +173,17 @@ export default function ProfileScreen() {
       </LifeCard>
 
       <LifeButton title={loggingOut ? "Signing out…" : "Logout"} variant="danger" onPress={handleLogout} disabled={loggingOut} />
+
+      <LifeCard>
+        <Text style={styles.cardTitle}>Delete Account</Text>
+        <Text style={styles.helper}>Permanently delete your account, game progress, tasks, purchases, and settings.</Text>
+        <LifeButton
+          title={deletingAccount ? "Deleting Account…" : "Delete Account"}
+          variant="danger"
+          onPress={confirmAccountDeletion}
+          disabled={deletingAccount || loggingOut}
+        />
+      </LifeCard>
     </ScrollView>
   );
 }

@@ -192,9 +192,21 @@ Do not run this runner to create the account, seed catalogs, or prepare data. No
 
 The stack does not import or adopt the existing manually managed table, user pool, app client, or their data. No automatic data migration is performed.
 
+## Self-service account deletion
+
+Authenticated users can call `DELETE /me`. The handler derives both the DynamoDB partition and Cognito username only from verified JWT claims; it accepts no user identifier from a body, path, or query string.
+
+All mutable user runtime records share `PK=USER#<sub>`. Current sort-key patterns are `PROFILE`, `TASK#`, `COMPLETION#`, `COMPLETION_HISTORY#`, `STATS#DAY#`, `STATS#WEEK#`, `ACHIEVEMENT#`, `ITEM#`, `EQUIPMENT`, `BUILDING#`, `ENTITLEMENTS`, `PREFERENCES`, `DEVICE#`, `REMINDER#`, and `NOTIFICATION_DELIVERY#`. Deletion queries that single partition with consistent reads and key projection, follows pagination, and deletes batches of at most 25 items. Unprocessed writes use bounded exponential retries. This partition-wide approach also covers future user-scoped records that follow the established key design.
+
+Global `CATALOG#COSMETICS`, `CATALOG#ACHIEVEMENTS`, and `CATALOG#BUILDINGS` partitions are never queried or deleted. No table scan is used.
+
+Application data is deleted first. Only after that succeeds does the Lambda call Cognito `AdminDeleteUser`, with IAM restricted to the stack-managed user-pool ARN. The existing API uses Cognito ID tokens, while Cognito's self-service `DeleteUser` API requires an access token, so the backend-owned admin call is the compatible option and no admin capability reaches the frontend. A DynamoDB failure leaves the Cognito identity active and returns a canonical 500. A Cognito failure after data cleanup also returns a canonical 500 and can be retried; an already-missing Cognito identity is treated as idempotent success. Successful deletion returns `204 No Content`.
+
+Account deletion does not delete global catalogs. No store billing exists today; if subscriptions are added later, Apple subscription cancellation remains a separate store-managed process and must be explained in the billing UX.
+
 ## Observability and cost protection
 
-All 30 development Lambdas use Lambda's native JSON log format at application level `INFO` and system level `WARN`. Unexpected API failures emit a stable `UNEXPECTED_ERROR` record with the function name and sanitized error metadata; Lambda adds the invocation request ID to its JSON envelope. CreateProfile and NotificationWorker emit the same safe metadata shape without logging Cognito events, request bodies, authorization values, JWTs, push tokens, or DynamoDB items. Expected API 4xx responses are not logged as errors.
+All 31 development Lambdas use Lambda's native JSON log format at application level `INFO` and system level `WARN`. Unexpected API failures emit a stable `UNEXPECTED_ERROR` record with the function name and sanitized error metadata; Lambda adds the invocation request ID to its JSON envelope. CreateProfile, DeleteAccount, and NotificationWorker emit safe structured metadata without logging Cognito events, request bodies, authorization values, JWTs, push tokens, or DynamoDB items. Expected API 4xx responses are not logged as errors.
 
 CloudFormation declares the standard `/aws/lambda/Evrenthia-Dev-<Function>` log group for every public API Lambda, CreateProfile, and NotificationWorker with 14-day retention. The log-group resources use `DeletionPolicy: Retain`, but retained events still expire after 14 days. Existing Lambda-created groups cannot be adopted by a normal stack update. The import stage below safely imports the 25 groups found in AWS; five functions have not created a group yet and their groups are deferred to the later normal observability update.
 

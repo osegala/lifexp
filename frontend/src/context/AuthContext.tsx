@@ -36,6 +36,7 @@ function useSessionValue() {
     register: session.register,
     confirmRegistration: session.confirmRegistration,
     logout: session.logout,
+    clearDeletedAccountSession: session.clearDeletedAccountSession,
     refreshUser: session.refreshUser,
     retrySession: session.retrySession,
   }), [snapshot, dashboardRefreshKey, triggerDashboardRefresh, session]);

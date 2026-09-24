@@ -236,5 +236,16 @@ export class AuthSession {
     this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null });
   };
 
+  clearDeletedAccountSession = async () => {
+    try {
+      await this.signOutFromCognito();
+    } catch {
+      // The server has already deleted the identity; local UI must still be cleared.
+    }
+    this.revision++;
+    this.refresh = null;
+    this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null });
+  };
+
   retrySession = () => this.state.token ? this.refreshUser() : this.restore();
 }

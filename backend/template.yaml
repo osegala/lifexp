@@ -474,6 +474,16 @@ Resources:
       RetentionInDays:
         Ref: LogRetentionDays
 
+  DeleteAccountLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-DeleteAccount"
+      RetentionInDays:
+        Ref: LogRetentionDays
+
   EvrenthiaDevUserPool:
     Type: AWS::Cognito::UserPool
     DeletionPolicy: Retain
@@ -1657,6 +1667,50 @@ Resources:
               Ref: EvrenthiaDevApi
             Path: /me
             Method: PATCH
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  DeleteAccountFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-DeleteAccount"
+      CodeUri: functions/delete-account/
+      Handler: index.handler
+      Description: Deletes the authenticated player's application data and Cognito identity.
+      Timeout: 30
+      Environment:
+        Variables:
+          USER_POOL_ID:
+            Ref: EvrenthiaDevUserPool
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:BatchWriteItem
+                - dynamodb:Query
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminDeleteUser
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevUserPool
+                  - Arn
+      Events:
+        DeleteAccount:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /me
+            Method: DELETE
             Auth:
               Authorizer: EvrenthiaCognito
 

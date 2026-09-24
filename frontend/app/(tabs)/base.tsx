@@ -29,6 +29,7 @@ import {
   getPathTileSource,
 } from "../../src/base/mapAssetRegistry";
 import { buildPathNetwork } from "../../src/base/pathNetwork";
+import { BASE_LAYOUT_STORAGE_KEY } from "../../src/storage/localAccountData";
 import { colors, radius, spacing } from "../../src/theme/theme";
 import {
   BaseProgress,
@@ -127,7 +128,6 @@ const GARDEN_BASE_ANCHOR = {
   xRatio: 0.5,
   yRatio: 0.84,
 };
-const BASE_LAYOUT_STORAGE_KEY = "lifexp.base.building-layouts.v1";
 const ACTION_BUTTONS: {
   key: "upgrade" | "enter" | "description";
   label: string;

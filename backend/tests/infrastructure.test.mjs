@@ -30,7 +30,7 @@ test("template creates and references the isolated development table", () => {
     assert.doesNotMatch(template, /\$\{TableName\}|\n  TableName:\n    Type: String|TableName: Evrenthia(?:\s|$)/);
 
     const dynamoPolicyResources = template.match(/Fn::GetAtt:\n\s+- EvrenthiaDevTable\n\s+- Arn/g) ?? [];
-    assert.equal(dynamoPolicyResources.length, 32);
+    assert.equal(dynamoPolicyResources.length, 33);
 });
 
 test("development table has one sparse due-notification index", () => {
@@ -58,7 +58,8 @@ test("all Lambda log groups use environment-scoped names and retention", () => {
         "UpdateReminder", "DeleteReminder", "NotificationWorker", "GetTasks", "CreateTask",
         "UpdateTask", "DeleteTask", "CompleteTask", "GetGoals", "GetHistory",
         "GetCompletionHistory", "GetAchievements", "GetWorld", "UpgradeBuilding", "GetShop",
-        "PurchaseItem", "GetInventory", "EquipItem", "UnequipItem", "UpdateMe"
+        "PurchaseItem", "GetInventory", "EquipItem", "UnequipItem", "UpdateMe",
+        "DeleteAccount"
     ];
     assert.equal((template.match(/Type: AWS::Logs::LogGroup/g) ?? []).length, functions.length);
     for (const name of functions) {
@@ -216,6 +217,7 @@ test("every public API handler receives and imports the canonical API helper lay
     assert.match(template, /ApiSharedLayer:[\s\S]*?ContentUri: layers\/api-shared\//);
     const handlers = [
         ["GetMeFunction", "get-me/index.mjs"], ["UpdateMeFunction", "update-me/index.mjs"],
+        ["DeleteAccountFunction", "delete-account/index.mjs"],
         ["CreateTaskFunction", "create-task/index.mjs"], ["GetTasksFunction", "get-tasks/index.mjs"],
         ["UpdateTaskFunction", "update-task/index.mjs"], ["DeleteTaskFunction", "delete-task/index.mjs"],
         ["CompleteTaskFunction", "complete-task/index.mjs"], ["GetGoalsFunction", "get-goals/index.mjs"],

@@ -27,6 +27,7 @@ test("every active frontend network feature maps to an existing SAM route", () =
   const routes = [
     ["GET", apiRoutes.me],
     ["PATCH", apiRoutes.me],
+    ["DELETE", apiRoutes.me],
     ["GET", apiRoutes.entitlements],
     ["GET", apiRoutes.goals],
     ["GET", apiRoutes.achievements],

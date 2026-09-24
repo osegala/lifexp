@@ -66,6 +66,10 @@ No Expo device-token registration currently exists in the frontend. It may later
 
 AWS Amplify v6 manages Cognito sessions and refresh tokens. Signup and confirmation use email and an emailed code. Authenticated API requests use the Cognito ID token as a bearer token; raw passwords are passed only to Cognito and are not stored by application code.
 
+Signed-in users can permanently delete their account from **Profile → Delete Account**. The app requires a destructive confirmation before calling authenticated `DELETE /me`. After server confirmation it clears the local Cognito session, avatar body type, and saved building layout, then returns to login. A failed request leaves the current session intact and can be retried.
+
+Deletion removes the Cognito identity and all user-owned backend records, including profile, tasks, completions and history, progression statistics, achievements, inventory/equipment, world buildings, entitlements, preferences, devices, reminders, and notification-delivery history. Global cosmetic, achievement, and building catalogs are not user data and remain intact. No store billing exists today; if subscriptions are introduced later, canceling an Apple subscription will remain a separate store-managed action.
+
 The active task, goals, achievements, world, shop, inventory, entitlement, and profile screens use the routes in `backend/template.yaml`. Weekly progress is read from `/goals`; rewards are granted by task completion and have no client-side claim action. Premium status is read-only through `/entitlements`, and no development entitlement setter is present.
 
 Social, visiting another player's base, and building-interior customization are hidden or disabled because the SAM backend does not expose those contracts. Those screens make no network requests. Notification preferences, devices, reminders, history, and task editing are supported by SAM but do not yet have frontend screens.

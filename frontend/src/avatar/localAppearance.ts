@@ -12,3 +12,7 @@ export async function getLocalBodyType(): Promise<BodyType> {
 export async function setLocalBodyType(bodyType: BodyType) {
   await SecureStore.setItemAsync(BODY_TYPE_KEY, bodyType);
 }
+
+export async function clearLocalBodyType() {
+  await SecureStore.deleteItemAsync(BODY_TYPE_KEY);
+}

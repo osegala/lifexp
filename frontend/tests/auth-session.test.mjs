@@ -239,6 +239,16 @@ test("failed Cognito sign-out leaves the current account available", async t => 
   assert.equal(h.authSession.getSnapshot().user.id, identity.userId);
 });
 
+test("a deleted account clears local session state even if Cognito sign-out fails", async t => {
+  const h = harness(t);
+  await h.ready();
+  h.auth.signOut = async () => { throw new Error("Identity is already deleted"); };
+  await h.authSession.clearDeletedAccountSession();
+  assert.equal(h.authSession.getSnapshot().token, null);
+  assert.equal(h.authSession.getSnapshot().user, null);
+  assert.equal(h.authSession.getSnapshot().sessionError, null);
+});
+
 test("a delayed expiry sign-out finishes before a later login starts", async t => {
   const h = harness(t);
   const signOut = deferred();
