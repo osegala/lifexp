@@ -23,6 +23,11 @@ export function loadSeedItems() {
         .flatMap((name) => JSON.parse(readFileSync(join(seedDirectory, name), "utf8")));
 }
 
+export function catalogBatches(items) {
+    return Array.from({ length: Math.ceil(items.length / 25) }, (_, index) =>
+        items.slice(index * 25, (index + 1) * 25));
+}
+
 function option(name) {
     const index = process.argv.indexOf(name);
     return index >= 0 ? process.argv[index + 1] : null;
@@ -84,7 +89,7 @@ function main() {
         return;
     }
 
-    runBatch(tableName, items, option("--region"), option("--profile"));
+    for (const batch of catalogBatches(items)) runBatch(tableName, batch, option("--region"), option("--profile"));
     console.log(`Seeded ${items.length} catalog records into ${tableName}.`);
 }
 

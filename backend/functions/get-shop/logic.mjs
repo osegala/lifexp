@@ -1,4 +1,4 @@
-export function buildShopItems(catalog, ownedIds, achievementIds, coins, level) {
+export function buildShopItems(catalog, ownedIds, achievementIds, coins, level, requirements = new Map()) {
     return catalog
         .filter((item) => item.active !== false)
         .map((item) => {
@@ -8,6 +8,7 @@ export function buildShopItems(catalog, ownedIds, achievementIds, coins, level) 
             const effectivePrice = Number(item.effectivePrice ?? price);
             const effectiveRequiredLevel = Number(item.effectiveRequiredLevel ?? requiredLevel);
             const requiredAchievement = item.requiredAchievement ?? null;
+            const requirement = requiredAchievement ? requirements.get(requiredAchievement) ?? null : null;
             const owned = ownedIds.has(item.itemId);
             const hasLevel = level >= effectiveRequiredLevel;
             const hasAchievement = !requiredAchievement || achievementIds.has(requiredAchievement);
@@ -19,7 +20,11 @@ export function buildShopItems(catalog, ownedIds, achievementIds, coins, level) 
                 lockReasons.push({ type: "LEVEL", requiredLevel, effectiveRequiredLevel });
             }
             if (!hasAchievement) {
-                lockReasons.push({ type: "ACHIEVEMENT", requiredAchievement });
+                lockReasons.push({
+                    type: "ACHIEVEMENT",
+                    requiredAchievement,
+                    name: requirement?.name ?? requiredAchievement
+                });
             }
 
             return {
@@ -32,6 +37,14 @@ export function buildShopItems(catalog, ownedIds, achievementIds, coins, level) 
                 requiredLevel,
                 effectiveRequiredLevel,
                 requiredAchievement,
+                achievementRequirement: requirement ? {
+                    ...requirement,
+                    progressPercent: requirement.requiredValue > 0
+                        ? Math.min(100, Math.floor((requirement.currentValue / requirement.requiredValue) * 100))
+                        : 0,
+                    satisfied: hasAchievement
+                } : null,
+                requirementSatisfied: hasAchievement,
                 assetKey: item.assetKey ?? null,
                 owned,
                 unlocked,

@@ -99,13 +99,15 @@ test("profile, reminder, and device validators retain stable validation codes", 
     expectCode(() => validateRegistration({ deviceId: "device-123", pushProvider: "EXPO", platform: "IOS", pushToken: "bad" }), Error, "INVALID_PUSH_TOKEN");
 });
 
-test("purchase input rejects missing IDs and client-controlled pricing fields", () => {
+test("purchase input rejects missing IDs and client-controlled catalog fields", () => {
     expectCode(() => requiredString({}, "itemId"), ApiError, "VALIDATION_ERROR");
-    expectCode(
-        () => validateBodyFields({ itemId: "hat", price: 1 }, ["itemId"]),
-        ApiError,
-        "VALIDATION_ERROR"
-    );
+    for (const [field, value] of [["price", 1], ["requiredLevel", 1], ["requiredAchievement", "FAKE"]]) {
+        expectCode(
+            () => validateBodyFields({ itemId: "hat", [field]: value }, ["itemId"]),
+            ApiError,
+            "VALIDATION_ERROR"
+        );
+    }
 });
 
 test("purchase and building business failures expose stable codes", () => {

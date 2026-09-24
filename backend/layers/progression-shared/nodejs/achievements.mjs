@@ -7,7 +7,8 @@ export const ACHIEVEMENT_TYPES = Object.freeze([
     "BUILDING_LEVEL_REACHED",
     "TOTAL_BUILDING_LEVELS",
     "COSMETICS_OWNED",
-    "ACHIEVEMENTS_EARNED"
+    "ACHIEVEMENTS_EARNED",
+    "DAILY_GOALS_COMPLETED"
 ]);
 
 const SUPPORTED_TYPES = new Set(ACHIEVEMENT_TYPES);
@@ -31,8 +32,21 @@ export function achievementProgress(achievement, progress) {
         case "TOTAL_BUILDING_LEVELS": return Number(progress.totalBuildingLevels ?? 0);
         case "COSMETICS_OWNED": return Number(progress.cosmeticsOwned ?? 0);
         case "ACHIEVEMENTS_EARNED": return Number(progress.achievementsEarned ?? 0);
+        case "DAILY_GOALS_COMPLETED": return Number(progress.dailyGoalsCompleted ?? 0);
         default: return null;
     }
+}
+
+export function dailyGoalCompletionCount(items = [], awardedDate = null) {
+    // ponytail: persisted day records stay authoritative; add a conditional aggregate only if history volume becomes a measured bottleneck.
+    const dates = new Set();
+    for (const item of items) {
+        const rewarded = item.goalRewarded?.BOOL ?? item.goalRewarded;
+        const date = item.date?.S ?? item.date ?? item.SK?.S?.slice("STATS#DAY#".length);
+        if (rewarded === true && date) dates.add(date);
+    }
+    if (awardedDate) dates.add(awardedDate);
+    return dates.size;
 }
 
 export function evaluateAchievementAwards({

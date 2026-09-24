@@ -1,6 +1,11 @@
 import { DynamoDBClient, GetItemCommand, QueryCommand } from "@aws-sdk/client-dynamodb";
 import { buildShopItems } from "./logic.mjs";
 import {
+    achievementCatalogFromItem,
+    achievementProgress,
+    dailyGoalCompletionCount
+} from "/opt/nodejs/achievements.mjs";
+import {
     buildingCatalogFromItem,
     cosmeticOffer,
     playerBuildingsFromItems,
@@ -59,13 +64,17 @@ export const handler = async (event) => {
             ownedResult,
             achievementsResult,
             buildingCatalogResult,
-            playerBuildingsResult
+            playerBuildingsResult,
+            achievementCatalogResult,
+            dailyStatsResult
         ] = await Promise.all([
             queryPrefix("CATALOG#COSMETICS", "ITEM#"),
             queryPrefix(userPk, "ITEM#"),
             queryPrefix(userPk, "ACHIEVEMENT#"),
             queryPrefix("CATALOG#BUILDINGS", "BUILDING#"),
-            queryPrefix(userPk, "BUILDING#")
+            queryPrefix(userPk, "BUILDING#"),
+            queryPrefix("CATALOG#ACHIEVEMENTS", "ACHIEVEMENT#"),
+            queryPrefix(userPk, "STATS#DAY#")
         ]);
 
         const xp = Number(profile.xp?.N ?? 0);
@@ -81,10 +90,27 @@ export const handler = async (event) => {
             playerBuildingsFromItems(playerBuildingsResult.Items)
         );
         const offers = catalog.map((item) => ({ ...item, ...cosmeticOffer(item, effects) }));
+        const progress = {
+            tasksCompleted: Number(profile.tasksCompleted?.N ?? 0),
+            level,
+            coins,
+            dailyGoalsCompleted: dailyGoalCompletionCount(dailyStatsResult.Items)
+        };
+        const requirements = new Map((achievementCatalogResult.Items ?? [])
+            .map(achievementCatalogFromItem)
+            .filter((achievement) => achievement.active)
+            .map((achievement) => [achievement.achievementId, {
+                achievementId: achievement.achievementId,
+                name: achievement.name,
+                description: achievement.description,
+                type: achievement.type,
+                requiredValue: achievement.requiredValue,
+                currentValue: achievementProgress(achievement, progress) ?? 0
+            }]));
 
         return response(200, {
             player: { level, coins },
-            items: buildShopItems(offers, ownedIds, achievementIds, coins, level)
+            items: buildShopItems(offers, ownedIds, achievementIds, coins, level, requirements)
         });
     } catch (error) {
         return internalServerError("Get shop failed", error);

@@ -76,6 +76,7 @@ export type Achievement = {
   progressPercent: number;
   earned: boolean;
   earnedAt: string | null;
+  rewards?: { itemId: string; name: string; category: string }[];
 };
 
 export type AchievementsResponse = {
@@ -98,6 +99,17 @@ export type ShopItem = {
   requiredLevel: number;
   effectiveRequiredLevel: number;
   requiredAchievement: string | null;
+  achievementRequirement: {
+    achievementId: string;
+    name: string;
+    description: string;
+    type: string;
+    requiredValue: number;
+    currentValue: number;
+    progressPercent: number;
+    satisfied: boolean;
+  } | null;
+  requirementSatisfied: boolean;
   assetKey: string | null;
   owned: boolean;
   unlocked: boolean;

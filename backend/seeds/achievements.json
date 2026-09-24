@@ -23,6 +23,17 @@
   },
   {
     "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#COMPLETE_25_TASKS",
+    "achievementId": "COMPLETE_25_TASKS",
+    "name": "Creature of Habit",
+    "description": "Complete 25 tasks.",
+    "type": "TASKS_COMPLETED",
+    "requiredValue": 25,
+    "active": true,
+    "sortOrder": 15
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
     "SK": "ACHIEVEMENT#COMPLETE_100_TASKS",
     "achievementId": "COMPLETE_100_TASKS",
     "name": "Task Master",
@@ -31,6 +42,39 @@
     "requiredValue": 100,
     "active": true,
     "sortOrder": 20
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#REACH_LEVEL_5",
+    "achievementId": "REACH_LEVEL_5",
+    "name": "Rising Star",
+    "description": "Reach level 5.",
+    "type": "LEVEL_REACHED",
+    "requiredValue": 5,
+    "active": true,
+    "sortOrder": 25
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#REACH_LEVEL_10",
+    "achievementId": "REACH_LEVEL_10",
+    "name": "Seasoned Adventurer",
+    "description": "Reach level 10.",
+    "type": "LEVEL_REACHED",
+    "requiredValue": 10,
+    "active": true,
+    "sortOrder": 26
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#COMPLETE_DAILY_GOAL_7_DAYS",
+    "achievementId": "COMPLETE_DAILY_GOAL_7_DAYS",
+    "name": "On a Roll",
+    "description": "Complete the daily task goal on 7 distinct days.",
+    "type": "DAILY_GOALS_COMPLETED",
+    "requiredValue": 7,
+    "active": true,
+    "sortOrder": 27
   },
   {
     "PK": "CATALOG#ACHIEVEMENTS",

@@ -119,10 +119,10 @@ test("catalog seeds contain the required stable logical keys", () => {
         sortOrder: 10,
         active: true
     });
-    assert.equal(cosmetics.size, 2);
-    assert.equal(items.filter((item) => item.PK === "CATALOG#ACHIEVEMENTS").length, 11);
+    assert.equal(cosmetics.size, 14);
+    assert.equal(items.filter((item) => item.PK === "CATALOG#ACHIEVEMENTS").length, 15);
     assert.equal(items.filter((item) => item.PK === "CATALOG#BUILDINGS").length, 6);
-    assert.equal(items.length, 19);
+    assert.equal(items.length, 35);
     assert.equal(JSON.stringify(items).includes("dragon-helm.png"), false);
     assert.equal(JSON.stringify(items).includes("dragon_helm"), false);
     assert.equal(JSON.stringify(items).includes("Dragon Helm"), false);
@@ -142,7 +142,11 @@ test("catalog seeds contain the required stable logical keys", () => {
         [
             { achievementId: "FIRST_TASK", name: "First Steps", description: "Complete your first task.", type: "TASKS_COMPLETED", requiredValue: 1, sortOrder: 1, active: true },
             { achievementId: "COMPLETE_10_TASKS", name: "Getting Things Done", description: "Complete 10 tasks.", type: "TASKS_COMPLETED", requiredValue: 10, sortOrder: 10, active: true },
+            { achievementId: "COMPLETE_25_TASKS", name: "Creature of Habit", description: "Complete 25 tasks.", type: "TASKS_COMPLETED", requiredValue: 25, sortOrder: 15, active: true },
             { achievementId: "COMPLETE_100_TASKS", name: "Task Master", description: "Complete 100 tasks.", type: "TASKS_COMPLETED", requiredValue: 100, sortOrder: 20, active: true },
+            { achievementId: "REACH_LEVEL_5", name: "Rising Star", description: "Reach level 5.", type: "LEVEL_REACHED", requiredValue: 5, sortOrder: 25, active: true },
+            { achievementId: "REACH_LEVEL_10", name: "Seasoned Adventurer", description: "Reach level 10.", type: "LEVEL_REACHED", requiredValue: 10, sortOrder: 26, active: true },
+            { achievementId: "COMPLETE_DAILY_GOAL_7_DAYS", name: "On a Roll", description: "Complete the daily task goal on 7 distinct days.", type: "DAILY_GOALS_COMPLETED", requiredValue: 7, sortOrder: 27, active: true },
             { achievementId: "STREAK_7", name: "One Week Strong", description: "Reach a 7-completion streak on a recurring task.", type: "STREAK_REACHED", requiredValue: 7, sortOrder: 30, active: true },
             { achievementId: "STREAK_30", name: "Unstoppable", description: "Reach a 30-completion streak on a recurring task.", type: "STREAK_REACHED", requiredValue: 30, sortOrder: 40, active: true },
             { achievementId: "STREAK_100", name: "Legendary Consistency", description: "Reach a 100-completion streak on a recurring task.", type: "STREAK_REACHED", requiredValue: 100, sortOrder: 50, active: true },

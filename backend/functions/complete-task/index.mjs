@@ -18,6 +18,7 @@ import {
     achievementCatalogFromItem,
     achievementPut,
     achievementResponse,
+    dailyGoalCompletionCount,
     earnedAchievementIdsFromItems,
     evaluateAchievementAwards
 } from "/opt/nodejs/achievements.mjs";
@@ -436,7 +437,7 @@ async function complete(userPk, taskId) {
             SK: { S: `STATS#WEEK#${weekId}` }
         };
         const [
-            dailyStatsItem,
+            dailyStatsItems,
             weeklyStatsItem,
             catalogItems,
             userAchievementItems,
@@ -444,7 +445,7 @@ async function complete(userPk, taskId) {
             buildingCatalogItems,
             playerBuildingItems
         ] = await Promise.all([
-            getItem(dailyStatsKey),
+            queryPrefix(userPk, "STATS#DAY#"),
             getItem(weeklyStatsKey),
             queryPrefix("CATALOG#ACHIEVEMENTS", "ACHIEVEMENT#"),
             queryPrefix(userPk, "ACHIEVEMENT#"),
@@ -452,6 +453,7 @@ async function complete(userPk, taskId) {
             queryPrefix("CATALOG#BUILDINGS", "BUILDING#"),
             queryPrefix(userPk, "BUILDING#")
         ]);
+        const dailyStatsItem = dailyStatsItems.find((item) => item.SK?.S === dailyStatsKey.SK.S);
         const dailyStats = statsFrom(dailyStatsItem);
         const weeklyStats = statsFrom(weeklyStatsItem);
         const earnedAchievementIds = earnedAchievementIdsFromItems(userAchievementItems);
@@ -492,13 +494,20 @@ async function complete(userPk, taskId) {
         plan.newAchievements = evaluateAchievementAwards({
             catalog: catalogItems.map(achievementCatalogFromItem),
             earnedAchievementIds,
-            progress: plan.achievementProgress,
+            progress: {
+                ...plan.achievementProgress,
+                dailyGoalsCompleted: dailyGoalCompletionCount(
+                    dailyStatsItems,
+                    plan.daily.awarded ? today : null
+                )
+            },
             allowedTypes: [
                 "TASKS_COMPLETED",
                 "LEVEL_REACHED",
                 "COINS_OWNED",
                 "WORLD_POINTS_OWNED",
                 "STREAK_REACHED",
+                "DAILY_GOALS_COMPLETED",
                 "ACHIEVEMENTS_EARNED"
             ],
             now

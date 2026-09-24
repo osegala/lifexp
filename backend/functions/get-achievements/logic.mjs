@@ -1,4 +1,4 @@
-export function buildAchievements(catalog, earnedById) {
+export function buildAchievements(catalog, earnedById, rewardsByAchievement = new Map()) {
     return catalog
         .filter((achievement) => achievement.active)
         .map((achievement) => {
@@ -19,6 +19,7 @@ export function buildAchievements(catalog, earnedById) {
                 earned: Boolean(earnedRecord),
                 earnedAt: earnedRecord?.earnedAt ?? null,
                 progressValueAtEarn: earnedRecord?.progressValue ?? null,
+                rewards: rewardsByAchievement.get(achievement.achievementId) ?? [],
                 sortOrder: achievement.sortOrder,
                 ...(achievement.targetBuildingId
                     ? { targetBuildingId: achievement.targetBuildingId }

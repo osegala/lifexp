@@ -107,6 +107,18 @@ test("shop uses read-only entitlements and the catalog-backed purchase route", (
   assert.doesNotMatch(shop, /dev\/activate|price\s*:/);
 });
 
+test("shop explains achievement locks and exposes no purchase control while locked", () => {
+  const shop = read("app/(tabs)/shop.tsx");
+  const dashboard = read("app/(tabs)/dashboard.tsx");
+
+  assert.match(shop, /item\.achievementRequirement/);
+  assert.match(shop, /Complete &quot;\{requirement\.name\}&quot;/);
+  assert.match(shop, /requirement\.currentValue\} \/ \{requirement\.requiredValue/);
+  assert.match(shop, /locked \|\| item\.owned \? \(/);
+  assert.match(shop, /item\.effectivePrice\} coins · \{item\.owned \? "Owned" : "Available"\}/);
+  assert.match(dashboard, /Rewards: \{\(achievement\.rewards \?\? \[\]\)\.map/);
+});
+
 test("social and interior screens are inert and hidden from tab navigation", () => {
   assert.doesNotMatch(read("app/(tabs)/social.tsx"), /\bapi\./);
   assert.doesNotMatch(read("app/social-base.tsx"), /\bapi\./);

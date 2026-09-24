@@ -100,6 +100,15 @@ function ShopItemRow({ item, busy, onPurchase }: { item: ShopItem; busy: boolean
       : item.status === "NOT_ENOUGH_COINS"
         ? "Need coins"
         : busy ? "Buying…" : "Buy";
+  const requirement = item.achievementRequirement;
+  const progressUnit = requirement?.type === "TASKS_COMPLETED"
+    ? "tasks"
+    : requirement?.type === "LEVEL_REACHED"
+      ? "levels"
+      : requirement?.type === "DAILY_GOALS_COMPLETED"
+        ? "daily goals"
+        : "progress";
+  const locked = item.status === "LOCKED";
 
   return (
     <LifeCard compact style={styles.item}>
@@ -109,12 +118,34 @@ function ShopItemRow({ item, busy, onPurchase }: { item: ShopItem; busy: boolean
       </View>
       <View style={styles.itemCopy}>
         <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.muted}>{item.effectivePrice} coins · level {item.effectiveRequiredLevel}</Text>
-        {item.requiredAchievement ? <Text style={styles.muted}>Requires {item.requiredAchievement}</Text> : null}
+        {locked ? (
+          <>
+            <Text style={styles.lockedText}>Locked</Text>
+            {requirement ? (
+              <>
+                <Text style={styles.muted}>Complete &quot;{requirement.name}&quot;</Text>
+                <Text style={styles.muted}>{requirement.currentValue} / {requirement.requiredValue} {progressUnit}</Text>
+              </>
+            ) : (
+              <Text style={styles.muted}>Reach level {item.effectiveRequiredLevel}</Text>
+            )}
+          </>
+        ) : (
+          <>
+            <Text style={styles.muted}>{item.effectivePrice} coins · {item.owned ? "Owned" : "Available"}</Text>
+            {requirement ? <Text style={styles.muted}>Unlocked by {requirement.name}</Text> : null}
+          </>
+        )}
       </View>
-      <Pressable onPress={onPurchase} disabled={!item.canPurchase || busy} style={[styles.buyButton, (!item.canPurchase || busy) && styles.disabled]}>
-        <Text style={styles.buyText}>{label}</Text>
-      </Pressable>
+      {locked || item.owned ? (
+        <View style={[styles.statusBadge, locked && styles.disabled]}>
+          <Text style={styles.statusText}>{label}</Text>
+        </View>
+      ) : (
+        <Pressable onPress={onPurchase} disabled={!item.canPurchase || busy} style={[styles.buyButton, (!item.canPurchase || busy) && styles.disabled]}>
+          <Text style={styles.buyText}>{label}</Text>
+        </Pressable>
+      )}
     </LifeCard>
   );
 }
@@ -133,7 +164,10 @@ const styles = StyleSheet.create({
   image: { width: 68, height: 68 },
   itemCopy: { flex: 1 },
   itemName: { color: colors.text, fontSize: 17, fontWeight: "700" },
+  lockedText: { color: colors.danger, fontWeight: "800", marginTop: 3 },
   buyButton: { minWidth: 82, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.primary },
+  statusBadge: { minWidth: 82, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.cardLight },
+  statusText: { color: colors.text, fontWeight: "800" },
   buyText: { color: colors.background, fontWeight: "800" },
   disabled: { opacity: 0.45 },
 });

@@ -89,6 +89,9 @@ export default function DashboardScreen() {
             <View style={styles.achievementCopy}>
               <Text style={styles.achievementName}>{achievement.name}</Text>
               <Text style={styles.muted}>{achievement.currentValue}/{achievement.requiredValue} · {achievement.description}</Text>
+              {(achievement.rewards ?? []).length ? (
+                <Text style={styles.muted}>Rewards: {(achievement.rewards ?? []).map((reward) => reward.name).join(", ")}</Text>
+              ) : null}
             </View>
           </View>
         ))}

@@ -9,7 +9,8 @@ import {
 } from "./logic.mjs";
 import {
     achievementCatalogFromItem,
-    achievementProgress
+    achievementProgress,
+    dailyGoalCompletionCount
 } from "/opt/nodejs/achievements.mjs";
 import {
     buildingCatalogFromItem,
@@ -72,14 +73,18 @@ export const handler = async (event) => {
             taskItems,
             buildingCatalogItems,
             playerBuildingItems,
-            ownedItems
+            ownedItems,
+            dailyStatsItems,
+            cosmeticCatalogItems
         ] = await Promise.all([
             queryPrefix("CATALOG#ACHIEVEMENTS", "ACHIEVEMENT#"),
             queryPrefix(userPk, "ACHIEVEMENT#"),
             queryPrefix(userPk, "TASK#"),
             queryPrefix("CATALOG#BUILDINGS", "BUILDING#"),
             queryPrefix(userPk, "BUILDING#"),
-            queryPrefix(userPk, "ITEM#")
+            queryPrefix(userPk, "ITEM#"),
+            queryPrefix(userPk, "STATS#DAY#"),
+            queryPrefix("CATALOG#COSMETICS", "ITEM#")
         ]);
         const totalXp = Number(profile.xp?.N ?? 0);
         const levels = levelInfo(totalXp);
@@ -104,7 +109,8 @@ export const handler = async (event) => {
             buildingLevels: buildingState.levels,
             totalBuildingLevels: [...buildingState.levels.values()].reduce((sum, level) => sum + level, 0),
             cosmeticsOwned: ownedItems.length,
-            achievementsEarned: earnedItems.length
+            achievementsEarned: earnedItems.length,
+            dailyGoalsCompleted: dailyGoalCompletionCount(dailyStatsItems)
         };
         const earnedById = new Map(earnedItems.map((item) => [
             item.achievementId?.S ?? item.SK.S.slice("ACHIEVEMENT#".length),
@@ -123,7 +129,18 @@ export const handler = async (event) => {
                 supported: currentValue !== null
             };
         });
-        const achievements = buildAchievements(catalog, earnedById);
+        const rewardsByAchievement = new Map();
+        for (const item of cosmeticCatalogItems) {
+            const achievementId = item.requiredAchievement?.S;
+            if (!achievementId || item.active?.BOOL === false) continue;
+            if (!rewardsByAchievement.has(achievementId)) rewardsByAchievement.set(achievementId, []);
+            rewardsByAchievement.get(achievementId).push({
+                itemId: item.itemId?.S ?? item.SK?.S?.slice("ITEM#".length),
+                name: item.name?.S ?? item.itemId?.S ?? "Cosmetic",
+                category: item.category?.S ?? "unknown"
+            });
+        }
+        const achievements = buildAchievements(catalog, earnedById, rewardsByAchievement);
 
         return response(200, {
             summary: achievementSummary(achievements),
