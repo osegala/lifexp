@@ -1,0 +1,15 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "evrenthia-dev"
+resolve_s3 = true
+s3_prefix = "evrenthia-dev"
+region = "us-east-2"
+profile = "evrenthia-admin"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EnvironmentName=\"dev\" FunctionNamePrefix=\"Evrenthia-Dev\""
+image_repositories = []
+
+[default.global.parameters]
+region = "us-east-2"

@@ -1,0 +1,104 @@
+[
+  {
+    "PK": "CATALOG#BUILDINGS",
+    "SK": "BUILDING#home_base",
+    "buildingId": "home_base",
+    "name": "Home Base",
+    "maxLevel": 5,
+    "upgradeCosts": [100, 250, 500, 1000],
+    "effectsByLevel": [
+      { "level": 1, "effects": [{ "type": "WORLD_AREA_UNLOCK", "value": 1 }] },
+      { "level": 2, "effects": [{ "type": "WORLD_AREA_UNLOCK", "value": 2 }] },
+      { "level": 3, "effects": [{ "type": "WORLD_AREA_UNLOCK", "value": 3 }] },
+      { "level": 4, "effects": [{ "type": "WORLD_AREA_UNLOCK", "value": 4 }] },
+      { "level": 5, "effects": [{ "type": "WORLD_AREA_UNLOCK", "value": 5 }] }
+    ],
+    "active": true,
+    "sortOrder": 1
+  },
+  {
+    "PK": "CATALOG#BUILDINGS",
+    "SK": "BUILDING#workshop",
+    "buildingId": "workshop",
+    "name": "Workshop",
+    "maxLevel": 5,
+    "upgradeCosts": [100, 250, 500, 1000],
+    "effectsByLevel": [
+      { "level": 1, "effects": [{ "type": "SHOP_DISCOUNT_PERCENT", "value": 0 }] },
+      { "level": 2, "effects": [{ "type": "SHOP_DISCOUNT_PERCENT", "value": 2 }] },
+      { "level": 3, "effects": [{ "type": "SHOP_DISCOUNT_PERCENT", "value": 4 }] },
+      { "level": 4, "effects": [{ "type": "SHOP_DISCOUNT_PERCENT", "value": 7 }] },
+      { "level": 5, "effects": [{ "type": "SHOP_DISCOUNT_PERCENT", "value": 10 }] }
+    ],
+    "active": true,
+    "sortOrder": 2
+  },
+  {
+    "PK": "CATALOG#BUILDINGS",
+    "SK": "BUILDING#library",
+    "buildingId": "library",
+    "name": "Library",
+    "maxLevel": 5,
+    "upgradeCosts": [100, 250, 500, 1000],
+    "effectsByLevel": [
+      { "level": 1, "effects": [{ "type": "COSMETIC_LEVEL_REQUIREMENT_REDUCTION", "value": 0 }] },
+      { "level": 2, "effects": [{ "type": "COSMETIC_LEVEL_REQUIREMENT_REDUCTION", "value": 0 }] },
+      { "level": 3, "effects": [{ "type": "COSMETIC_LEVEL_REQUIREMENT_REDUCTION", "value": 1 }] },
+      { "level": 4, "effects": [{ "type": "COSMETIC_LEVEL_REQUIREMENT_REDUCTION", "value": 1 }] },
+      { "level": 5, "effects": [{ "type": "COSMETIC_LEVEL_REQUIREMENT_REDUCTION", "value": 2 }] }
+    ],
+    "active": true,
+    "sortOrder": 3
+  },
+  {
+    "PK": "CATALOG#BUILDINGS",
+    "SK": "BUILDING#training_grounds",
+    "buildingId": "training_grounds",
+    "name": "Training Grounds",
+    "maxLevel": 5,
+    "upgradeCosts": [100, 250, 500, 1000],
+    "effectsByLevel": [
+      { "level": 1, "effects": [{ "type": "TASK_XP_BONUS_PERCENT", "value": 0 }] },
+      { "level": 2, "effects": [{ "type": "TASK_XP_BONUS_PERCENT", "value": 2 }] },
+      { "level": 3, "effects": [{ "type": "TASK_XP_BONUS_PERCENT", "value": 5 }] },
+      { "level": 4, "effects": [{ "type": "TASK_XP_BONUS_PERCENT", "value": 8 }] },
+      { "level": 5, "effects": [{ "type": "TASK_XP_BONUS_PERCENT", "value": 10 }] }
+    ],
+    "active": true,
+    "sortOrder": 4
+  },
+  {
+    "PK": "CATALOG#BUILDINGS",
+    "SK": "BUILDING#garden",
+    "buildingId": "garden",
+    "name": "Garden",
+    "maxLevel": 5,
+    "upgradeCosts": [100, 250, 500, 1000],
+    "effectsByLevel": [
+      { "level": 1, "effects": [{ "type": "TASK_COIN_BONUS_PERCENT", "value": 0 }] },
+      { "level": 2, "effects": [{ "type": "TASK_COIN_BONUS_PERCENT", "value": 2 }] },
+      { "level": 3, "effects": [{ "type": "TASK_COIN_BONUS_PERCENT", "value": 5 }] },
+      { "level": 4, "effects": [{ "type": "TASK_COIN_BONUS_PERCENT", "value": 8 }] },
+      { "level": 5, "effects": [{ "type": "TASK_COIN_BONUS_PERCENT", "value": 10 }] }
+    ],
+    "active": true,
+    "sortOrder": 5
+  },
+  {
+    "PK": "CATALOG#BUILDINGS",
+    "SK": "BUILDING#hall_of_achievements",
+    "buildingId": "hall_of_achievements",
+    "name": "Hall of Achievements",
+    "maxLevel": 5,
+    "upgradeCosts": [100, 250, 500, 1000],
+    "effectsByLevel": [
+      { "level": 1, "effects": [{ "type": "ACHIEVEMENT_DISPLAY_SLOTS", "value": 3 }] },
+      { "level": 2, "effects": [{ "type": "ACHIEVEMENT_DISPLAY_SLOTS", "value": 5 }] },
+      { "level": 3, "effects": [{ "type": "ACHIEVEMENT_DISPLAY_SLOTS", "value": 7 }] },
+      { "level": 4, "effects": [{ "type": "ACHIEVEMENT_DISPLAY_SLOTS", "value": 10 }] },
+      { "level": 5, "effects": [{ "type": "ACHIEVEMENT_DISPLAY_SLOTS", "value": 15 }] }
+    ],
+    "active": true,
+    "sortOrder": 6
+  }
+]

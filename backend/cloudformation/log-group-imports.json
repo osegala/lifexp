@@ -1,0 +1,177 @@
+[
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "CreateProfileLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-CreateProfile"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetMeLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetMe"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetEntitlementsLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetEntitlements"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetPreferencesLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetPreferences"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "UpdatePreferencesLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-UpdatePreferences"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetDevicesLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetDevices"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "RegisterDeviceLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-RegisterDevice"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetRemindersLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetReminders"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "CreateReminderLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-CreateReminder"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "NotificationWorkerLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-NotificationWorker"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetTasksLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetTasks"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "CreateTaskLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-CreateTask"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "UpdateTaskLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-UpdateTask"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "DeleteTaskLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-DeleteTask"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "CompleteTaskLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-CompleteTask"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetGoalsLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetGoals"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetHistoryLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetHistory"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetCompletionHistoryLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetCompletionHistory"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetAchievementsLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetAchievements"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetWorldLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetWorld"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "UpgradeBuildingLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-UpgradeBuilding"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetShopLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetShop"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "PurchaseItemLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-PurchaseItem"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "GetInventoryLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-GetInventory"
+    }
+  },
+  {
+    "ResourceType": "AWS::Logs::LogGroup",
+    "LogicalResourceId": "UpdateMeLogGroup",
+    "ResourceIdentifier": {
+      "LogGroupName": "/aws/lambda/Evrenthia-Dev-UpdateMe"
+    }
+  }
+]

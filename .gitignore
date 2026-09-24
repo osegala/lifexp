@@ -66,3 +66,6 @@ service-account*.json
 
 # Logs
 *.log
+
+# AWS SAM build output
+backend/.aws-sam/

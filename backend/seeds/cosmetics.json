@@ -1,0 +1,41 @@
+[
+  {
+    "PK": "CATALOG#COSMETICS",
+    "SK": "ITEM#starter_tunic",
+    "itemId": "starter_tunic",
+    "name": "Starter Tunic",
+    "category": "tunic",
+    "price": 25,
+    "requiredLevel": 1,
+    "requiredAchievement": null,
+    "assetKey": "starter-tunic.png",
+    "sortOrder": 1,
+    "active": true
+  },
+  {
+    "PK": "CATALOG#COSMETICS",
+    "SK": "ITEM#forest_tunic",
+    "itemId": "forest_tunic",
+    "name": "Forest Tunic",
+    "category": "tunic",
+    "price": 250,
+    "requiredLevel": 5,
+    "requiredAchievement": null,
+    "assetKey": "forest-tunic.png",
+    "sortOrder": 10,
+    "active": true
+  },
+  {
+    "PK": "CATALOG#COSMETICS",
+    "SK": "ITEM#dragon_helm",
+    "itemId": "dragon_helm",
+    "name": "Dragon Helm",
+    "category": "hat",
+    "price": 1000,
+    "requiredLevel": 10,
+    "requiredAchievement": "COMPLETE_100_TASKS",
+    "assetKey": "dragon-helm.png",
+    "sortOrder": 20,
+    "active": true
+  }
+]

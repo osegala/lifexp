@@ -1,0 +1,1450 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Evrenthia development backend
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+    AllowedPattern: ^[a-z][a-z0-9-]*$
+    Description: Logical deployment environment name.
+  FunctionNamePrefix:
+    Type: String
+    Default: Evrenthia-Dev
+    Description: Physical development resource prefix; the default preserves existing
+      Lambda names.
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures:
+    - arm64
+    MemorySize: 128
+    Timeout: 10
+    Environment:
+      Variables:
+        ENVIRONMENT_NAME:
+          Ref: EnvironmentName
+        TABLE_NAME:
+          Ref: EvrenthiaDevTable
+Resources:
+  EvrenthiaDevTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Ref: FunctionNamePrefix
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: PK
+        AttributeType: S
+      - AttributeName: SK
+        AttributeType: S
+      - AttributeName: GSI1PK
+        AttributeType: S
+      - AttributeName: GSI1SK
+        AttributeType: S
+      KeySchema:
+      - AttributeName: PK
+        KeyType: HASH
+      - AttributeName: SK
+        KeyType: RANGE
+      GlobalSecondaryIndexes:
+      - IndexName: NotificationDueIndex
+        KeySchema:
+        - AttributeName: GSI1PK
+          KeyType: HASH
+        - AttributeName: GSI1SK
+          KeyType: RANGE
+        Projection:
+          ProjectionType: KEYS_ONLY
+    Metadata:
+      SamResourceId: EvrenthiaDevTable
+  NotificationSharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName:
+        Fn::Sub: ${FunctionNamePrefix}-NotificationShared
+      Description: Dependency-free timezone-aware notification scheduling helpers.
+      ContentUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/86c7a06de873804aa9ae4dafd1065da0
+      CompatibleRuntimes:
+      - nodejs22.x
+      RetentionPolicy: Retain
+    Metadata:
+      SamResourceId: NotificationSharedLayer
+  ApiSharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName:
+        Fn::Sub: ${FunctionNamePrefix}-ApiShared
+      Description: Canonical HTTP responses, JSON parsing, authentication extraction,
+        and error handling.
+      ContentUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/9e4a31e9c9477128fa95596223b43a1d
+      CompatibleRuntimes:
+      - nodejs22.x
+      RetentionPolicy: Retain
+    Metadata:
+      SamResourceId: ApiSharedLayer
+  ProgressionSharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName:
+        Fn::Sub: ${FunctionNamePrefix}-ProgressionShared
+      Description: Server-authoritative building effects and catalog-driven achievement
+        evaluation.
+      ContentUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/c05d34a4d2ddd3860a7d232901a0473c
+      CompatibleRuntimes:
+      - nodejs22.x
+      RetentionPolicy: Retain
+    Metadata:
+      SamResourceId: ProgressionSharedLayer
+  EvrenthiaDevUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName:
+        Fn::Sub: ${FunctionNamePrefix}-Users
+      UsernameAttributes:
+      - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      AutoVerifiedAttributes:
+      - email
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      Schema:
+      - Name: email
+        AttributeDataType: String
+        Mutable: true
+        Required: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 7
+      LambdaConfig:
+        PostConfirmation:
+          Fn::GetAtt:
+          - CreateProfileFunction
+          - Arn
+    Metadata:
+      SamResourceId: EvrenthiaDevUserPool
+  EvrenthiaDevUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName:
+        Fn::Sub: ${FunctionNamePrefix}-Mobile
+      UserPoolId:
+        Ref: EvrenthiaDevUserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+      - ALLOW_USER_PASSWORD_AUTH
+      - ALLOW_USER_SRP_AUTH
+      - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+      - COGNITO
+    Metadata:
+      SamResourceId: EvrenthiaDevUserPoolClient
+  CreateProfileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-CreateProfile
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/b39818a3a5e3959477549c3de2bbc6ed
+      Handler: index.handler
+      Description: Creates a default player profile after Cognito confirmation.
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:PutItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+    Metadata:
+      SamResourceId: CreateProfileFunction
+  CreateProfileInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: CreateProfileFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceAccount:
+        Ref: AWS::AccountId
+      SourceArn:
+        Fn::GetAtt:
+        - EvrenthiaDevUserPool
+        - Arn
+    Metadata:
+      SamResourceId: CreateProfileInvokePermission
+  EvrenthiaDevApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins:
+        - '*'
+        AllowHeaders:
+        - Authorization
+        - Content-Type
+        AllowMethods:
+        - GET
+        - POST
+        - PATCH
+        - DELETE
+        - OPTIONS
+      Auth:
+        Authorizers:
+          EvrenthiaCognito:
+            JwtConfiguration:
+              issuer:
+                Fn::Sub:
+                - https://cognito-idp.${AWS::Region}.amazonaws.com/${PoolId}
+                - PoolId:
+                    Ref: EvrenthiaDevUserPool
+              audience:
+              - Ref: EvrenthiaDevUserPoolClient
+            IdentitySource: $request.header.Authorization
+    Metadata:
+      SamResourceId: EvrenthiaDevApi
+  GetMeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetMe
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/f63a7e313d85c19e9eece1a5e45edf29
+      Handler: index.handler
+      Description: Retrieves the authenticated Evrenthia player profile.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetMe:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /me
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetMeFunction
+  GetEntitlementsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetEntitlements
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/4d26e11017fba7b702f6bdf6b346ea64
+      Handler: index.handler
+      Description: Retrieves the authenticated player's effective subscription and
+        ad entitlement.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetEntitlements:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /entitlements
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetEntitlementsFunction
+  GetPreferencesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetPreferences
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/fbddeded3336b6a613e8a166bd714f82
+      Handler: get.handler
+      Description: Retrieves resolved notification and experience preferences.
+      Layers:
+      - Ref: ApiSharedLayer
+      - Ref: NotificationSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetPreferences:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /preferences
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetPreferencesFunction
+  UpdatePreferencesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-UpdatePreferences
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/fbddeded3336b6a613e8a166bd714f82
+      Handler: update.handler
+      Description: Updates editable notification and experience preferences.
+      Layers:
+      - Ref: ApiSharedLayer
+      - Ref: NotificationSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        UpdatePreferences:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /preferences
+            Method: PATCH
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: UpdatePreferencesFunction
+  GetDevicesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetDevices
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/6dc0655110278dc84700c8e9ad422a10
+      Handler: get.handler
+      Description: Retrieves registered devices without exposing push tokens.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:Query
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetDevices:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /devices
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetDevicesFunction
+  RegisterDeviceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-RegisterDevice
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/6dc0655110278dc84700c8e9ad422a10
+      Handler: register.handler
+      Description: Registers or refreshes an Expo push device.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        RegisterDevice:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /devices
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: RegisterDeviceFunction
+  DisableDeviceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-DisableDevice
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/6dc0655110278dc84700c8e9ad422a10
+      Handler: disable.handler
+      Description: Soft-disables a registered push device.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        DisableDevice:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /devices/{deviceId}
+            Method: DELETE
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: DisableDeviceFunction
+  GetRemindersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetReminders
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/0d6c13e45c7f8f1f455eb6d6784a4633
+      Handler: get.handler
+      Description: Retrieves reminder configuration and effective delivery eligibility.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetReminders:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /reminders
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetRemindersFunction
+  CreateReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-CreateReminder
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/0d6c13e45c7f8f1f455eb6d6784a4633
+      Handler: create.handler
+      Description: Creates an idempotent task reminder configuration.
+      Layers:
+      - Ref: ApiSharedLayer
+      - Ref: NotificationSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:PutItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        CreateReminder:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /reminders
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: CreateReminderFunction
+  UpdateReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-UpdateReminder
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/0d6c13e45c7f8f1f455eb6d6784a4633
+      Handler: update.handler
+      Description: Updates editable reminder configuration.
+      Layers:
+      - Ref: ApiSharedLayer
+      - Ref: NotificationSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        UpdateReminder:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /reminders/{reminderId}
+            Method: PATCH
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: UpdateReminderFunction
+  DeleteReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-DeleteReminder
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/0d6c13e45c7f8f1f455eb6d6784a4633
+      Handler: disable.handler
+      Description: Soft-disables a reminder configuration.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        DeleteReminder:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /reminders/{reminderId}
+            Method: DELETE
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: DeleteReminderFunction
+  NotificationWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-NotificationWorker
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/d959f0da3e046cb18fad07ef08cfe207
+      Handler: index.handler
+      Description: Claims due notification configurations and prepares or delivers
+        push attempts.
+      Timeout: 30
+      Layers:
+      - Ref: NotificationSharedLayer
+      Environment:
+        Variables:
+          PUSH_DELIVERY_MODE: DRY_RUN
+          NOTIFICATION_BATCH_SIZE: '25'
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:Query
+          Resource:
+          - Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+          - Fn::Sub:
+            - ${TableArn}/index/NotificationDueIndex
+            - TableArn:
+                Fn::GetAtt:
+                - EvrenthiaDevTable
+                - Arn
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        NotificationWorkerSchedule:
+          Type: Schedule
+          Properties:
+            Name:
+              Fn::Sub: ${FunctionNamePrefix}-NotificationWorker-EveryMinute
+            Description: Development notification worker tick for the isolated Evrenthia
+              backend.
+            Schedule: rate(1 minute)
+            Enabled: true
+    Metadata:
+      SamResourceId: NotificationWorkerFunction
+  GetTasksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetTasks
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/eb80b4b575a2a380501846783c7fa83c
+      Handler: index.handler
+      Description: Retrieves the authenticated player's tasks.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetTasks:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /tasks
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetTasksFunction
+  CreateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-CreateTask
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/05eac651b391511655d7f9235a038dbe
+      Handler: index.handler
+      Description: Creates a task for the authenticated player.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:PutItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        CreateTask:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /tasks
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: CreateTaskFunction
+  UpdateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-UpdateTask
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/60fc7d56a1f4d98ec7cf4bea56d5f3a6
+      Handler: index.handler
+      Description: Updates editable task fields for the authenticated player.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        UpdateTask:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /tasks/{taskId}
+            Method: PATCH
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: UpdateTaskFunction
+  DeleteTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-DeleteTask
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/2ad5a692989d935ae36762bb251c9886
+      Handler: index.handler
+      Description: Archives a task owned by the authenticated player.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        DeleteTask:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /tasks/{taskId}
+            Method: DELETE
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: DeleteTaskFunction
+  CompleteTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-CompleteTask
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/df0a6e99cdbbea6da86e36f94e7dae5c
+      Handler: index.handler
+      Description: Completes a task and atomically applies player progression.
+      Layers:
+      - Ref: ApiSharedLayer
+      - Ref: ProgressionSharedLayer
+      Environment:
+        Variables:
+          DEFAULT_TASK_XP: '10'
+          DEFAULT_TASK_COINS: '1'
+          DAILY_TASK_TARGET: '3'
+          WEEKLY_TASK_TARGET: '15'
+          DAILY_WORLD_POINTS_REWARD: '25'
+          WEEKLY_WORLD_POINTS_REWARD: '100'
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        CompleteTask:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /tasks/{taskId}/complete
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: CompleteTaskFunction
+  GetGoalsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetGoals
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/12aef57d2b6218cd3a442a300c725e79
+      Handler: index.handler
+      Description: Retrieves the authenticated player's daily and weekly goals.
+      Layers:
+      - Ref: ApiSharedLayer
+      Environment:
+        Variables:
+          DAILY_TASK_TARGET: '3'
+          WEEKLY_TASK_TARGET: '15'
+          DAILY_WORLD_POINTS_REWARD: '25'
+          WEEKLY_WORLD_POINTS_REWARD: '100'
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetGoals:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /goals
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetGoalsFunction
+  GetHistoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetHistory
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/4925db3dde742f004db8f684b4d82943
+      Handler: index.handler
+      Description: Retrieves the authenticated player's 30-day completion history.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetHistory:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /history
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetHistoryFunction
+  GetCompletionHistoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetCompletionHistory
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/fd70468e2e4a101f3a08cb67a1effa03
+      Handler: index.handler
+      Description: Retrieves immutable task completion snapshots newest first.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:Query
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetCompletionHistory:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /history/completions
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetCompletionHistoryFunction
+  GetAchievementsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetAchievements
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/b3d44ee059945e4f86cc6694bc63e96a
+      Handler: index.handler
+      Description: Retrieves catalog-backed achievement progress for the authenticated
+        player.
+      Layers:
+      - Ref: ApiSharedLayer
+      - Ref: ProgressionSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetAchievements:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /achievements
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetAchievementsFunction
+  GetWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetWorld
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/2e4644b173463f6bc13c40617ae5e077
+      Handler: index.handler
+      Description: Retrieves the authenticated player's building world.
+      Layers:
+      - Ref: ApiSharedLayer
+      - Ref: ProgressionSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetWorld:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /world
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetWorldFunction
+  UpgradeBuildingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-UpgradeBuilding
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/fed1e9b2f911bfe05a65f323665f8252
+      Handler: index.handler
+      Description: Atomically upgrades a building using the authenticated player's
+        World Points.
+      Layers:
+      - Ref: ApiSharedLayer
+      - Ref: ProgressionSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        UpgradeBuilding:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /world/buildings/{buildingId}/upgrade
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: UpgradeBuildingFunction
+  GetShopFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetShop
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/e4dca72647d31a4e3bfcfe8a7c0244cc
+      Handler: index.handler
+      Description: Retrieves the cosmetic catalog and player purchase eligibility.
+      Layers:
+      - Ref: ApiSharedLayer
+      - Ref: ProgressionSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetShop:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /shop
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetShopFunction
+  PurchaseItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-PurchaseItem
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/a7a95351d338fe365e948796698ddc5e
+      Handler: index.handler
+      Description: Atomically purchases a catalog cosmetic with player coins.
+      Layers:
+      - Ref: ApiSharedLayer
+      - Ref: ProgressionSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        PurchaseItem:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /shop/purchase
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: PurchaseItemFunction
+  GetInventoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-GetInventory
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/a5ef7fd3d29c5fc25287bfad1993e9c5
+      Handler: index.handler
+      Description: Retrieves owned cosmetics and current equipment.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        GetInventory:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /inventory
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: GetInventoryFunction
+  EquipItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-EquipItem
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/36a710992d035c1cd50286439eab6b1e
+      Handler: index.handler
+      Description: Equips an owned cosmetic in its server-controlled category slot.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        EquipItem:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /inventory/equip
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: EquipItemFunction
+  UnequipItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-UnequipItem
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/7a6eb2ff6e52c52a411ceafdd99e711f
+      Handler: index.handler
+      Description: Unequips a cosmetic from its server-controlled category slot.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        UnequipItem:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /inventory/unequip
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: UnequipItemFunction
+  UpdateMeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: ${FunctionNamePrefix}-UpdateMe
+      CodeUri: s3://aws-sam-cli-managed-default-samclisourcebucket-o26wn2fbzyhe/evrenthia-dev/57d3c2a5925beecbdc37bcc67e2c4293
+      Handler: index.handler
+      Description: Updates editable profile settings for the authenticated player.
+      Layers:
+      - Ref: ApiSharedLayer
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:UpdateItem
+          Resource:
+            Fn::GetAtt:
+            - EvrenthiaDevTable
+            - Arn
+      Events:
+        UpdateMe:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /me
+            Method: PATCH
+            Auth:
+              Authorizer: EvrenthiaCognito
+    Metadata:
+      SamResourceId: UpdateMeFunction
+  CreateProfileLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-CreateProfile
+      RetentionInDays: 14
+
+  GetMeLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetMe
+      RetentionInDays: 14
+
+  GetEntitlementsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetEntitlements
+      RetentionInDays: 14
+
+  GetPreferencesLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetPreferences
+      RetentionInDays: 14
+
+  UpdatePreferencesLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-UpdatePreferences
+      RetentionInDays: 14
+
+  GetDevicesLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetDevices
+      RetentionInDays: 14
+
+  RegisterDeviceLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-RegisterDevice
+      RetentionInDays: 14
+
+  GetRemindersLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetReminders
+      RetentionInDays: 14
+
+  CreateReminderLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-CreateReminder
+      RetentionInDays: 14
+
+  NotificationWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-NotificationWorker
+      RetentionInDays: 14
+
+  GetTasksLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetTasks
+      RetentionInDays: 14
+
+  CreateTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-CreateTask
+      RetentionInDays: 14
+
+  UpdateTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-UpdateTask
+      RetentionInDays: 14
+
+  DeleteTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-DeleteTask
+      RetentionInDays: 14
+
+  CompleteTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-CompleteTask
+      RetentionInDays: 14
+
+  GetGoalsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetGoals
+      RetentionInDays: 14
+
+  GetHistoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetHistory
+      RetentionInDays: 14
+
+  GetCompletionHistoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetCompletionHistory
+      RetentionInDays: 14
+
+  GetAchievementsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetAchievements
+      RetentionInDays: 14
+
+  GetWorldLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetWorld
+      RetentionInDays: 14
+
+  UpgradeBuildingLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-UpgradeBuilding
+      RetentionInDays: 14
+
+  GetShopLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetShop
+      RetentionInDays: 14
+
+  PurchaseItemLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-PurchaseItem
+      RetentionInDays: 14
+
+  GetInventoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-GetInventory
+      RetentionInDays: 14
+
+  UpdateMeLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/Evrenthia-Dev-UpdateMe
+      RetentionInDays: 14
+
+Outputs:
+  ApiUrl:
+    Description: Evrenthia development API URL
+    Value:
+      Fn::Sub: https://${EvrenthiaDevApi}.execute-api.${AWS::Region}.amazonaws.com
+  DevApiUrl:
+    Description: Isolated development HTTP API URL
+    Value:
+      Fn::Sub: https://${EvrenthiaDevApi}.execute-api.${AWS::Region}.amazonaws.com
+  DevTableName:
+    Description: Isolated development DynamoDB table name
+    Value:
+      Ref: EvrenthiaDevTable
+  DevUserPoolId:
+    Description: Isolated development Cognito user pool ID
+    Value:
+      Ref: EvrenthiaDevUserPool
+  DevUserPoolClientId:
+    Description: Isolated development Cognito app client ID
+    Value:
+      Ref: EvrenthiaDevUserPoolClient
+  GetMeFunctionName:
+    Description: GetMe Lambda function name
+    Value:
+      Ref: GetMeFunction
+  CreateProfileFunctionArn:
+    Description: CreateProfile Lambda ARN
+    Value:
+      Fn::GetAtt:
+      - CreateProfileFunction
+      - Arn
+  CreateProfileFunctionName:
+    Description: CreateProfile Lambda function name
+    Value:
+      Ref: CreateProfileFunction
+

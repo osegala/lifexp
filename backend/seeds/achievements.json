@@ -1,0 +1,124 @@
+[
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#FIRST_TASK",
+    "achievementId": "FIRST_TASK",
+    "name": "First Steps",
+    "description": "Complete your first task.",
+    "type": "TASKS_COMPLETED",
+    "requiredValue": 1,
+    "active": true,
+    "sortOrder": 1
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#COMPLETE_10_TASKS",
+    "achievementId": "COMPLETE_10_TASKS",
+    "name": "Getting Things Done",
+    "description": "Complete 10 tasks.",
+    "type": "TASKS_COMPLETED",
+    "requiredValue": 10,
+    "active": true,
+    "sortOrder": 10
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#COMPLETE_100_TASKS",
+    "achievementId": "COMPLETE_100_TASKS",
+    "name": "Task Master",
+    "description": "Complete 100 tasks.",
+    "type": "TASKS_COMPLETED",
+    "requiredValue": 100,
+    "active": true,
+    "sortOrder": 20
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#STREAK_7",
+    "achievementId": "STREAK_7",
+    "name": "One Week Strong",
+    "description": "Reach a 7-completion streak on a recurring task.",
+    "type": "STREAK_REACHED",
+    "requiredValue": 7,
+    "active": true,
+    "sortOrder": 30
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#STREAK_30",
+    "achievementId": "STREAK_30",
+    "name": "Unstoppable",
+    "description": "Reach a 30-completion streak on a recurring task.",
+    "type": "STREAK_REACHED",
+    "requiredValue": 30,
+    "active": true,
+    "sortOrder": 40
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#STREAK_100",
+    "achievementId": "STREAK_100",
+    "name": "Legendary Consistency",
+    "description": "Reach a 100-completion streak on a recurring task.",
+    "type": "STREAK_REACHED",
+    "requiredValue": 100,
+    "active": true,
+    "sortOrder": 50
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#WORLD_EXPLORER_I",
+    "achievementId": "WORLD_EXPLORER_I",
+    "name": "World Explorer I",
+    "description": "Own 100 World Points.",
+    "type": "WORLD_POINTS_OWNED",
+    "requiredValue": 100,
+    "active": true,
+    "sortOrder": 60
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#WORKSHOP_LEVEL_3",
+    "achievementId": "WORKSHOP_LEVEL_3",
+    "name": "Master Craftsperson",
+    "description": "Upgrade the Workshop to level 3.",
+    "type": "BUILDING_LEVEL_REACHED",
+    "targetBuildingId": "workshop",
+    "requiredValue": 3,
+    "active": true,
+    "sortOrder": 70
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#BUILDER",
+    "achievementId": "BUILDER",
+    "name": "Builder",
+    "description": "Reach 10 total building levels.",
+    "type": "TOTAL_BUILDING_LEVELS",
+    "requiredValue": 10,
+    "active": true,
+    "sortOrder": 80
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#COLLECTOR",
+    "achievementId": "COLLECTOR",
+    "name": "Collector",
+    "description": "Own 5 cosmetics.",
+    "type": "COSMETICS_OWNED",
+    "requiredValue": 5,
+    "active": true,
+    "sortOrder": 90
+  },
+  {
+    "PK": "CATALOG#ACHIEVEMENTS",
+    "SK": "ACHIEVEMENT#ACHIEVEMENT_HUNTER",
+    "achievementId": "ACHIEVEMENT_HUNTER",
+    "name": "Achievement Hunter",
+    "description": "Earn 5 achievements.",
+    "type": "ACHIEVEMENTS_EARNED",
+    "requiredValue": 5,
+    "active": true,
+    "sortOrder": 100
+  }
+]
