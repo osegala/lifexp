@@ -87,9 +87,7 @@ export default function TabLayout() {
         name="social"
         options={{
           title: "Social",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account-group" color={color} size={size} />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen

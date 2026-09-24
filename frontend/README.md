@@ -40,7 +40,11 @@ No Expo device-token registration currently exists in the frontend. It may later
 
 AWS Amplify v6 manages Cognito sessions and refresh tokens. Its native React Native support requires a development build rather than Expo Go.
 
-The shared API client now targets the SAM base URL, but some existing screens still call legacy routes that the SAM backend does not expose, including social, weekly-quest, subscription-development, and older avatar/base endpoints. Migrate or deliberately hide those screens before approving a production app build; environment selection does not invent replacement contracts.
+The active task, goals, achievements, world, shop, inventory, entitlement, and profile screens use the routes in `backend/template.yaml`. Weekly progress is read from `/goals`; rewards are granted by task completion and have no client-side claim action. Premium status is read-only through `/entitlements`, and no development entitlement setter is present.
+
+Social, visiting another player's base, and building-interior customization are hidden or disabled because the SAM backend does not expose those contracts. Those screens make no network requests. Notification preferences, devices, reminders, history, and task editing are supported by SAM but do not yet have frontend screens.
+
+Avatar body type is appearance-only state saved locally with SecureStore. It is not part of `PROFILE`, is not sent to Cognito, and is never included in `PATCH /me`; only `displayName` and `timeZone` are editable profile fields in the app. Owned cosmetics and equipped slots come from `/inventory`.
 
 In the output, you'll find options to open the app in a
 

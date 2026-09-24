@@ -2,7 +2,7 @@ import { ImageSourcePropType } from "react-native";
 
 import type { BodyRegion, CharacterLayer } from "./cosmeticCatalog";
 import type { BootCuff, ImageCrop, SpriteFrame, TrouserLeg } from "./spriteLayout";
-import { Cosmetic, CosmeticType, EquipmentSlot } from "../types/avatar";
+import { Cosmetic, CosmeticId, CosmeticType, EquipmentSlot } from "../types/avatar";
 import girlSilhouettes from "../../assets/avatar/v2/body-girl/silhouettes.json";
 
 export type CharacterSpriteDefinition = {
@@ -780,7 +780,9 @@ export function getCosmeticPreviewSource(cosmetic: CosmeticAssetReference) {
     return COSMETIC_ASSETS[cosmetic.imageUrl].previewSource;
   }
 
-  return FALLBACK_IMAGES[cosmetic.type]?.[cosmetic.id];
+  return typeof cosmetic.id === "number"
+    ? FALLBACK_IMAGES[cosmetic.type]?.[cosmetic.id]
+    : undefined;
 }
 
 export function getCosmeticPreviewCrop(cosmetic: CosmeticAssetReference) {
@@ -789,7 +791,7 @@ export function getCosmeticPreviewCrop(cosmetic: CosmeticAssetReference) {
 
 export function getEquippedCharacterSprites(
   cosmetics: Cosmetic[] | undefined,
-  cosmeticId: number | null | undefined,
+  cosmeticId: CosmeticId | null | undefined,
   type: CosmeticType,
 ): ResolvedCharacterSprite[] {
   if (!cosmeticId) return [];
@@ -804,7 +806,9 @@ export function getEquippedCharacterSprites(
     return resolveSpriteSet(assetKey, definition.sprites, definition.covers);
   }
 
-  const fallbackSource = FALLBACK_IMAGES[type]?.[cosmeticId];
+  const fallbackSource = typeof cosmeticId === "number"
+    ? FALLBACK_IMAGES[type]?.[cosmeticId]
+    : undefined;
   const fallbackLayer = FALLBACK_CHARACTER_LAYER[type];
   return fallbackSource && fallbackLayer
     ? [
@@ -819,7 +823,7 @@ export function getEquippedCharacterSprites(
 
 export function getEquippedSceneSource(
   cosmetics: Cosmetic[] | undefined,
-  cosmeticId: number | null | undefined,
+  cosmeticId: CosmeticId | null | undefined,
   type: "BACKGROUND" | "PET" | "AURA",
 ) {
   if (!cosmeticId) return undefined;
@@ -833,7 +837,9 @@ export function getEquippedSceneSource(
     if (source) return source;
   }
 
-  return FALLBACK_IMAGES[type]?.[cosmeticId];
+  return typeof cosmeticId === "number"
+    ? FALLBACK_IMAGES[type]?.[cosmeticId]
+    : undefined;
 }
 
 export function resolveSpriteSet(

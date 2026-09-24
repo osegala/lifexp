@@ -8,7 +8,7 @@ const identity = { token: "saved-id-token", userId: "user-sub-1", email: "hero@e
 const nextIdentity = { token: "new-id-token", userId: "user-sub-2", email: "second@example.test" };
 const profile = {
   displayName: "Test Hero", level: 3, xp: 200, xpIntoLevel: 50,
-  xpForNextLevel: 200, xpToNextLevel: 150, coins: 20,
+  xpForNextLevel: 200, xpToNextLevel: 150, coins: 20, timeZone: "America/New_York",
 };
 const deferred = () => {
   let resolve, reject;
@@ -263,6 +263,7 @@ test("profile mapping preserves progression and premium state", () => {
     id: identity.userId,
     username: profile.displayName,
     email: identity.email,
+    timeZone: profile.timeZone,
     totalXp: 200,
     level: 3,
     xpToNextLevel: 150,

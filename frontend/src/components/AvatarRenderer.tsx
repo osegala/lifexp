@@ -14,22 +14,22 @@ import {
   CHARACTER_LAYER_PRIORITY,
   SHOW_CHARACTER_LAYER_DEBUG,
 } from "../avatar/cosmeticCatalog";
-import { Cosmetic } from "../types/avatar";
+import { Cosmetic, CosmeticId } from "../types/avatar";
 import { colors } from "../theme/theme";
 
 type Props = {
   bodyType?: "BOY" | "GIRL";
-  hairId?: number | null;
-  hatId?: number | null;
-  topId?: number | null;
-  bottomId?: number | null;
-  bootsId?: number | null;
-  capeId?: number | null;
-  weaponId?: number | null;
-  shieldId?: number | null;
-  backgroundId?: number | null;
-  petId?: number | null;
-  auraId?: number | null;
+  hairId?: CosmeticId | null;
+  hatId?: CosmeticId | null;
+  topId?: CosmeticId | null;
+  bottomId?: CosmeticId | null;
+  bootsId?: CosmeticId | null;
+  capeId?: CosmeticId | null;
+  weaponId?: CosmeticId | null;
+  shieldId?: CosmeticId | null;
+  backgroundId?: CosmeticId | null;
+  petId?: CosmeticId | null;
+  auraId?: CosmeticId | null;
   cosmetics?: Cosmetic[];
   showBackground?: boolean;
   size?: "compact" | "regular";

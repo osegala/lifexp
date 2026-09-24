@@ -17,6 +17,7 @@ import LifeInput from "../src/components/LifeInput";
 import AvatarRenderer from "../src/components/AvatarRenderer";
 import { useAuth } from "../src/context/AuthContext";
 import { colors, radius, spacing } from "../src/theme/theme";
+import { setLocalBodyType } from "../src/avatar/localAppearance";
 
 const skyImage = require("../assets/base/backgrounds/sky.png");
 const baseImage = require("../assets/base/buildings/library/library-level-1.png");
@@ -51,6 +52,7 @@ export default function RegisterScreen() {
       setLoading(true);
       setError("");
       const nextStep = await register(trimmedUsername, trimmedEmail, password, bodyType);
+      await setLocalBodyType(bodyType);
       if (nextStep === "CONFIRM_SIGN_UP") {
         setAwaitingConfirmation(true);
       } else {

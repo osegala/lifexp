@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as SecureStore from "expo-secure-store";
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -17,7 +17,8 @@ import {
   ViewStyle,
 } from "react-native";
 
-import { api } from "../../src/api/client";
+import { api, apiError } from "../../src/api/client";
+import { apiRoutes } from "../../src/api/routes";
 import {
   BASE_BACKGROUND_IMAGES,
   getBuildingImageSource,
@@ -33,6 +34,8 @@ import {
   BaseProgress,
   BuildingProgress,
   BuildingType,
+  UpgradeBuildingResponse,
+  WorldResponse,
 } from "../../src/types/progression";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
@@ -1016,24 +1019,26 @@ export default function BaseScreen() {
   const loadBase = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get<BaseProgress>("/base");
-      setBase(response.data);
+      const response = await api.get<WorldResponse>(apiRoutes.world);
+      const nextBase = worldToBaseProgress(response.data);
+      setBase(nextBase);
       setSelectedBuilding((current) => {
         if (!current) {
           return null;
         }
 
         return (
-          response.data.buildings.find(
-            (building) => building.type === current.type,
+          nextBase.buildings.find(
+            (building) => building.buildingId === current.buildingId,
           ) ??
-          response.data.buildings[0] ??
+          nextBase.buildings[0] ??
           null
         );
       });
+      return nextBase;
     } catch (error) {
-      console.log("Base load error:", error);
-      Alert.alert("Error", "Could not load your base.");
+      Alert.alert("World", apiError(error, "Could not load your world.").message);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -1202,21 +1207,8 @@ export default function BaseScreen() {
       return;
     }
 
-    const meta = BUILDING_META[selectedBuilding.type];
-
     if (action === "enter") {
-      if (selectedBuilding.visualTier < 5) {
-        Alert.alert(
-          "Interior locked",
-          "Interiors unlock when this building reaches tier 5.",
-        );
-        return;
-      }
-
-      router.push({
-        pathname: "/base-interior" as never,
-        params: { type: selectedBuilding.type },
-      });
+      Alert.alert("Interiors unavailable", "Interior customization needs a future backend API.");
       return;
     }
 
@@ -1224,37 +1216,28 @@ export default function BaseScreen() {
       if (!selectedBuilding.upgradeAvailable) {
         Alert.alert(
           `${selectedBuilding.type} upgrade`,
-          `${nextTierCopy(selectedBuilding)} Complete ${meta.category} tasks to earn the next upgrade.`,
+          selectedBuilding.level >= selectedBuilding.maxLevel
+            ? "This building is at its maximum level."
+            : `The next upgrade costs ${selectedBuilding.upgradeCost ?? "more"} World Points.`,
         );
         return;
       }
 
       try {
-        const response = await api.post<BuildingProgress>(
-          `/base/buildings/${encodeURIComponent(selectedBuilding.type)}/upgrade`,
+        await api.post<UpgradeBuildingResponse>(
+          apiRoutes.upgradeBuilding(selectedBuilding.buildingId),
+          {},
         );
-        const upgradedBuilding = response.data;
-
-        setBase((current) =>
-          current
-            ? {
-                ...current,
-                buildings: current.buildings.map((building) =>
-                  building.type === upgradedBuilding.type
-                    ? upgradedBuilding
-                    : building,
-                ),
-              }
-            : current,
+        const nextBase = await loadBase();
+        const upgradedBuilding = nextBase?.buildings.find(
+          (building) => building.buildingId === selectedBuilding.buildingId,
         );
-        setSelectedBuilding(upgradedBuilding);
-        setCelebration(upgradedBuilding);
+        if (upgradedBuilding) {
+          setSelectedBuilding(upgradedBuilding);
+          setCelebration(upgradedBuilding);
+        }
       } catch (error) {
-        console.log("Building upgrade error:", error);
-        Alert.alert(
-          "Upgrade unavailable",
-          "This building is not ready to upgrade yet.",
-        );
+        Alert.alert("Upgrade unavailable", apiError(error, "This building cannot be upgraded yet.").message);
       }
       return;
     }
@@ -1389,6 +1372,11 @@ export default function BaseScreen() {
           )}
         </View>
       </MapViewport>
+
+      <View pointerEvents="none" style={styles.worldPointsBadge}>
+        <MaterialCommunityIcons name="star-four-points" color={colors.accent} size={18} />
+        <Text style={styles.worldPointsText}>{base?.worldPoints ?? 0} World Points</Text>
+      </View>
 
       {celebration && <UpgradeCelebration building={celebration} />}
     </View>
@@ -1595,7 +1583,6 @@ function BuildingActionTray({
             style={[
               styles.actionButton,
               action.key === "enter" &&
-                building.visualTier < 5 &&
                 styles.actionButtonDisabled,
             ]}
           >
@@ -1610,7 +1597,7 @@ function BuildingActionTray({
               name={action.icon}
               size={24}
               color={
-                action.key === "enter" && building.visualTier < 5
+                action.key === "enter"
                   ? colors.mutedText
                   : colors.text
               }
@@ -1628,8 +1615,8 @@ function BuildingActionTray({
           <Text style={styles.descriptionTitle}>{building.type}</Text>
           <Text style={styles.descriptionText}>{meta.description}</Text>
           <Text style={styles.descriptionMeta}>
-            Upgraded by {meta.category} tasks. {building.xpToNextLevel} XP until
-            next level.
+            Upgrades cost World Points earned from daily and weekly goals.
+            {building.upgradeCost == null ? " Maximum level reached." : ` Next cost: ${building.upgradeCost}.`}
           </Text>
         </View>
       )}
@@ -1713,31 +1700,44 @@ function UpgradeCelebration({ building }: { building: BuildingProgress }) {
   );
 }
 
-function nextTierCopy(building: BuildingProgress) {
-  const nextTierLevel = nextVisualTierLevel(building.visualTier);
+function worldToBaseProgress(world: WorldResponse): BaseProgress {
+  const buildings = world.buildings
+    .filter((building) => Object.hasOwn(BUILDING_META, building.name))
+    .map((building): BuildingProgress => ({
+      buildingId: building.buildingId,
+      type: building.name as BuildingType,
+      level: building.currentLevel,
+      maxLevel: building.maxLevel,
+      upgradeCost: building.upgradeCost,
+      visualTier: Math.max(1, Math.min(5, building.currentLevel)),
+      upgradeAvailable: building.canUpgrade,
+    }));
 
-  if (building.visualTier >= 5) {
-    return "This building is at its highest visual tier.";
-  }
-
-  return `Tier ${building.visualTier + 1} unlocks at level ${nextTierLevel}.`;
-}
-
-function nextVisualTierLevel(visualTier: number) {
-  if (visualTier <= 1) {
-    return 8;
-  }
-  if (visualTier === 2) {
-    return 14;
-  }
-  if (visualTier === 3) {
-    return 22;
-  }
-  return 35;
+  return {
+    baseLevel: Math.max(1, ...buildings.map((building) => building.level)),
+    worldPoints: world.worldPoints,
+    buildings,
+  };
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  worldPointsBadge: {
+    position: "absolute",
+    top: spacing.md,
+    right: spacing.md,
+    zIndex: 1000,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  worldPointsText: { color: colors.text, fontWeight: "800" },
   loadingScreen: {
     flex: 1,
     backgroundColor: colors.background,

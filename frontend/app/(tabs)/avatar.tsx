@@ -13,14 +13,17 @@ import {
   View,
 } from "react-native";
 
-import { api } from "../../src/api/client";
+import { api, apiError } from "../../src/api/client";
+import { apiRoutes } from "../../src/api/routes";
 import { getCosmeticPreviewCrop, getCosmeticPreviewSource, getEquippedSceneSource } from "../../src/avatar/assetRegistry";
+import { avatarFromInventory, inventoryCosmetics } from "../../src/avatar/inventory";
+import { getLocalBodyType } from "../../src/avatar/localAppearance";
 import CosmeticImage from "../../src/components/CosmeticImage";
 import AvatarRenderer from "../../src/components/AvatarRenderer";
 import LifeCard from "../../src/components/LifeCard";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme/theme";
-import { Avatar, Cosmetic, CosmeticType } from "../../src/types/avatar";
+import { Avatar, Cosmetic, CosmeticId, CosmeticType, InventoryResponse } from "../../src/types/avatar";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -48,22 +51,20 @@ export default function AvatarScreen() {
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [cosmetics, setCosmetics] = useState<Cosmetic[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [loadingId, setLoadingId] = useState<CosmeticId | null>(null);
   const [selectedType, setSelectedType] = useState<CosmeticType>("HAIR");
 
   const loadAvatarData = useCallback(async () => {
     try {
       setLoading(true);
-      const [avatarRes, cosmeticsRes] = await Promise.all([
-        api.get<Avatar>("/avatar"),
-        api.get<Cosmetic[]>("/avatar/cosmetics"),
+      const [inventoryResponse, bodyType] = await Promise.all([
+        api.get<InventoryResponse>(apiRoutes.inventory),
+        getLocalBodyType(),
       ]);
-
-      setAvatar(avatarRes.data);
-      setCosmetics(cosmeticsRes.data);
+      setAvatar(avatarFromInventory(inventoryResponse.data, bodyType));
+      setCosmetics(inventoryCosmetics(inventoryResponse.data));
     } catch (error) {
-      console.log("Avatar load error:", error);
-      Alert.alert("Character", "Could not load your wardrobe.");
+      Alert.alert("Character", apiError(error, "Could not load your wardrobe.").message);
     } finally {
       setLoading(false);
     }
@@ -82,23 +83,13 @@ export default function AvatarScreen() {
 
     try {
       setLoadingId(cosmetic.id);
-      const response = await api.put<Avatar>(
-        cosmetic.equipped ? "/avatar/unequip" : "/avatar/equip",
-        {
-          cosmeticId: cosmetic.id,
-        },
+      await api.post(
+        cosmetic.equipped ? apiRoutes.inventoryUnequip : apiRoutes.inventoryEquip,
+        { itemId: String(cosmetic.id) },
       );
-
-      setAvatar(response.data);
-      setCosmetics((current) =>
-        current.map((candidate) => ({
-          ...candidate,
-          equipped: isEquipped(response.data, candidate),
-        })),
-      );
+      await loadAvatarData();
     } catch (error) {
-      console.log("Equip error:", error);
-      Alert.alert("Character", "Could not equip that item.");
+      Alert.alert("Character", apiError(error, "Could not update that item.").message);
     } finally {
       setLoadingId(null);
     }
@@ -273,23 +264,6 @@ export default function AvatarScreen() {
       </View>
     </ScrollView>
   );
-}
-
-function isEquipped(avatar: Avatar, cosmetic: Cosmetic) {
-  const ids: Partial<Record<CosmeticType, number | null>> = {
-    HAIR: avatar.equippedHairId,
-    HAT: avatar.equippedHatId,
-    TOP: avatar.equippedTopId,
-    BOTTOM: avatar.equippedBottomId,
-    BOOTS: avatar.equippedBootsId,
-    CAPE: avatar.equippedCapeId,
-    WEAPON: avatar.equippedWeaponId,
-    SHIELD: avatar.equippedShieldId,
-    BACKGROUND: avatar.equippedBackgroundId,
-    PET: avatar.equippedPetId,
-    AURA: avatar.equippedAuraId,
-  };
-  return ids[cosmetic.type] === cosmetic.id;
 }
 
 function CosmeticCard({

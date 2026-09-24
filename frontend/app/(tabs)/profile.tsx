@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -8,16 +8,45 @@ import LifeCard from "../../src/components/LifeCard";
 import LifeButton from "../../src/components/LifeButton";
 import XPBar from "../../src/components/XPBar";
 import { colors, spacing } from "../../src/theme/theme";
+import LifeInput from "../../src/components/LifeInput";
+import { api, apiError } from "../../src/api/client";
+import { apiRoutes } from "../../src/api/routes";
 
 export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [displayName, setDisplayName] = useState(user?.username ?? "");
+  const [timeZone, setTimeZone] = useState(user?.timeZone ?? "UTC");
+  const [saving, setSaving] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      refreshUser();
+      void refreshUser();
     }, [refreshUser]),
   );
+
+  useEffect(() => {
+    if (user) {
+      setDisplayName(user.username);
+      setTimeZone(user.timeZone);
+    }
+  }, [user]);
+
+  async function saveProfile() {
+    try {
+      setSaving(true);
+      await api.patch(apiRoutes.me, {
+        displayName: displayName.trim(),
+        timeZone: timeZone.trim(),
+      });
+      await refreshUser();
+      Alert.alert("Profile", "Profile settings saved.");
+    } catch (error) {
+      Alert.alert("Profile", apiError(error, "Could not save profile settings.").message);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleLogout() {
     if (loggingOut) return;
@@ -92,17 +121,21 @@ export default function ProfileScreen() {
       </LifeCard>
 
       <LifeCard>
-        <Text style={styles.cardTitle}>Account</Text>
+        <Text style={styles.cardTitle}>Profile settings</Text>
 
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Username</Text>
-          <Text style={styles.statValue}>{user?.username}</Text>
-        </View>
+        <Text style={styles.statLabel}>Display name</Text>
+        <LifeInput value={displayName} onChangeText={setDisplayName} placeholder="Adventurer" />
+
+        <Text style={styles.statLabel}>Time zone</Text>
+        <LifeInput value={timeZone} onChangeText={setTimeZone} placeholder="America/New_York" autoCapitalize="none" />
+        <Text style={styles.helper}>Use an IANA time zone. Task dates and reminders use this setting.</Text>
 
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Email</Text>
           <Text style={styles.statValue}>{user?.email}</Text>
         </View>
+
+        <LifeButton title={saving ? "Saving…" : "Save settings"} onPress={saveProfile} disabled={saving || !displayName.trim() || !timeZone.trim()} />
       </LifeCard>
 
       <LifeButton title={loggingOut ? "Signing out…" : "Logout"} variant="danger" onPress={handleLogout} disabled={loggingOut} />
@@ -227,5 +260,11 @@ const styles = StyleSheet.create({
 
   xpBarWrapper: {
     marginTop: spacing.md,
+  },
+  helper: {
+    color: colors.mutedText,
+    fontSize: 13,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
   },
 });

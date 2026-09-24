@@ -1,5 +1,6 @@
 import { create } from "axios";
 import { environment } from "../config/environment";
+export { apiError } from "./errors";
 
 export const API_BASE_URL = environment.apiUrl;
 

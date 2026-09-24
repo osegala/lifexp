@@ -13,6 +13,7 @@ type SessionState = {
 
 type ProfileResponse = {
   displayName: string;
+  timeZone: string;
   level: number;
   xp: number;
   xpIntoLevel: number;
@@ -34,6 +35,7 @@ export function userFromProfile(
     id: identity.userId,
     username: profile.displayName,
     email: identity.email,
+    timeZone: profile.timeZone ?? "UTC",
     totalXp: profile.xp,
     level: profile.level,
     xpToNextLevel: profile.xpToNextLevel,
