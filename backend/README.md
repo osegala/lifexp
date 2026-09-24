@@ -373,7 +373,7 @@ node seeds/seed-catalogs.mjs --table Evrenthia-Dev --region us-east-2 --profile 
 
 Batch writes use stable `PK`/`SK` keys, so reruns replace the same logical catalog records rather than creating duplicates. They are never run by `sam build` or `sam deploy`.
 
-The cosmetic records contain the verified category, price, level, achievement, and asset values for `starter_tunic`, `forest_tunic`, and `dragon_helm`. Temporary `sam_test_*` records are not included. Achievement thresholds and building upgrade costs reflect the established backend contract.
+The initial static catalog contains 2 cosmetics (`starter_tunic` and `forest_tunic`), 11 achievements, and 6 buildings: 19 records total. Temporary `sam_test_*` records are not included. Achievement thresholds and building upgrade costs reflect the established backend contract.
 
 ## API errors and validation
 

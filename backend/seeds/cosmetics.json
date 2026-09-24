@@ -24,18 +24,5 @@
     "assetKey": "forest-tunic.png",
     "sortOrder": 10,
     "active": true
-  },
-  {
-    "PK": "CATALOG#COSMETICS",
-    "SK": "ITEM#dragon_helm",
-    "itemId": "dragon_helm",
-    "name": "Dragon Helm",
-    "category": "hat",
-    "price": 1000,
-    "requiredLevel": 10,
-    "requiredAchievement": "COMPLETE_100_TASKS",
-    "assetKey": "dragon-helm.png",
-    "sortOrder": 20,
-    "active": true
   }
 ]

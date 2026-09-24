@@ -80,7 +80,6 @@ test("catalog seeds contain the required stable logical keys", () => {
     for (const key of [
         "CATALOG#COSMETICS|ITEM#starter_tunic",
         "CATALOG#COSMETICS|ITEM#forest_tunic",
-        "CATALOG#COSMETICS|ITEM#dragon_helm",
         "CATALOG#ACHIEVEMENTS|ACHIEVEMENT#FIRST_TASK",
         "CATALOG#ACHIEVEMENTS|ACHIEVEMENT#STREAK_100",
         "CATALOG#BUILDINGS|BUILDING#home_base",
@@ -118,19 +117,13 @@ test("catalog seeds contain the required stable logical keys", () => {
         sortOrder: 10,
         active: true
     });
-    assert.deepEqual(cosmetics.get("dragon_helm"), {
-        PK: "CATALOG#COSMETICS",
-        SK: "ITEM#dragon_helm",
-        itemId: "dragon_helm",
-        name: "Dragon Helm",
-        category: "hat",
-        price: 1000,
-        requiredLevel: 10,
-        requiredAchievement: "COMPLETE_100_TASKS",
-        assetKey: "dragon-helm.png",
-        sortOrder: 20,
-        active: true
-    });
+    assert.equal(cosmetics.size, 2);
+    assert.equal(items.filter((item) => item.PK === "CATALOG#ACHIEVEMENTS").length, 11);
+    assert.equal(items.filter((item) => item.PK === "CATALOG#BUILDINGS").length, 6);
+    assert.equal(items.length, 19);
+    assert.equal(JSON.stringify(items).includes("dragon-helm.png"), false);
+    assert.equal(JSON.stringify(items).includes("dragon_helm"), false);
+    assert.equal(JSON.stringify(items).includes("Dragon Helm"), false);
     assert.equal(items.some((item) => item.itemId?.startsWith("sam_test_")), false);
     assert.deepEqual(attributeValue(null), { NULL: true });
     assert.deepEqual(attributeValue({ type: "TASK_XP_BONUS_PERCENT", value: 5 }), {
