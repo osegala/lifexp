@@ -7,6 +7,7 @@ import {
     internalServerError,
     jsonResponse as response,
     parseJsonBody,
+    requireActivePlayer,
     requiredString,
     unauthorized,
     validateBodyFields
@@ -21,6 +22,11 @@ const readEquipment = (item) => Object.fromEntries(SLOTS.map((slot) => [slot, it
 export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) return unauthorized();
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Equip item active player check failed");
+    }
     let body;
     let itemId;
     try {

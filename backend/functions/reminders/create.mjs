@@ -19,6 +19,7 @@ import {
     jsonResponse as response,
     notFound,
     parseJsonBody,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 
@@ -33,6 +34,12 @@ const getItem = async (key) => (await client.send(new GetItemCommand({
 export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) return unauthorized();
+    let profile;
+    try {
+        ({ profile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+    } catch (error) {
+        return handleApiError(error, "Create reminder active player check failed");
+    }
 
     let body;
     try { body = parseJsonBody(event); }
@@ -47,8 +54,7 @@ export const handler = async (event) => {
             ? reminderIdFor(userId, values.clientRequestId)
             : randomUUID();
         const userPk = `USER#${userId}`;
-        const [profile, task, priorReminder] = await Promise.all([
-            getItem({ PK: { S: userPk }, SK: { S: "PROFILE" } }),
+        const [task, priorReminder] = await Promise.all([
             values.taskId
                 ? getItem({ PK: { S: userPk }, SK: { S: `TASK#${values.taskId}` } })
                 : Promise.resolve(null),
@@ -56,7 +62,6 @@ export const handler = async (event) => {
                 ? getItem({ PK: { S: userPk }, SK: { S: `REMINDER#${reminderId}` } })
                 : Promise.resolve(null)
         ]);
-        if (!profile) return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
         timeZone = profile.timeZone?.S ?? "UTC";
         if (priorReminder?.clientRequestId?.S === values.clientRequestId) {
             return response(200, {

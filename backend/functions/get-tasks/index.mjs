@@ -16,9 +16,11 @@ import {
 import {
     authSubject,
     badRequest,
+    handleApiError,
     internalServerError,
     jsonResponse as response,
     notFound,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 
@@ -89,20 +91,16 @@ export const handler = async (event) => {
     if (!userId) {
         return unauthorized();
     }
+    let profile;
+    try {
+        ({ profile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+    } catch (error) {
+        return handleApiError(error, "Get tasks active player check failed");
+    }
 
     try {
         const userPk = `USER#${userId}`;
-        const profileResult = await client.send(new GetItemCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: { S: userPk }, SK: { S: "PROFILE" } },
-            ConsistentRead: true
-        }));
-
-        if (!profileResult.Item) {
-            return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
-        }
-
-        const timeZone = profileResult.Item.timeZone?.S ?? "UTC";
+        const timeZone = profile.timeZone?.S ?? "UTC";
         let today;
 
         try {

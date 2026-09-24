@@ -26,6 +26,7 @@ import {
     internalServerError,
     jsonResponse as response,
     parseJsonBody,
+    requireActivePlayer,
     requiredString,
     unauthorized,
     validateBodyFields
@@ -78,6 +79,12 @@ function readCatalog(item, itemId) {
 export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) return unauthorized();
+    let activeProfile;
+    try {
+        ({ profile: activeProfile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+    } catch (error) {
+        return handleApiError(error, "Purchase item active player check failed");
+    }
 
     let body;
     let itemId;
@@ -90,20 +97,18 @@ export const handler = async (event) => {
 
     try {
         const userPk = `USER#${userId}`;
+        const profileKey = { PK: { S: userPk }, SK: { S: "PROFILE" } };
         const catalog = readCatalog(await getItem({
             PK: { S: "CATALOG#COSMETICS" },
             SK: { S: `ITEM#${itemId}` }
         }), itemId);
-        const profileKey = { PK: { S: userPk }, SK: { S: "PROFILE" } };
         const [
-            profileItem,
             ownedItems,
             buildingCatalogItems,
             playerBuildingItems,
             achievementCatalogItems,
             earnedAchievementItems
         ] = await Promise.all([
-            getItem(profileKey),
             queryPrefix(userPk, "ITEM#"),
             queryPrefix("CATALOG#BUILDINGS", "BUILDING#"),
             queryPrefix(userPk, "BUILDING#"),
@@ -124,7 +129,7 @@ export const handler = async (event) => {
         try {
             plan = planPurchase(
                 catalog,
-                profileItem ? { xp: Number(profileItem.xp?.N ?? 0), coins: Number(profileItem.coins?.N ?? 0) } : null,
+                { xp: Number(activeProfile.xp?.N ?? 0), coins: Number(activeProfile.coins?.N ?? 0) },
                 {
                     owned: Boolean(ownedItem),
                     hasRequiredAchievement: !catalog?.requiredAchievement || earnedAchievementIds.has(catalog.requiredAchievement),
@@ -171,7 +176,7 @@ export const handler = async (event) => {
                     ExpressionAttributeValues: {
                         ":negativePrice": { N: String(-plan.price) },
                         ":price": { N: String(plan.price) },
-                        ":expectedCoins": profileItem.coins ?? { N: "0" },
+                        ":expectedCoins": activeProfile.coins ?? { N: "0" },
                         ":now": { S: now }
                     }
                 }

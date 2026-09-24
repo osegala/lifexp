@@ -7,7 +7,15 @@ import {
     isoWeekId,
     localDate
 } from "./logic.mjs";
-import { authSubject, internalServerError, jsonResponse as response, notFound, unauthorized } from "/opt/nodejs/http.mjs";
+import {
+    authSubject,
+    handleApiError,
+    internalServerError,
+    jsonResponse as response,
+    notFound,
+    requireActivePlayer,
+    unauthorized
+} from "/opt/nodejs/http.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -34,15 +42,15 @@ export const handler = async (event) => {
     if (!userId) {
         return unauthorized();
     }
+    let profile;
+    try {
+        ({ profile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+    } catch (error) {
+        return handleApiError(error, "Get goals active player check failed");
+    }
 
     try {
         const userPk = `USER#${userId}`;
-        const profile = await getItem({ PK: { S: userPk }, SK: { S: "PROFILE" } });
-
-        if (!profile.PK) {
-            return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
-        }
-
         const timeZone = profile.timeZone?.S ?? "America/New_York";
         const date = localDate(new Date(), timeZone);
         const week = isoWeekId(date);

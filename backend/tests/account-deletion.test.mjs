@@ -154,6 +154,23 @@ test("Cognito deletion occurs only after application data succeeds", async () =>
     assert.doesNotMatch(calls.join(","), /should-not-run/);
 });
 
+test("a Cognito deletion failure remains retryable after application data is gone", async () => {
+    const calls = [];
+    let cognitoAttempt = 0;
+    const deletion = () => executeAccountDeletion({
+        deleteApplicationData: async () => { calls.push("data"); },
+        deleteCognitoIdentity: async () => {
+            calls.push("cognito");
+            cognitoAttempt++;
+            if (cognitoAttempt === 1) throw new Error("Cognito unavailable");
+        }
+    });
+
+    await assert.rejects(deletion(), /Cognito unavailable/);
+    await deletion();
+    assert.deepEqual(calls, ["data", "cognito", "data", "cognito"]);
+});
+
 test("DELETE me infrastructure is authorized and least privilege", () => {
     const block = resourceBlock("DeleteAccountFunction");
     assert.match(block, /CodeUri: functions\/delete-account\//);
@@ -161,7 +178,7 @@ test("DELETE me infrastructure is authorized and least privilege", () => {
     assert.match(block, /Authorizer: EvrenthiaCognito/);
     assert.deepEqual(
         [...block.matchAll(/- dynamodb:([A-Za-z]+)/g)].map((match) => match[1]).sort(),
-        ["BatchWriteItem", "Query"]
+        ["BatchWriteItem", "GetItem", "Query"]
     );
     assert.match(block, /- cognito-idp:AdminDeleteUser/);
     assert.match(block, /- EvrenthiaDevUserPool\n\s+- Arn/);
@@ -170,6 +187,14 @@ test("DELETE me infrastructure is authorized and least privilege", () => {
 
 test("handler returns canonical outcomes and logs deletion stages without request data", () => {
     assert.match(handler, /if \(!userId\) return unauthorized\(\)/);
+    assert.match(
+        handler,
+        /requireActivePlayer\(event, dynamodb, TABLE_NAME, GetItemCommand, \{ allowMissing: true \}\)/
+    );
+    assert.ok(
+        handler.indexOf("requireActivePlayer(event,") < handler.indexOf("executeAccountDeletion({"),
+        "the profile check must precede destructive account deletion"
+    );
     assert.match(handler, /return noContent\(\)/);
     assert.match(handler, /return internalServerError\("Account deletion failed", error\)/);
     assert.match(handler, /ACCOUNT_DELETION_STARTED/);

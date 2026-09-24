@@ -8,7 +8,15 @@ import {
     shiftDate,
     summarize
 } from "./logic.mjs";
-import { authSubject, internalServerError, jsonResponse as response, notFound, unauthorized } from "/opt/nodejs/http.mjs";
+import {
+    authSubject,
+    handleApiError,
+    internalServerError,
+    jsonResponse as response,
+    notFound,
+    requireActivePlayer,
+    unauthorized
+} from "/opt/nodejs/http.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -29,20 +37,15 @@ export const handler = async (event) => {
     if (!userId) {
         return unauthorized();
     }
+    let profile;
+    try {
+        ({ profile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+    } catch (error) {
+        return handleApiError(error, "Get history active player check failed");
+    }
 
     try {
         const userPk = `USER#${userId}`;
-        const profileResult = await client.send(new GetItemCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: { S: userPk }, SK: { S: "PROFILE" } },
-            ConsistentRead: true
-        }));
-        const profile = profileResult.Item;
-
-        if (!profile) {
-            return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
-        }
-
         const timeZone = profile.timeZone?.S ?? "America/New_York";
         const today = localDate(new Date(), timeZone);
         const start = shiftDate(today, -29);

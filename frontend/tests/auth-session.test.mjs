@@ -16,7 +16,13 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 const response = (config, data) => ({ config, data, status: 200, statusText: "OK", headers: {} });
-const httpError = (config, status) => new AxiosError(`Request failed: ${status}`, "ERR_BAD_RESPONSE", config, null, { ...response(config, {}), status });
+const httpError = (config, status, data = {}) => new AxiosError(
+  `Request failed: ${status}`,
+  "ERR_BAD_RESPONSE",
+  config,
+  null,
+  { ...response(config, data), status },
+);
 
 function harness(t, { session = identity } = {}) {
   const calls = [], authCalls = [];
@@ -141,6 +147,21 @@ test("a 401 expires the local session and signs out of Cognito", async t => {
   assert.equal(h.authSession.getSnapshot().token, null);
   assert.match(h.authSession.getSnapshot().sessionNotice, /expired/);
   assert.ok(h.authCalls.some(call => call[0] === "signOut"));
+});
+
+test("ACCOUNT_NOT_FOUND clears a stale Cognito session without retrying", async t => {
+  const h = harness(t);
+  h.profile = config => {
+    throw httpError(config, 403, {
+      error: { code: "ACCOUNT_NOT_FOUND", message: "Player account no longer exists.", details: [] },
+    });
+  };
+  await h.ready();
+  assert.equal(h.authSession.getSnapshot().token, null);
+  assert.equal(h.authSession.getSnapshot().user, null);
+  assert.match(h.authSession.getSnapshot().sessionNotice, /account no longer exists/i);
+  assert.equal(h.authCalls.filter(call => call[0] === "signOut").length, 1);
+  assert.equal(h.authCalls.filter(call => call[0] === "getSession").length, 1);
 });
 
 test("login uses Cognito and never posts credentials to the API", async t => {

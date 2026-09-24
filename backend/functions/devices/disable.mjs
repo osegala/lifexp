@@ -1,4 +1,4 @@
-import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import {
     disableDeviceRequest,
     validateDeviceId
@@ -6,9 +6,11 @@ import {
 import {
     authSubject,
     badRequest,
+    handleApiError,
     internalServerError,
     noContent,
     notFound,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 
@@ -18,6 +20,11 @@ export const handler = async (event) => {
     const userId = authSubject(event);
     const deviceId = event.pathParameters?.deviceId;
     if (!userId) return unauthorized();
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Disable device active player check failed");
+    }
     if (!validateDeviceId(deviceId)) return badRequest("VALIDATION_ERROR", "deviceId is invalid.");
 
     try {

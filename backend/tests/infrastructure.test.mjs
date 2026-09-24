@@ -138,13 +138,13 @@ test("preference, device, and reminder routes use JWT auth and least-privilege a
     const resources = [
         ["GetPreferencesFunction", "/preferences", "GET", ["GetItem"]],
         ["UpdatePreferencesFunction", "/preferences", "PATCH", ["GetItem", "UpdateItem"]],
-        ["GetDevicesFunction", "/devices", "GET", ["Query"]],
-        ["RegisterDeviceFunction", "/devices", "POST", ["UpdateItem"]],
-        ["DisableDeviceFunction", "/devices/{deviceId}", "DELETE", ["UpdateItem"]],
+        ["GetDevicesFunction", "/devices", "GET", ["GetItem", "Query"]],
+        ["RegisterDeviceFunction", "/devices", "POST", ["GetItem", "UpdateItem"]],
+        ["DisableDeviceFunction", "/devices/{deviceId}", "DELETE", ["GetItem", "UpdateItem"]],
         ["GetRemindersFunction", "/reminders", "GET", ["GetItem", "Query"]],
         ["CreateReminderFunction", "/reminders", "POST", ["GetItem", "PutItem"]],
         ["UpdateReminderFunction", "/reminders/{reminderId}", "PATCH", ["GetItem", "UpdateItem"]],
-        ["DeleteReminderFunction", "/reminders/{reminderId}", "DELETE", ["UpdateItem"]]
+        ["DeleteReminderFunction", "/reminders/{reminderId}", "DELETE", ["GetItem", "UpdateItem"]]
     ];
 
     for (const [name, path, method, actions] of resources) {
@@ -232,12 +232,52 @@ test("every public API handler receives and imports the canonical API helper lay
         ["GetRemindersFunction", "reminders/get.mjs"], ["CreateReminderFunction", "reminders/create.mjs"],
         ["UpdateReminderFunction", "reminders/update.mjs"], ["DeleteReminderFunction", "reminders/disable.mjs"]
     ];
+    const authenticatedFunctions = [...template.matchAll(/^  ([A-Za-z0-9]+Function):$/gm)]
+        .map((match) => match[1])
+        .filter((resource) => /Authorizer: EvrenthiaCognito/.test(resourceBlock(resource)))
+        .sort();
+    assert.equal(handlers.length, 29);
+    assert.deepEqual(authenticatedFunctions, handlers.map(([resource]) => resource).sort());
+
     for (const [resource, path] of handlers) {
-        assert.match(resourceBlock(resource), /- Ref: ApiSharedLayer/, resource);
-        assert.match(readFileSync(`${backend}/functions/${path}`, "utf8"), /\/opt\/nodejs\/http\.mjs/, path);
+        const block = resourceBlock(resource);
+        const source = readFileSync(`${backend}/functions/${path}`, "utf8");
+        assert.match(block, /- Ref: ApiSharedLayer/, resource);
+        assert.match(block, /- dynamodb:GetItem/, `${resource} active-profile read permission`);
+        assert.doesNotMatch(block, /dynamodb:\*|Resource:\s*["']?\*/, `${resource} least privilege`);
+        assert.match(source, /\/opt\/nodejs\/http\.mjs/, path);
+        assert.match(source, /await requireActivePlayer\(event,/, `${path} active-profile guard`);
+        assert.doesNotMatch(
+            source,
+            /new PutItemCommand\(\{[\s\S]{0,800}?SK:\s*\{\s*S:\s*["']PROFILE["']/,
+            `${path} must not auto-create PROFILE`
+        );
     }
+    const createTaskSource = readFileSync(`${backend}/functions/create-task/index.mjs`, "utf8");
+    const createTaskHandler = createTaskSource.slice(createTaskSource.indexOf("export const handler"));
+    assert.ok(
+        createTaskHandler.indexOf("await requireActivePlayer(event,")
+            < createTaskHandler.indexOf("await client.send(new PutItemCommand("),
+        "POST /tasks checks the active profile before writing"
+    );
+    assert.match(
+        readFileSync(`${backend}/functions/delete-account/index.mjs`, "utf8"),
+        /requireActivePlayer\(event, dynamodb, TABLE_NAME, GetItemCommand, \{ allowMissing: true \}\)/
+    );
     assert.doesNotMatch(resourceBlock("CreateProfileFunction"), /ApiSharedLayer/);
     assert.doesNotMatch(resourceBlock("NotificationWorkerFunction"), /ApiSharedLayer/);
+});
+
+test("POST tasks rejects a stale JWT before any task write can run", () => {
+    const source = readFileSync(`${backend}/functions/create-task/index.mjs`, "utf8");
+    const handler = source.slice(source.indexOf("export const handler"));
+    const guard = handler.indexOf("await requireActivePlayer(event,");
+    const write = handler.indexOf("await client.send(new PutItemCommand(");
+
+    assert.notEqual(guard, -1);
+    assert.notEqual(write, -1);
+    assert.ok(guard < write);
+    assert.match(resourceBlock("CreateTaskFunction"), /- dynamodb:GetItem/);
 });
 
 test("HTTP authorizer uses the stack-managed Cognito resources", () => {

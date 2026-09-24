@@ -14,6 +14,7 @@ import {
     jsonResponse as response,
     notFound,
     parseJsonBody,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 
@@ -22,6 +23,12 @@ const TABLE_NAME = process.env.TABLE_NAME;
 export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) return unauthorized();
+    let profile;
+    try {
+        ({ profile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+    } catch (error) {
+        return handleApiError(error, "Update preferences active player check failed");
+    }
 
     let body;
     try { body = parseJsonBody(event); }
@@ -34,17 +41,13 @@ export const handler = async (event) => {
             Key: { PK: { S: userPk }, SK: { S: SK } },
             ConsistentRead: true
         }));
-        const [existing, profileResult] = await Promise.all([
-            getItem("PREFERENCES"),
-            getItem("PROFILE")
-        ]);
-        if (!profileResult.Item) return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
+        const existing = await getItem("PREFERENCES");
 
         const { patch, resolved } = validatePreferencePatch(body, preferencesFromItem(existing.Item));
         const now = new Date();
         const schedule = notificationSchedule({
             enabled: resolved.notificationsEnabled && resolved.dailyReminderEnabled,
-            timeZone: profileResult.Item.timeZone?.S ?? "UTC",
+            timeZone: profile.timeZone?.S ?? "UTC",
             localTime: resolved.dailyReminderTime,
             daysOfWeek: [],
             identifier: `${userId}#DAILY`

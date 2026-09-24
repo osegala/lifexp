@@ -1,4 +1,4 @@
-import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import {
     DeviceError,
     deviceResponse,
@@ -12,6 +12,7 @@ import {
     internalServerError,
     jsonResponse as response,
     parseJsonBody,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 
@@ -20,6 +21,11 @@ const TABLE_NAME = process.env.TABLE_NAME;
 export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) return unauthorized();
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Register device active player check failed");
+    }
 
     let body;
     try { body = parseJsonBody(event); }

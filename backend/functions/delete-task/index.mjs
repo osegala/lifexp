@@ -1,5 +1,6 @@
 import {
     DynamoDBClient,
+    GetItemCommand,
     UpdateItemCommand
 } from "@aws-sdk/client-dynamodb";
 import { archiveTaskRequest } from "./logic.mjs";
@@ -9,6 +10,7 @@ import {
     internalServerError,
     noContent,
     notFound,
+    requireActivePlayer,
     requiredString,
     unauthorized
 } from "/opt/nodejs/http.mjs";
@@ -22,6 +24,11 @@ export const handler = async (event) => {
 
     if (!userId) {
         return unauthorized();
+    }
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Archive task active player check failed");
     }
     try {
         taskId = requiredString(event.pathParameters ?? {}, "taskId");

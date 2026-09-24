@@ -30,6 +30,7 @@ import {
     jsonResponse as response,
     notFound,
     parseJsonBody,
+    requireActivePlayer,
     requiredString,
     unauthorized,
     validateBodyFields
@@ -74,6 +75,12 @@ export const handler = async (event) => {
     if (!userId) {
         return unauthorized();
     }
+    let activeProfile;
+    try {
+        ({ profile: activeProfile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+    } catch (error) {
+        return handleApiError(error, "Upgrade building active player check failed");
+    }
     try {
         buildingId = requiredString(event.pathParameters ?? {}, "buildingId");
     } catch (error) {
@@ -92,22 +99,16 @@ export const handler = async (event) => {
         const profileKey = { PK: { S: userPk }, SK: { S: "PROFILE" } };
         const buildingKey = { PK: { S: userPk }, SK: { S: `BUILDING#${buildingId}` } };
         const [
-            profile,
             buildingCatalogItems,
             playerBuildingItems,
             achievementCatalogItems,
             earnedAchievementItems
         ] = await Promise.all([
-            getItem(profileKey),
             queryPrefix("CATALOG#BUILDINGS", "BUILDING#"),
             queryPrefix(userPk, "BUILDING#"),
             queryPrefix("CATALOG#ACHIEVEMENTS", "ACHIEVEMENT#"),
             queryPrefix(userPk, "ACHIEVEMENT#")
         ]);
-
-        if (!profile) {
-            return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
-        }
 
         const buildingCatalog = buildingCatalogItems.map(buildingCatalogFromItem);
         const catalog = buildingCatalog.find((entry) => entry.buildingId === buildingId) ?? null;
@@ -116,7 +117,7 @@ export const handler = async (event) => {
         let plan;
 
         try {
-            plan = planUpgrade(catalog, building, Number(profile.worldPoints?.N ?? 0));
+            plan = planUpgrade(catalog, building, Number(activeProfile.worldPoints?.N ?? 0));
         } catch (error) {
             if (error instanceof UpgradeError) {
                 return errorResponse(error.statusCode, error.code, error.message, error.details);
@@ -161,7 +162,7 @@ export const handler = async (event) => {
                         ExpressionAttributeValues: {
                             ":negativeCost": { N: String(-plan.upgradeCost) },
                             ":cost": { N: String(plan.upgradeCost) },
-                            ":expectedWorldPoints": profile.worldPoints ?? { N: "0" },
+                            ":expectedWorldPoints": activeProfile.worldPoints ?? { N: "0" },
                             ":now": { S: now }
                         }
                     }

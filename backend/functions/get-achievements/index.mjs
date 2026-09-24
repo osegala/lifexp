@@ -17,7 +17,15 @@ import {
     playerBuildingsFromItems,
     resolveBuildingEffects
 } from "/opt/nodejs/building-effects.mjs";
-import { authSubject, internalServerError, jsonResponse as response, notFound, unauthorized } from "/opt/nodejs/http.mjs";
+import {
+    authSubject,
+    handleApiError,
+    internalServerError,
+    jsonResponse as response,
+    notFound,
+    requireActivePlayer,
+    unauthorized
+} from "/opt/nodejs/http.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -49,11 +57,16 @@ export const handler = async (event) => {
     if (!userId) {
         return unauthorized();
     }
+    let profile;
+    try {
+        ({ profile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+    } catch (error) {
+        return handleApiError(error, "Get achievements active player check failed");
+    }
 
     try {
         const userPk = `USER#${userId}`;
         const [
-            profileResult,
             catalogItems,
             earnedItems,
             taskItems,
@@ -61,11 +74,6 @@ export const handler = async (event) => {
             playerBuildingItems,
             ownedItems
         ] = await Promise.all([
-            client.send(new GetItemCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: { S: userPk }, SK: { S: "PROFILE" } },
-                ConsistentRead: true
-            })),
             queryPrefix("CATALOG#ACHIEVEMENTS", "ACHIEVEMENT#"),
             queryPrefix(userPk, "ACHIEVEMENT#"),
             queryPrefix(userPk, "TASK#"),
@@ -73,12 +81,6 @@ export const handler = async (event) => {
             queryPrefix(userPk, "BUILDING#"),
             queryPrefix(userPk, "ITEM#")
         ]);
-        const profile = profileResult.Item;
-
-        if (!profile) {
-            return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
-        }
-
         const totalXp = Number(profile.xp?.N ?? 0);
         const levels = levelInfo(totalXp);
         const buildingState = resolveBuildingEffects(

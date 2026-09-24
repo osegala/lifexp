@@ -69,6 +69,36 @@ export function requireAuthSubject(event) {
     return subject;
 }
 
+export async function requireActivePlayer(
+    event,
+    client,
+    tableName,
+    GetItemCommand,
+    { allowMissing = false } = {}
+) {
+    const userId = requireAuthSubject(event);
+    const result = await client.send(new GetItemCommand({
+        TableName: tableName,
+        Key: {
+            PK: { S: `USER#${userId}` },
+            SK: { S: "PROFILE" }
+        },
+        ConsistentRead: true
+    }));
+    const profile = result.Item ?? null;
+
+    if (!profile && !allowMissing) {
+        throw new ApiError(
+            403,
+            "ACCOUNT_NOT_FOUND",
+            "Player account no longer exists.",
+            []
+        );
+    }
+
+    return { userId, profile };
+}
+
 export function parseJsonBody(event) {
     const raw = event?.isBase64Encoded
         ? Buffer.from(event.body ?? "", "base64").toString("utf8")

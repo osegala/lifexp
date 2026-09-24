@@ -7,6 +7,7 @@ import {
     logUnexpectedError,
     noContent,
     parseJsonBody,
+    requireActivePlayer,
     requiredString,
     validateBodyFields
 } from "../layers/api-shared/nodejs/http.mjs";
@@ -204,4 +205,78 @@ test("structured unexpected-error logs redact sensitive values", () => {
 test("authentication subject extraction trusts only Cognito JWT context", () => {
     assert.equal(authSubject({ requestContext: { authorizer: { jwt: { claims: { sub: "user-123" } } } } }), "user-123");
     assert.equal(authSubject({ body: JSON.stringify({ userId: "attacker" }) }), null);
+});
+
+test("active player guard uses one strongly consistent exact-key profile read", async () => {
+    class GetItemCommand {
+        constructor(input) { this.input = input; }
+    }
+    const requests = [];
+    const profile = { PK: { S: "USER#user-123" }, SK: { S: "PROFILE" } };
+    const client = { send: async (command) => {
+        requests.push(command.input);
+        return { Item: profile };
+    } };
+    const event = {
+        body: JSON.stringify({ sub: "attacker" }),
+        requestContext: { authorizer: { jwt: { claims: { sub: "user-123" } } } }
+    };
+
+    assert.deepEqual(
+        await requireActivePlayer(event, client, "Evrenthia-Dev", GetItemCommand),
+        { userId: "user-123", profile }
+    );
+    assert.deepEqual(requests, [{
+        TableName: "Evrenthia-Dev",
+        Key: { PK: { S: "USER#user-123" }, SK: { S: "PROFILE" } },
+        ConsistentRead: true
+    }]);
+});
+
+test("missing active profile returns the canonical ACCOUNT_NOT_FOUND contract", async () => {
+    class GetItemCommand {
+        constructor(input) { this.input = input; }
+    }
+    const event = { requestContext: { authorizer: { jwt: { claims: { sub: "deleted-user" } } } } };
+    const client = { send: async () => ({}) };
+
+    let error;
+    let taskCreated = false;
+    try {
+        await requireActivePlayer(event, client, "Evrenthia-Dev", GetItemCommand);
+        taskCreated = true;
+    } catch (caught) {
+        error = caught;
+    }
+    assert.equal(taskCreated, false, "POST /tasks must not reach its write after the guard rejects");
+    assert.ok(error instanceof ApiError);
+    assert.equal(error.statusCode, 403);
+    assert.equal(error.code, "ACCOUNT_NOT_FOUND");
+    assert.deepEqual(error.details, []);
+    assert.deepEqual(body(handleApiError(error, "test active player")), {
+        error: {
+            code: "ACCOUNT_NOT_FOUND",
+            message: "Player account no longer exists.",
+            details: []
+        }
+    });
+});
+
+test("account deletion can retry after its profile was already removed", async () => {
+    class GetItemCommand {
+        constructor(input) { this.input = input; }
+    }
+    const event = { requestContext: { authorizer: { jwt: { claims: { sub: "deleted-user" } } } } };
+    const client = { send: async () => ({}) };
+
+    assert.deepEqual(
+        await requireActivePlayer(
+            event,
+            client,
+            "Evrenthia-Dev",
+            GetItemCommand,
+            { allowMissing: true }
+        ),
+        { userId: "deleted-user", profile: null }
+    );
 });

@@ -1,6 +1,7 @@
 import {
     BatchWriteItemCommand,
     DynamoDBClient,
+    GetItemCommand,
     QueryCommand
 } from "@aws-sdk/client-dynamodb";
 import {
@@ -9,8 +10,10 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
     authSubject,
+    handleApiError,
     internalServerError,
     noContent,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 import {
@@ -39,6 +42,11 @@ function log(level, event, context, details = {}) {
 export const handler = async (event, context) => {
     const userId = authSubject(event);
     if (!userId) return unauthorized();
+    try {
+        await requireActivePlayer(event, dynamodb, TABLE_NAME, GetItemCommand, { allowMissing: true });
+    } catch (error) {
+        return handleApiError(error, "Delete account active player check failed");
+    }
 
     const username = cognitoUsername(event, userId);
     let stage = "APPLICATION_DATA";

@@ -4,9 +4,11 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import {
     authSubject,
+    handleApiError,
     internalServerError,
     jsonResponse as response,
     notFound,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 
@@ -82,44 +84,11 @@ async (event) => {
             return unauthorized();
         }
 
-
-        const userPk =
-            `USER#${userId}`;
-
-
-        const result =
-            await client.send(
-                new GetItemCommand({
-
-                    TableName:
-                        TABLE_NAME,
-
-                    Key: {
-
-                        PK: {
-                            S:
-                                userPk
-                        },
-
-                        SK: {
-                            S:
-                                "PROFILE"
-                        }
-                    },
-
-                    ConsistentRead:
-                        true
-                })
-            );
-
-
-        const profile =
-            result.Item;
-
-
-        if (!profile) {
-
-            return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
+        let profile;
+        try {
+            ({ profile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+        } catch (error) {
+            return handleApiError(error, "Get profile active player check failed");
         }
 
 
@@ -225,4 +194,3 @@ async (event) => {
         return internalServerError("Get profile failed", error);
     }
 };
-

@@ -1,4 +1,4 @@
-import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import { ProfilePatchError, validateProfilePatch } from "./logic.mjs";
 import {
     authSubject,
@@ -8,6 +8,7 @@ import {
     jsonResponse as response,
     notFound,
     parseJsonBody,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 
@@ -16,6 +17,11 @@ const TABLE_NAME = process.env.TABLE_NAME;
 export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) return unauthorized();
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Update profile active player check failed");
+    }
 
     let body;
     try { body = parseJsonBody(event); }

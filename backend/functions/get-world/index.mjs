@@ -9,7 +9,15 @@ import {
     playerBuildingsFromItems,
     resolveBuildingEffects
 } from "/opt/nodejs/building-effects.mjs";
-import { authSubject, internalServerError, jsonResponse as response, notFound, unauthorized } from "/opt/nodejs/http.mjs";
+import {
+    authSubject,
+    handleApiError,
+    internalServerError,
+    jsonResponse as response,
+    notFound,
+    requireActivePlayer,
+    unauthorized
+} from "/opt/nodejs/http.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -41,23 +49,19 @@ export const handler = async (event) => {
     if (!userId) {
         return unauthorized();
     }
+    let profile;
+    try {
+        ({ profile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+    } catch (error) {
+        return handleApiError(error, "Get world active player check failed");
+    }
 
     try {
         const userPk = `USER#${userId}`;
-        const [profileResult, catalogItems, buildingItems] = await Promise.all([
-            client.send(new GetItemCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: { S: userPk }, SK: { S: "PROFILE" } },
-                ConsistentRead: true
-            })),
+        const [catalogItems, buildingItems] = await Promise.all([
             queryPrefix("CATALOG#BUILDINGS", "BUILDING#"),
             queryPrefix(userPk, "BUILDING#")
         ]);
-        const profile = profileResult.Item;
-
-        if (!profile) {
-            return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
-        }
 
         const catalog = catalogItems.map(buildingCatalogFromItem);
         const playerBuildings = playerBuildingsFromItems(buildingItems);

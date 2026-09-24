@@ -19,6 +19,7 @@ import {
     jsonResponse as response,
     notFound,
     parseJsonBody,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 
@@ -34,6 +35,12 @@ export const handler = async (event) => {
     const userId = authSubject(event);
     const reminderId = event.pathParameters?.reminderId;
     if (!userId) return unauthorized();
+    let profile;
+    try {
+        ({ profile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
+    } catch (error) {
+        return handleApiError(error, "Update reminder active player check failed");
+    }
     if (!validReminderId(reminderId)) return badRequest("VALIDATION_ERROR", "reminderId is invalid.");
 
     let body;
@@ -43,12 +50,8 @@ export const handler = async (event) => {
     try {
         const patch = validateReminderPatch(body);
         const userPk = `USER#${userId}`;
-        const [existing, profile] = await Promise.all([
-            getItem({ PK: { S: userPk }, SK: { S: `REMINDER#${reminderId}` } }),
-            getItem({ PK: { S: userPk }, SK: { S: "PROFILE" } })
-        ]);
+        const existing = await getItem({ PK: { S: userPk }, SK: { S: `REMINDER#${reminderId}` } });
         if (!existing) return notFound("REMINDER_NOT_FOUND", "Reminder not found.");
-        if (!profile) return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
 
         const values = { ...reminderValuesFromItem(existing), ...patch };
         if (values.type !== "TASK") {

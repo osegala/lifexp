@@ -1,11 +1,19 @@
-import { DynamoDBClient, QueryCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, QueryCommand } from "@aws-sdk/client-dynamodb";
 import {
     encodeCursor,
     historyItem,
     historyQuery,
     HistoryQueryError
 } from "./logic.mjs";
-import { authSubject, badRequest, internalServerError, jsonResponse as response, unauthorized } from "/opt/nodejs/http.mjs";
+import {
+    authSubject,
+    badRequest,
+    handleApiError,
+    internalServerError,
+    jsonResponse as response,
+    requireActivePlayer,
+    unauthorized
+} from "/opt/nodejs/http.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -14,6 +22,11 @@ export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) {
         return unauthorized();
+    }
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Get completion history active player check failed");
     }
 
     try {

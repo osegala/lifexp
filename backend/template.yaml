@@ -785,6 +785,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
+                - dynamodb:GetItem
                 - dynamodb:Query
               Resource:
                 Fn::GetAtt:
@@ -816,6 +817,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
+                - dynamodb:GetItem
                 - dynamodb:UpdateItem
               Resource:
                 Fn::GetAtt:
@@ -847,6 +849,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
+                - dynamodb:GetItem
                 - dynamodb:UpdateItem
               Resource:
                 Fn::GetAtt:
@@ -980,6 +983,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
+                - dynamodb:GetItem
                 - dynamodb:UpdateItem
               Resource:
                 Fn::GetAtt:
@@ -1105,6 +1109,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
+                - dynamodb:GetItem
                 - dynamodb:PutItem
               Resource:
                 Fn::GetAtt:
@@ -1176,6 +1181,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
+                - dynamodb:GetItem
                 - dynamodb:UpdateItem
               Resource:
                 Fn::GetAtt:
@@ -1341,6 +1347,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
+                - dynamodb:GetItem
                 - dynamodb:Query
               Resource:
                 Fn::GetAtt:
@@ -1654,6 +1661,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
+                - dynamodb:GetItem
                 - dynamodb:UpdateItem
               Resource:
                 Fn::GetAtt:
@@ -1691,6 +1699,7 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:BatchWriteItem
+                - dynamodb:GetItem
                 - dynamodb:Query
               Resource:
                 Fn::GetAtt:

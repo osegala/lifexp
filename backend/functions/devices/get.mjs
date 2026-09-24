@@ -1,6 +1,13 @@
-import { DynamoDBClient, QueryCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, QueryCommand } from "@aws-sdk/client-dynamodb";
 import { deviceResponse } from "./logic.mjs";
-import { authSubject, internalServerError, jsonResponse as response, unauthorized } from "/opt/nodejs/http.mjs";
+import {
+    authSubject,
+    handleApiError,
+    internalServerError,
+    jsonResponse as response,
+    requireActivePlayer,
+    unauthorized
+} from "/opt/nodejs/http.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -26,6 +33,11 @@ async function getDevices(userId) {
 export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) return unauthorized();
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Get devices active player check failed");
+    }
 
     try {
         const devices = (await getDevices(userId)).map(deviceResponse)

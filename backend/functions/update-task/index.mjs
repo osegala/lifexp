@@ -12,6 +12,7 @@ import {
     jsonResponse as response,
     notFound,
     parseJsonBody,
+    requireActivePlayer,
     requiredString,
     unauthorized
 } from "/opt/nodejs/http.mjs";
@@ -54,6 +55,11 @@ export const handler = async (event) => {
 
     if (!userId) {
         return unauthorized();
+    }
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Update task active player check failed");
     }
     try {
         taskId = requiredString(event.pathParameters ?? {}, "taskId");

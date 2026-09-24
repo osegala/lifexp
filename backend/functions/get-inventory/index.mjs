@@ -1,6 +1,13 @@
 import { DynamoDBClient, GetItemCommand, QueryCommand } from "@aws-sdk/client-dynamodb";
 import { buildInventory } from "./logic.mjs";
-import { authSubject, internalServerError, jsonResponse as response, unauthorized } from "/opt/nodejs/http.mjs";
+import {
+    authSubject,
+    handleApiError,
+    internalServerError,
+    jsonResponse as response,
+    requireActivePlayer,
+    unauthorized
+} from "/opt/nodejs/http.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -13,6 +20,11 @@ const queryPrefix = (pk, prefix) => client.send(new QueryCommand({
 export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) return unauthorized();
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Get inventory active player check failed");
+    }
 
     try {
         const userPk = `USER#${userId}`;

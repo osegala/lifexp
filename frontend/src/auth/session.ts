@@ -23,8 +23,15 @@ type ProfileResponse = {
 };
 
 type EntitlementResponse = { plan?: string; subscriptionStatus?: string };
+type ApiErrorResponse = { error?: { code?: string } };
 type SessionRequest = InternalAxiosRequestConfig & { sessionRevision?: number };
 const AUTH_TIMEOUT = 15_000;
+
+function isAccountNotFound(error: unknown) {
+  return isAxiosError<ApiErrorResponse>(error)
+    && error.response?.status === 403
+    && error.response.data?.error?.code === "ACCOUNT_NOT_FOUND";
+}
 
 export function userFromProfile(
   profile: ProfileResponse,
@@ -95,8 +102,12 @@ export class AuthSession {
       return config;
     });
     const responseId = this.client.interceptors.response.use(response => response, error => {
-      if (isAxiosError(error) && error.response?.status === 401) {
-        this.expire((error.config as SessionRequest | undefined)?.sessionRevision);
+      const accountNotFound = isAccountNotFound(error);
+      if ((isAxiosError(error) && error.response?.status === 401) || accountNotFound) {
+        this.expire(
+          (error.config as SessionRequest | undefined)?.sessionRevision,
+          accountNotFound ? "This account no longer exists. Please sign in again." : undefined,
+        );
       }
       return Promise.reject(error);
     });
@@ -109,12 +120,15 @@ export class AuthSession {
     };
   };
 
-  private expire(revision: number | undefined) {
+  private expire(
+    revision: number | undefined,
+    notice = "Your session has expired. Please sign in again.",
+  ) {
     if (revision !== this.revision || !this.state.token) return;
     this.revision++;
     this.update({
       token: null, user: null, loading: false, sessionError: null,
-      sessionNotice: "Your session has expired. Please sign in again.",
+      sessionNotice: notice,
     });
     void this.signOutFromCognito().catch(() => {});
   }

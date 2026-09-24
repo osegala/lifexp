@@ -1,4 +1,4 @@
-import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import {
     disableReminderRequest,
     validReminderId
@@ -6,9 +6,11 @@ import {
 import {
     authSubject,
     badRequest,
+    handleApiError,
     internalServerError,
     noContent,
     notFound,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 
@@ -18,6 +20,11 @@ export const handler = async (event) => {
     const userId = authSubject(event);
     const reminderId = event.pathParameters?.reminderId;
     if (!userId) return unauthorized();
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Disable reminder active player check failed");
+    }
     if (!validReminderId(reminderId)) return badRequest("VALIDATION_ERROR", "reminderId is invalid.");
 
     try {

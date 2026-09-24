@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
     DynamoDBClient,
+    GetItemCommand,
     PutItemCommand
 } from "@aws-sdk/client-dynamodb";
 import {
@@ -9,6 +10,7 @@ import {
     internalServerError,
     jsonResponse as response,
     parseJsonBody,
+    requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
 import { validateTaskCreate } from "/opt/nodejs/task-input.mjs";
@@ -19,6 +21,11 @@ export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) {
         return unauthorized();
+    }
+    try {
+        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+    } catch (error) {
+        return handleApiError(error, "Create task active player check failed");
     }
 
     let input;
