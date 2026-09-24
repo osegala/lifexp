@@ -1,0 +1,1916 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: Evrenthia development backend
+
+# ======================================================
+# PARAMETERS
+# ======================================================
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+    AllowedPattern: "^[a-z][a-z0-9-]*$"
+    Description: Logical deployment environment name.
+
+  FunctionNamePrefix:
+    Type: String
+    Default: Evrenthia-Dev
+    Description: Physical development resource prefix; the default preserves existing Lambda names.
+
+  BudgetNotificationEmail:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    ConstraintDescription: Must be empty or a valid email address.
+    Description: Optional email subscriber for development budget alerts; no address is hardcoded.
+
+Conditions:
+  HasBudgetNotificationEmail:
+    Fn::Not:
+      - Fn::Equals:
+          - Ref: BudgetNotificationEmail
+          - ""
+
+# ======================================================
+# GLOBAL LAMBDA SETTINGS
+# ======================================================
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+
+    Architectures:
+      - arm64
+
+    MemorySize: 128
+
+    Timeout: 10
+
+    LoggingConfig:
+      LogFormat: JSON
+      ApplicationLogLevel: INFO
+      SystemLogLevel: WARN
+
+    Environment:
+      Variables:
+        ENVIRONMENT_NAME:
+          Ref: EnvironmentName
+
+        TABLE_NAME:
+          Ref: EvrenthiaDevTable
+
+# ======================================================
+# RESOURCES
+# ======================================================
+
+Resources:
+  # ----------------------------------------------------
+  # ISOLATED DEVELOPMENT DATA AND IDENTITY
+  # ----------------------------------------------------
+
+  EvrenthiaDevTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName:
+        Ref: FunctionNamePrefix
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: NotificationDueIndex
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+
+  NotificationSharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName:
+        Fn::Sub: "${FunctionNamePrefix}-NotificationShared"
+      Description: Dependency-free timezone-aware notification scheduling helpers.
+      ContentUri: layers/notification-shared/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Retain
+
+  ApiSharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName:
+        Fn::Sub: "${FunctionNamePrefix}-ApiShared"
+      Description: Canonical HTTP responses, JSON parsing, authentication extraction, and error handling.
+      ContentUri: layers/api-shared/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Retain
+
+  ProgressionSharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName:
+        Fn::Sub: "${FunctionNamePrefix}-ProgressionShared"
+      Description: Server-authoritative building effects and catalog-driven achievement evaluation.
+      ContentUri: layers/progression-shared/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Retain
+
+  # ----------------------------------------------------
+  # LAMBDA LOG RETENTION
+  # ----------------------------------------------------
+
+  CreateProfileLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-CreateProfile"
+      RetentionInDays: 14
+
+  GetMeLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetMe"
+      RetentionInDays: 14
+
+  GetEntitlementsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetEntitlements"
+      RetentionInDays: 14
+
+  GetPreferencesLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetPreferences"
+      RetentionInDays: 14
+
+  UpdatePreferencesLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UpdatePreferences"
+      RetentionInDays: 14
+
+  GetDevicesLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetDevices"
+      RetentionInDays: 14
+
+  RegisterDeviceLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-RegisterDevice"
+      RetentionInDays: 14
+
+  DisableDeviceLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-DisableDevice"
+      RetentionInDays: 14
+
+  GetRemindersLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetReminders"
+      RetentionInDays: 14
+
+  CreateReminderLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-CreateReminder"
+      RetentionInDays: 14
+
+  UpdateReminderLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UpdateReminder"
+      RetentionInDays: 14
+
+  DeleteReminderLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-DeleteReminder"
+      RetentionInDays: 14
+
+  NotificationWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-NotificationWorker"
+      RetentionInDays: 14
+
+  GetTasksLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetTasks"
+      RetentionInDays: 14
+
+  CreateTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-CreateTask"
+      RetentionInDays: 14
+
+  UpdateTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UpdateTask"
+      RetentionInDays: 14
+
+  DeleteTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-DeleteTask"
+      RetentionInDays: 14
+
+  CompleteTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-CompleteTask"
+      RetentionInDays: 14
+
+  GetGoalsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetGoals"
+      RetentionInDays: 14
+
+  GetHistoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetHistory"
+      RetentionInDays: 14
+
+  GetCompletionHistoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetCompletionHistory"
+      RetentionInDays: 14
+
+  GetAchievementsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetAchievements"
+      RetentionInDays: 14
+
+  GetWorldLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetWorld"
+      RetentionInDays: 14
+
+  UpgradeBuildingLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UpgradeBuilding"
+      RetentionInDays: 14
+
+  GetShopLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetShop"
+      RetentionInDays: 14
+
+  PurchaseItemLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-PurchaseItem"
+      RetentionInDays: 14
+
+  GetInventoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetInventory"
+      RetentionInDays: 14
+
+  EquipItemLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-EquipItem"
+      RetentionInDays: 14
+
+  UnequipItemLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UnequipItem"
+      RetentionInDays: 14
+
+  UpdateMeLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UpdateMe"
+      RetentionInDays: 14
+
+  EvrenthiaDevUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName:
+        Fn::Sub: "${FunctionNamePrefix}-Users"
+      UsernameAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      AutoVerifiedAttributes:
+        - email
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 7
+      LambdaConfig:
+        PostConfirmation:
+          Fn::GetAtt:
+            - CreateProfileFunction
+            - Arn
+
+  EvrenthiaDevUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName:
+        Fn::Sub: "${FunctionNamePrefix}-Mobile"
+      UserPoolId:
+        Ref: EvrenthiaDevUserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+
+  # ----------------------------------------------------
+  # COGNITO POST-CONFIRMATION PROFILE CREATION
+  # ----------------------------------------------------
+
+  CreateProfileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-CreateProfile"
+      CodeUri: functions/create-profile/
+      Handler: index.handler
+      Description: Creates a default player profile after Cognito confirmation.
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+  CreateProfileInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: CreateProfileFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceAccount:
+        Ref: AWS::AccountId
+      SourceArn:
+        Fn::GetAtt:
+          - EvrenthiaDevUserPool
+          - Arn
+
+  # ----------------------------------------------------
+  # HTTP API
+  # ----------------------------------------------------
+
+  EvrenthiaDevApi:
+    Type: AWS::Serverless::HttpApi
+
+    Properties:
+      StageName: "$default"
+
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+
+        AllowHeaders:
+          - Authorization
+          - Content-Type
+
+        AllowMethods:
+          - GET
+          - POST
+          - PATCH
+          - DELETE
+          - OPTIONS
+
+      Auth:
+        Authorizers:
+          EvrenthiaCognito:
+            JwtConfiguration:
+              issuer:
+                Fn::Sub:
+                  - "https://cognito-idp.${AWS::Region}.amazonaws.com/${PoolId}"
+                  - PoolId:
+                      Ref: EvrenthiaDevUserPool
+
+              audience:
+                - Ref: EvrenthiaDevUserPoolClient
+
+            IdentitySource: "$request.header.Authorization"
+
+  # ----------------------------------------------------
+  # GET /me
+  # ----------------------------------------------------
+
+  GetMeFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetMe"
+
+      CodeUri: functions/get-me/
+
+      Handler: index.handler
+
+      Description: Retrieves the authenticated Evrenthia player profile.
+
+      Layers:
+        - Ref: ApiSharedLayer
+
+      Policies:
+        - Version: "2012-10-17"
+
+          Statement:
+            - Effect: Allow
+
+              Action:
+                - dynamodb:GetItem
+
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        GetMe:
+          Type: HttpApi
+
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+
+            Path: /me
+
+            Method: GET
+
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  # ----------------------------------------------------
+  # GET /entitlements
+  # ----------------------------------------------------
+
+  GetEntitlementsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetEntitlements"
+      CodeUri: functions/get-entitlements/
+      Handler: index.handler
+      Description: Retrieves the authenticated player's effective subscription and ad entitlement.
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        GetEntitlements:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /entitlements
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  # ----------------------------------------------------
+  # PREFERENCES
+  # ----------------------------------------------------
+
+  GetPreferencesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetPreferences"
+      CodeUri: functions/preferences/
+      Handler: get.handler
+      Description: Retrieves resolved notification and experience preferences.
+      Layers:
+        - Ref: ApiSharedLayer
+        - Ref: NotificationSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        GetPreferences:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /preferences
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  UpdatePreferencesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-UpdatePreferences"
+      CodeUri: functions/preferences/
+      Handler: update.handler
+      Description: Updates editable notification and experience preferences.
+      Layers:
+        - Ref: ApiSharedLayer
+        - Ref: NotificationSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        UpdatePreferences:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /preferences
+            Method: PATCH
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  # ----------------------------------------------------
+  # PUSH DEVICES
+  # ----------------------------------------------------
+
+  GetDevicesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetDevices"
+      CodeUri: functions/devices/
+      Handler: get.handler
+      Description: Retrieves registered devices without exposing push tokens.
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        GetDevices:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /devices
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  RegisterDeviceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-RegisterDevice"
+      CodeUri: functions/devices/
+      Handler: register.handler
+      Description: Registers or refreshes an Expo push device.
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        RegisterDevice:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /devices
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  DisableDeviceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-DisableDevice"
+      CodeUri: functions/devices/
+      Handler: disable.handler
+      Description: Soft-disables a registered push device.
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        DisableDevice:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /devices/{deviceId}
+            Method: DELETE
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  # ----------------------------------------------------
+  # REMINDER CONFIGURATION
+  # ----------------------------------------------------
+
+  GetRemindersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetReminders"
+      CodeUri: functions/reminders/
+      Handler: get.handler
+      Description: Retrieves reminder configuration and effective delivery eligibility.
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        GetReminders:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /reminders
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  CreateReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-CreateReminder"
+      CodeUri: functions/reminders/
+      Handler: create.handler
+      Description: Creates an idempotent task reminder configuration.
+      Layers:
+        - Ref: ApiSharedLayer
+        - Ref: NotificationSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        CreateReminder:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /reminders
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  UpdateReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-UpdateReminder"
+      CodeUri: functions/reminders/
+      Handler: update.handler
+      Description: Updates editable reminder configuration.
+      Layers:
+        - Ref: ApiSharedLayer
+        - Ref: NotificationSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        UpdateReminder:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /reminders/{reminderId}
+            Method: PATCH
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  DeleteReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-DeleteReminder"
+      CodeUri: functions/reminders/
+      Handler: disable.handler
+      Description: Soft-disables a reminder configuration.
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        DeleteReminder:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /reminders/{reminderId}
+            Method: DELETE
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  NotificationWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-NotificationWorker"
+      CodeUri: functions/notification-worker/
+      Handler: index.handler
+      Description: Claims due notification configurations and prepares or delivers push attempts.
+      Timeout: 30
+      Layers:
+        - Ref: NotificationSharedLayer
+      Environment:
+        Variables:
+          PUSH_DELIVERY_MODE: DRY_RUN
+          NOTIFICATION_BATCH_SIZE: "25"
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - Fn::GetAtt:
+                    - EvrenthiaDevTable
+                    - Arn
+                - Fn::Sub:
+                    - "${TableArn}/index/NotificationDueIndex"
+                    - TableArn:
+                        Fn::GetAtt:
+                          - EvrenthiaDevTable
+                          - Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        NotificationWorkerSchedule:
+          Type: Schedule
+          Properties:
+            Name:
+              Fn::Sub: "${FunctionNamePrefix}-NotificationWorker-EveryMinute"
+            Description: Development notification worker tick for the isolated Evrenthia backend.
+            Schedule: rate(1 minute)
+            Enabled: true
+
+  # ----------------------------------------------------
+  # TASKS
+  # ----------------------------------------------------
+
+  GetTasksFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetTasks"
+      CodeUri: functions/get-tasks/
+      Handler: index.handler
+      Description: Retrieves the authenticated player's tasks.
+
+      Layers:
+        - Ref: ApiSharedLayer
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        GetTasks:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /tasks
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  CreateTaskFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-CreateTask"
+      CodeUri: functions/create-task/
+      Handler: index.handler
+      Description: Creates a task for the authenticated player.
+
+      Layers:
+        - Ref: ApiSharedLayer
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        CreateTask:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /tasks
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  UpdateTaskFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-UpdateTask"
+      CodeUri: functions/update-task/
+      Handler: index.handler
+      Description: Updates editable task fields for the authenticated player.
+
+      Layers:
+        - Ref: ApiSharedLayer
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        UpdateTask:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /tasks/{taskId}
+            Method: PATCH
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  DeleteTaskFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-DeleteTask"
+      CodeUri: functions/delete-task/
+      Handler: index.handler
+      Description: Archives a task owned by the authenticated player.
+
+      Layers:
+        - Ref: ApiSharedLayer
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        DeleteTask:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /tasks/{taskId}
+            Method: DELETE
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  CompleteTaskFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-CompleteTask"
+      CodeUri: functions/complete-task/
+      Handler: index.handler
+      Description: Completes a task and atomically applies player progression.
+
+      Layers:
+        - Ref: ApiSharedLayer
+        - Ref: ProgressionSharedLayer
+
+      Environment:
+        Variables:
+          DEFAULT_TASK_XP: "10"
+          DEFAULT_TASK_COINS: "1"
+          DAILY_TASK_TARGET: "3"
+          WEEKLY_TASK_TARGET: "15"
+          DAILY_WORLD_POINTS_REWARD: "25"
+          WEEKLY_WORLD_POINTS_REWARD: "100"
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        CompleteTask:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /tasks/{taskId}/complete
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  # ----------------------------------------------------
+  # GOALS, HISTORY, ACHIEVEMENTS, AND WORLD
+  # ----------------------------------------------------
+
+  GetGoalsFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetGoals"
+      CodeUri: functions/get-goals/
+      Handler: index.handler
+      Description: Retrieves the authenticated player's daily and weekly goals.
+
+      Layers:
+        - Ref: ApiSharedLayer
+
+      Environment:
+        Variables:
+          DAILY_TASK_TARGET: "3"
+          WEEKLY_TASK_TARGET: "15"
+          DAILY_WORLD_POINTS_REWARD: "25"
+          WEEKLY_WORLD_POINTS_REWARD: "100"
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        GetGoals:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /goals
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  GetHistoryFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetHistory"
+      CodeUri: functions/get-history/
+      Handler: index.handler
+      Description: Retrieves the authenticated player's 30-day completion history.
+
+      Layers:
+        - Ref: ApiSharedLayer
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        GetHistory:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /history
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  GetCompletionHistoryFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetCompletionHistory"
+      CodeUri: functions/get-completion-history/
+      Handler: index.handler
+      Description: Retrieves immutable task completion snapshots newest first.
+
+      Layers:
+        - Ref: ApiSharedLayer
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        GetCompletionHistory:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /history/completions
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  GetAchievementsFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetAchievements"
+      CodeUri: functions/get-achievements/
+      Handler: index.handler
+      Description: Retrieves catalog-backed achievement progress for the authenticated player.
+
+      Layers:
+        - Ref: ApiSharedLayer
+        - Ref: ProgressionSharedLayer
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        GetAchievements:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /achievements
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  GetWorldFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetWorld"
+      CodeUri: functions/get-world/
+      Handler: index.handler
+      Description: Retrieves the authenticated player's building world.
+
+      Layers:
+        - Ref: ApiSharedLayer
+        - Ref: ProgressionSharedLayer
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        GetWorld:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /world
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  UpgradeBuildingFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-UpgradeBuilding"
+      CodeUri: functions/upgrade-building/
+      Handler: index.handler
+      Description: Atomically upgrades a building using the authenticated player's World Points.
+
+      Layers:
+        - Ref: ApiSharedLayer
+        - Ref: ProgressionSharedLayer
+
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+
+      Events:
+        UpgradeBuilding:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /world/buildings/{buildingId}/upgrade
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  # ----------------------------------------------------
+  # SHOP, INVENTORY, AND PROFILE SETTINGS
+  # ----------------------------------------------------
+
+  GetShopFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetShop"
+      CodeUri: functions/get-shop/
+      Handler: index.handler
+      Description: Retrieves the cosmetic catalog and player purchase eligibility.
+      Layers:
+        - Ref: ApiSharedLayer
+        - Ref: ProgressionSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        GetShop:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /shop
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  PurchaseItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-PurchaseItem"
+      CodeUri: functions/purchase-item/
+      Handler: index.handler
+      Description: Atomically purchases a catalog cosmetic with player coins.
+      Layers:
+        - Ref: ApiSharedLayer
+        - Ref: ProgressionSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        PurchaseItem:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /shop/purchase
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  GetInventoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-GetInventory"
+      CodeUri: functions/get-inventory/
+      Handler: index.handler
+      Description: Retrieves owned cosmetics and current equipment.
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        GetInventory:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /inventory
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  EquipItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-EquipItem"
+      CodeUri: functions/equip-item/
+      Handler: index.handler
+      Description: Equips an owned cosmetic in its server-controlled category slot.
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        EquipItem:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /inventory/equip
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  UnequipItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-UnequipItem"
+      CodeUri: functions/unequip-item/
+      Handler: index.handler
+      Description: Unequips a cosmetic from its server-controlled category slot.
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        UnequipItem:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /inventory/unequip
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  UpdateMeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-UpdateMe"
+      CodeUri: functions/update-me/
+      Handler: index.handler
+      Description: Updates editable profile settings for the authenticated player.
+      Layers:
+        - Ref: ApiSharedLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        UpdateMe:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /me
+            Method: PATCH
+            Auth:
+              Authorizer: EvrenthiaCognito
+
+  # ----------------------------------------------------
+  # LOW-COST DEVELOPMENT OBSERVABILITY
+  # ----------------------------------------------------
+
+  Api5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName:
+        Fn::Sub: "${FunctionNamePrefix}-Api-5XX"
+      AlarmDescription: Five or more HTTP API server errors within five minutes.
+      Namespace: AWS/ApiGateway
+      MetricName: 5xx
+      Dimensions:
+        - Name: ApiId
+          Value:
+            Ref: EvrenthiaDevApi
+        - Name: Stage
+          Value: "$default"
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  CompleteTaskErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName:
+        Fn::Sub: "${FunctionNamePrefix}-CompleteTask-Errors"
+      AlarmDescription: Three or more CompleteTask Lambda errors within five minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value:
+            Ref: CompleteTaskFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  PurchaseItemErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName:
+        Fn::Sub: "${FunctionNamePrefix}-PurchaseItem-Errors"
+      AlarmDescription: Three or more PurchaseItem Lambda errors within five minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value:
+            Ref: PurchaseItemFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  UpgradeBuildingErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName:
+        Fn::Sub: "${FunctionNamePrefix}-UpgradeBuilding-Errors"
+      AlarmDescription: Three or more UpgradeBuilding Lambda errors within five minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value:
+            Ref: UpgradeBuildingFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  NotificationWorkerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName:
+        Fn::Sub: "${FunctionNamePrefix}-NotificationWorker-Errors"
+      AlarmDescription: Three or more NotificationWorker Lambda errors within five minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value:
+            Ref: NotificationWorkerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  CreateProfileErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName:
+        Fn::Sub: "${FunctionNamePrefix}-CreateProfile-Errors"
+      AlarmDescription: Three or more CreateProfile Lambda errors within five minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value:
+            Ref: CreateProfileFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  DynamoDbThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName:
+        Fn::Sub: "${FunctionNamePrefix}-DynamoDB-ThrottledRequests"
+      AlarmDescription: One or more on-demand DynamoDB requests throttled within five minutes.
+      Namespace: AWS/DynamoDB
+      MetricName: ThrottledRequests
+      Dimensions:
+        - Name: TableName
+          Value:
+            Ref: EvrenthiaDevTable
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  EvrenthiaDevDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName:
+        Ref: FunctionNamePrefix
+      DashboardBody:
+        Fn::Sub: |
+          {
+            "widgets": [
+              {
+                "type": "metric",
+                "x": 0,
+                "y": 0,
+                "width": 12,
+                "height": 6,
+                "properties": {
+                  "title": "API traffic and errors",
+                  "region": "${AWS::Region}",
+                  "view": "timeSeries",
+                  "period": 300,
+                  "stat": "Sum",
+                  "metrics": [
+                    ["AWS/ApiGateway", "Count", "ApiId", "${EvrenthiaDevApi}", "Stage", "$default", {"label": "Requests"}],
+                    [".", "4xx", ".", ".", ".", ".", {"label": "4xx"}],
+                    [".", "5xx", ".", ".", ".", ".", {"label": "5xx"}]
+                  ]
+                }
+              },
+              {
+                "type": "metric",
+                "x": 12,
+                "y": 0,
+                "width": 12,
+                "height": 6,
+                "properties": {
+                  "title": "Critical Lambda errors",
+                  "region": "${AWS::Region}",
+                  "view": "timeSeries",
+                  "period": 300,
+                  "stat": "Sum",
+                  "metrics": [
+                    ["AWS/Lambda", "Errors", "FunctionName", "${CompleteTaskFunction}", {"label": "CompleteTask"}],
+                    [".", ".", ".", "${PurchaseItemFunction}", {"label": "PurchaseItem"}],
+                    [".", ".", ".", "${UpgradeBuildingFunction}", {"label": "UpgradeBuilding"}],
+                    [".", ".", ".", "${NotificationWorkerFunction}", {"label": "NotificationWorker"}]
+                  ]
+                }
+              },
+              {
+                "type": "metric",
+                "x": 0,
+                "y": 6,
+                "width": 12,
+                "height": 6,
+                "properties": {
+                  "title": "NotificationWorker duration",
+                  "region": "${AWS::Region}",
+                  "view": "timeSeries",
+                  "period": 300,
+                  "stat": "Average",
+                  "metrics": [
+                    ["AWS/Lambda", "Duration", "FunctionName", "${NotificationWorkerFunction}", {"label": "Average duration"}]
+                  ]
+                }
+              },
+              {
+                "type": "metric",
+                "x": 12,
+                "y": 6,
+                "width": 12,
+                "height": 6,
+                "properties": {
+                  "title": "DynamoDB throttles",
+                  "region": "${AWS::Region}",
+                  "view": "timeSeries",
+                  "period": 300,
+                  "stat": "Sum",
+                  "metrics": [
+                    ["AWS/DynamoDB", "ThrottledRequests", "TableName", "${EvrenthiaDevTable}", {"label": "Throttled requests"}]
+                  ]
+                }
+              }
+            ]
+          }
+
+  EvrenthiaDevBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName:
+          Fn::Sub: "${FunctionNamePrefix}-Monthly-10-USD"
+        BudgetLimit:
+          Amount: 10
+          Unit: USD
+        BudgetType: COST
+        TimeUnit: MONTHLY
+      NotificationsWithSubscribers:
+        Fn::If:
+          - HasBudgetNotificationEmail
+          - - Notification:
+                ComparisonOperator: GREATER_THAN
+                NotificationType: ACTUAL
+                Threshold: 50
+                ThresholdType: PERCENTAGE
+              Subscribers:
+                - Address:
+                    Ref: BudgetNotificationEmail
+                  SubscriptionType: EMAIL
+            - Notification:
+                ComparisonOperator: GREATER_THAN
+                NotificationType: ACTUAL
+                Threshold: 80
+                ThresholdType: PERCENTAGE
+              Subscribers:
+                - Address:
+                    Ref: BudgetNotificationEmail
+                  SubscriptionType: EMAIL
+            - Notification:
+                ComparisonOperator: GREATER_THAN
+                NotificationType: ACTUAL
+                Threshold: 100
+                ThresholdType: PERCENTAGE
+              Subscribers:
+                - Address:
+                    Ref: BudgetNotificationEmail
+                  SubscriptionType: EMAIL
+          - Ref: AWS::NoValue
+
+# ======================================================
+# OUTPUTS
+# ======================================================
+
+Outputs:
+  ApiUrl:
+    Description: Evrenthia development API URL
+
+    Value:
+      Fn::Sub: "https://${EvrenthiaDevApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  DevApiUrl:
+    Description: Isolated development HTTP API URL
+    Value:
+      Fn::Sub: "https://${EvrenthiaDevApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  DevTableName:
+    Description: Isolated development DynamoDB table name
+    Value:
+      Ref: EvrenthiaDevTable
+
+  DevUserPoolId:
+    Description: Isolated development Cognito user pool ID
+    Value:
+      Ref: EvrenthiaDevUserPool
+
+  DevUserPoolClientId:
+    Description: Isolated development Cognito app client ID
+    Value:
+      Ref: EvrenthiaDevUserPoolClient
+
+  GetMeFunctionName:
+    Description: GetMe Lambda function name
+
+    Value:
+      Ref: GetMeFunction
+
+  CreateProfileFunctionArn:
+    Description: CreateProfile Lambda ARN
+    Value:
+      Fn::GetAtt:
+        - CreateProfileFunction
+        - Arn
+
+  CreateProfileFunctionName:
+    Description: CreateProfile Lambda function name
+    Value:
+      Ref: CreateProfileFunction
