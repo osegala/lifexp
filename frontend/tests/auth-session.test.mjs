@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import { setImmediate as nextTick } from "node:timers/promises";
 import test from "node:test";
 import axios, { AxiosError } from "axios";
-import { AuthSession } from "../src/auth/session.ts";
+import { AuthSession, userFromProfile } from "../src/auth/session.ts";
 
-const user = { id: 1, username: "Test Hero", email: "hero@example.test", level: 3, totalXp: 200, coins: 20, currentStreak: 2, longestStreak: 2, xpToNextLevel: 50, progressPercent: 80, premiumActive: false };
-const secondUser = { ...user, id: 2, username: "Second Hero" };
+const identity = { token: "saved-id-token", userId: "user-sub-1", email: "hero@example.test" };
+const nextIdentity = { token: "new-id-token", userId: "user-sub-2", email: "second@example.test" };
+const profile = {
+  displayName: "Test Hero", level: 3, xp: 200, xpIntoLevel: 50,
+  xpForNextLevel: 200, xpToNextLevel: 150, coins: 20,
+};
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -14,36 +18,52 @@ const deferred = () => {
 const response = (config, data) => ({ config, data, status: 200, statusText: "OK", headers: {} });
 const httpError = (config, status) => new AxiosError(`Request failed: ${status}`, "ERR_BAD_RESPONSE", config, null, { ...response(config, {}), status });
 
-function harness(t, { token = "saved-token", profile, storage = {} } = {}) {
-  const calls = [], writes = [];
-  let savedToken = token;
+function harness(t, { session = identity } = {}) {
+  const calls = [], authCalls = [];
   const h = {
-    calls, writes,
-    profile: profile ?? (config => response(config, user)),
-    other: config => response(config, []),
-    auth: config => response(config, { token: "new-token", user: secondUser }),
-    get savedToken() { return savedToken; },
+    calls,
+    authCalls,
+    session,
+    profile: config => response(config, profile),
+    entitlement: config => response(config, { plan: "FREE", subscriptionStatus: "FREE" }),
+  };
+  h.auth = {
+    getSession: async forceRefresh => {
+      authCalls.push(["getSession", forceRefresh ?? false]);
+      return h.session;
+    },
+    signIn: async (email, password) => {
+      authCalls.push(["signIn", email, password]);
+      h.session = nextIdentity;
+      return nextIdentity;
+    },
+    signUp: async (displayName, email, password) => {
+      authCalls.push(["signUp", displayName, email, password]);
+      return "CONFIRM_SIGN_UP";
+    },
+    confirmSignUp: async (email, code) => {
+      authCalls.push(["confirmSignUp", email, code]);
+    },
+    signOut: async () => {
+      authCalls.push(["signOut"]);
+      h.session = null;
+    },
   };
   h.client = axios.create({ adapter: async config => {
     calls.push(config);
-    if (config.url === "/users/me") return h.profile(config);
-    if (config.url === "/users/login" || config.url === "/users/register") return h.auth(config);
-    return h.other(config);
+    if (config.url === "/me") return h.profile(config);
+    if (config.url === "/entitlements") return h.entitlement(config);
+    return response(config, {});
   } });
-  h.session = new AuthSession(h.client, {
-    getToken: async () => savedToken,
-    setToken: async value => { writes.push(value); savedToken = value; },
-    deleteToken: async () => { writes.push(null); savedToken = null; },
-    ...storage,
-  });
-  const stop = h.session.start();
+  h.authSession = new AuthSession(h.client, h.auth);
+  const stop = h.authSession.start();
   t.after(stop);
   h.ready = async () => {
-    if (h.session.getSnapshot().loading) {
+    if (h.authSession.getSnapshot().loading) {
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => { unsubscribe(); reject(new Error("Session did not finish restoring")); }, 1000);
-        const unsubscribe = h.session.subscribe(() => {
-          if (!h.session.getSnapshot().loading) {
+        const unsubscribe = h.authSession.subscribe(() => {
+          if (!h.authSession.getSnapshot().loading) {
             clearTimeout(timeout);
             unsubscribe();
             resolve();
@@ -56,220 +76,200 @@ function harness(t, { token = "saved-token", profile, storage = {} } = {}) {
   return h;
 }
 
-test("restores saved credentials and attaches them to protected requests", async t => {
+test("restores the Cognito session and authenticates profile requests with its ID token", async t => {
   const h = harness(t);
   await h.ready();
-  assert.equal(h.session.getSnapshot().user.id, 1);
-  assert.equal(h.calls[0].headers.get("Authorization"), "Bearer saved-token");
-  assert.equal(h.calls[0].timeout, 15000);
-  assert.deepEqual(h.writes, []);
+  assert.equal(h.authSession.getSnapshot().user.id, identity.userId);
+  assert.equal(h.authSession.getSnapshot().user.username, profile.displayName);
+  assert.equal(h.authSession.getSnapshot().user.email, identity.email);
+  assert.deepEqual(h.calls.map(call => call.url).sort(), ["/entitlements", "/me"]);
+  assert.ok(h.calls.every(call => call.headers.get("Authorization") === `Bearer ${identity.token}`));
+  assert.ok(h.calls.every(call => call.timeout === 15000));
 });
 
-for (const failure of ["offline", "timeout", 403, 429, 500]) {
-  test(`preserves saved sign-in when startup encounters ${failure}`, async t => {
-    const h = harness(t, { profile: config => {
-      throw typeof failure === "number" ? httpError(config, failure)
-        : new AxiosError(failure, failure === "timeout" ? "ECONNABORTED" : "ERR_NETWORK", config);
-    } });
-    await h.ready();
-    assert.equal(h.session.getSnapshot().token, "saved-token");
-    assert.equal(h.session.getSnapshot().user, null);
-    assert.ok(h.session.getSnapshot().sessionError);
-    assert.equal(h.savedToken, "saved-token");
-    assert.deepEqual(h.writes, []);
-    h.profile = config => response(config, user);
-    assert.equal(await h.session.retrySession(), true);
-    assert.equal(h.session.getSnapshot().user.id, 1);
-    assert.equal(h.session.getSnapshot().sessionError, null);
-  });
-}
-
-test("keeps an already loaded account during an outage and recovers on retry", async t => {
-  const h = harness(t);
+test("an empty Cognito session stays signed out without API requests", async t => {
+  const h = harness(t, { session: null });
   await h.ready();
-  const refresh = h.session.refreshUser;
-  h.profile = config => { throw new AxiosError("Network Error", "ERR_NETWORK", config); };
-  assert.equal(await refresh(), false);
-  assert.equal(h.session.getSnapshot().user, user);
-  assert.equal(h.savedToken, "saved-token");
-  h.profile = config => response(config, { ...user, coins: 35 });
-  assert.equal(await h.session.retrySession(), true);
-  assert.equal(h.session.getSnapshot().user.coins, 35);
-  assert.equal(h.session.getSnapshot().sessionError, null);
-  assert.equal(h.session.refreshUser, refresh);
-});
-
-test("invalid startup credentials are cleared with an expired-session notice", async t => {
-  const h = harness(t, { profile: config => { throw httpError(config, 401); } });
-  await h.ready();
-  assert.equal(h.session.getSnapshot().token, null);
-  assert.equal(h.session.getSnapshot().user, null);
-  assert.match(h.session.getSnapshot().sessionNotice, /expired/);
-  assert.equal(h.savedToken, null);
-  assert.deepEqual(h.writes, [null]);
-});
-
-test("a 401 from any protected screen ends the session only once", async t => {
-  const h = harness(t);
-  await h.ready();
-  h.other = config => { throw httpError(config, 401); };
-  await Promise.allSettled([h.client.get("/avatar"), h.client.get("/shop")]);
-  await nextTick();
-  assert.equal(h.session.getSnapshot().token, null);
-  assert.deepEqual(h.writes, [null]);
-});
-
-test("wrong login details neither send old credentials nor invalidate a current session", async t => {
-  const h = harness(t);
-  await h.ready();
-  h.auth = config => {
-    assert.equal(config.headers.get("Authorization"), undefined);
-    throw httpError(config, 401);
-  };
-  await assert.rejects(h.session.login("hero@example.test", "test-password"));
-  assert.equal(h.session.getSnapshot().token, "saved-token");
-  assert.deepEqual(h.writes, []);
-});
-
-test("concurrent account refreshes share one request", async t => {
-  const h = harness(t);
-  await h.ready();
-  const pending = deferred();
-  h.profile = config => pending.promise.then(() => response(config, user));
-  const promises = Array.from({ length: 10 }, () => h.session.refreshUser());
-  assert.ok(promises.every(promise => promise === promises[0]));
-  await nextTick();
-  assert.equal(h.calls.filter(call => call.url === "/users/me").length, 2);
-  pending.resolve();
-  assert.ok((await Promise.all(promises)).every(Boolean));
-});
-
-test("a late profile response cannot restore a logged-out user", async t => {
-  const h = harness(t);
-  await h.ready();
-  const pending = deferred();
-  h.profile = config => pending.promise.then(() => response(config, user));
-  const refresh = h.session.refreshUser();
-  await nextTick();
-  await h.session.logout();
-  pending.resolve();
-  assert.equal(await refresh, false);
-  assert.equal(h.session.getSnapshot().token, null);
-  assert.equal(h.session.getSnapshot().user, null);
-  assert.equal(h.savedToken, null);
-});
-
-for (const status of [200, 401]) {
-  test(`an old ${status} response cannot overwrite or sign out a new session`, async t => {
-    const h = harness(t);
-    await h.ready();
-    const pending = deferred();
-    h.profile = async config => {
-      await pending.promise;
-      if (status === 401) throw httpError(config, 401);
-      return response(config, user);
-    };
-    const refresh = h.session.refreshUser();
-    await nextTick();
-    await h.session.login("second@example.test", "test-password");
-    pending.resolve();
-    assert.equal(await refresh, false);
-    assert.equal(h.session.getSnapshot().user.id, 2);
-    assert.equal(h.session.getSnapshot().token, "new-token");
-    assert.equal(h.savedToken, "new-token");
-  });
-}
-
-test("slow credential deletion cannot erase a later successful login", async t => {
-  const deletion = deferred();
-  let persisted = "saved-token";
-  const h = harness(t, { storage: {
-    getToken: async () => persisted,
-    deleteToken: async () => { await deletion.promise; persisted = null; },
-    setToken: async token => { persisted = token; },
-  } });
-  await h.ready();
-  h.other = config => { throw httpError(config, 401); };
-  await assert.rejects(h.client.get("/tasks"));
-  const login = h.session.login("second@example.test", "test-password");
-  await nextTick();
-  deletion.resolve();
-  await login;
-  assert.equal(persisted, "new-token");
-  assert.equal(h.session.getSnapshot().user.id, 2);
-});
-
-test("a storage read failure does not delete credentials and can be retried", async t => {
-  let readable = false;
-  const h = harness(t, { storage: { getToken: async () => {
-    if (!readable) throw new Error("Storage unavailable");
-    return "saved-token";
-  } } });
-  await h.ready();
-  assert.ok(h.session.getSnapshot().sessionError);
-  assert.deepEqual(h.writes, []);
-  readable = true;
-  assert.equal(await h.session.retrySession(), true);
-  assert.equal(h.session.getSnapshot().user.id, 1);
-});
-
-test("failed manual sign-out leaves the account available for another attempt", async t => {
-  const h = harness(t, { storage: { deleteToken: async () => { throw new Error("Storage unavailable"); } } });
-  await h.ready();
-  await assert.rejects(h.session.logout());
-  assert.equal(h.session.getSnapshot().token, "saved-token");
-});
-
-test("registration saves the session and preserves the chosen character", async t => {
-  const h = harness(t, { token: null });
-  await h.ready();
-  await h.session.register("Test Hero", "hero@example.test", "test-password", "GIRL");
-  const request = h.calls.find(call => call.url === "/users/register");
-  assert.equal(JSON.parse(request.data).bodyType, "GIRL");
-  assert.equal(request.headers.get("Authorization"), undefined);
-  assert.equal(h.savedToken, "new-token");
-});
-
-test("a late startup read cannot restore credentials after manual logout", async t => {
-  const read = deferred();
-  const h = harness(t, { storage: { getToken: () => read.promise } });
-  await nextTick();
-  await h.session.logout();
-  read.resolve("old-token");
-  await h.ready();
-  assert.equal(h.session.getSnapshot().token, null);
+  assert.equal(h.authSession.getSnapshot().token, null);
+  assert.equal(h.authSession.getSnapshot().user, null);
   assert.equal(h.calls.length, 0);
 });
 
-test("provider effect restart ignores the old startup request", async () => {
-  const read = deferred();
-  let reads = 0;
-  const calls = [];
-  const client = axios.create({ adapter: async config => { calls.push(config); return response(config, user); } });
-  const session = new AuthSession(client, {
-    getToken: async () => ++reads === 1 ? read.promise : "current-token",
-    setToken: async () => {},
-    deleteToken: async () => {},
-  });
-  const stopFirst = session.start();
-  await nextTick();
-  stopFirst();
-  const stopSecond = session.start();
-  await nextTick();
-  read.resolve("old-token");
-  await nextTick();
-  assert.equal(session.getSnapshot().token, "current-token");
-  assert.equal(session.getSnapshot().loading, false);
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].headers.get("Authorization"), "Bearer current-token");
-  stopSecond();
+test("a profile outage preserves the Cognito token and can be retried", async t => {
+  const h = harness(t);
+  h.profile = config => { throw new AxiosError("Network Error", "ERR_NETWORK", config); };
+  await h.ready();
+  assert.equal(h.authSession.getSnapshot().token, identity.token);
+  assert.ok(h.authSession.getSnapshot().sessionError);
+  h.profile = config => response(config, profile);
+  assert.equal(await h.authSession.retrySession(), true);
+  assert.equal(h.authSession.getSnapshot().user.id, identity.userId);
+  assert.deepEqual(h.authCalls.at(-1), ["getSession", true]);
 });
 
-test("failure to persist a new login does not leave it authenticated", async t => {
-  const h = harness(t, { token: null, storage: { setToken: async () => { throw new Error("Storage unavailable"); } } });
+for (const failure of ["timeout", 403, 429, 500]) {
+  test(`preserves a restored Cognito session when profile loading encounters ${failure}`, async t => {
+    const h = harness(t);
+    h.profile = config => {
+      throw typeof failure === "number"
+        ? httpError(config, failure)
+        : new AxiosError(failure, "ECONNABORTED", config);
+    };
+    await h.ready();
+    assert.equal(h.authSession.getSnapshot().token, identity.token);
+    assert.equal(h.authSession.getSnapshot().user, null);
+    assert.ok(h.authSession.getSnapshot().sessionError);
+    assert.equal(h.authCalls.filter(call => call[0] === "signOut").length, 0);
+  });
+}
+
+test("keeps an already loaded profile during an outage and recovers on retry", async t => {
+  const h = harness(t);
   await h.ready();
-  await assert.rejects(h.session.login("hero@example.test", "test-password"));
-  assert.equal(h.session.getSnapshot().token, null);
-  assert.equal(h.session.getSnapshot().user, null);
-  assert.match(h.session.getSnapshot().sessionNotice, /save your sign-in/);
+  h.profile = config => { throw new AxiosError("Network Error", "ERR_NETWORK", config); };
+  assert.equal(await h.authSession.refreshUser(), false);
+  assert.equal(h.authSession.getSnapshot().user.id, identity.userId);
+  h.profile = config => response(config, { ...profile, coins: 35 });
+  assert.equal(await h.authSession.retrySession(), true);
+  assert.equal(h.authSession.getSnapshot().user.coins, 35);
+});
+
+test("a 401 expires the local session and signs out of Cognito", async t => {
+  const h = harness(t);
+  h.profile = config => { throw httpError(config, 401); };
+  await h.ready();
+  assert.equal(h.authSession.getSnapshot().token, null);
+  assert.match(h.authSession.getSnapshot().sessionNotice, /expired/);
+  assert.ok(h.authCalls.some(call => call[0] === "signOut"));
+});
+
+test("login uses Cognito and never posts credentials to the API", async t => {
+  const h = harness(t, { session: null });
+  await h.ready();
+  await h.authSession.login("second@example.test", "test-password");
+  assert.deepEqual(h.authCalls.find(call => call[0] === "signIn"), ["signIn", "second@example.test", "test-password"]);
+  assert.ok(h.calls.every(call => call.url === "/me" || call.url === "/entitlements"));
+  assert.ok(h.calls.every(call => call.headers.get("Authorization") === `Bearer ${nextIdentity.token}`));
+  assert.equal(h.authSession.getSnapshot().user.id, nextIdentity.userId);
+});
+
+test("failed Cognito login does not invalidate an existing session", async t => {
+  const h = harness(t);
+  await h.ready();
+  h.auth.signIn = async () => { throw new Error("NotAuthorizedException"); };
+  await assert.rejects(h.authSession.login("wrong@example.test", "wrong-password"));
+  assert.equal(h.authSession.getSnapshot().token, identity.token);
+  assert.equal(h.authSession.getSnapshot().user.id, identity.userId);
+});
+
+test("registration and confirmation stay in Cognito before loading the API profile", async t => {
+  const h = harness(t, { session: null });
+  await h.ready();
+  assert.equal(
+    await h.authSession.register("Test Hero", "hero@example.test", "test-password", "GIRL"),
+    "CONFIRM_SIGN_UP",
+  );
+  await h.authSession.confirmRegistration("hero@example.test", "123456", "test-password");
+  assert.deepEqual(h.authCalls.find(call => call[0] === "signUp"), ["signUp", "Test Hero", "hero@example.test", "test-password"]);
+  assert.deepEqual(h.authCalls.find(call => call[0] === "confirmSignUp"), ["confirmSignUp", "hero@example.test", "123456"]);
+  assert.equal(h.authSession.getSnapshot().user.id, nextIdentity.userId);
+});
+
+test("concurrent profile refreshes share one forced Cognito refresh", async t => {
+  const h = harness(t);
+  await h.ready();
+  const pending = deferred();
+  h.auth.getSession = async forceRefresh => {
+    h.authCalls.push(["getSession", forceRefresh ?? false]);
+    await pending.promise;
+    return identity;
+  };
+  const refreshes = Array.from({ length: 10 }, () => h.authSession.refreshUser());
+  assert.ok(refreshes.every(refresh => refresh === refreshes[0]));
+  await nextTick();
+  assert.equal(h.authCalls.filter(call => call[0] === "getSession" && call[1] === true).length, 1);
+  pending.resolve();
+  assert.ok((await Promise.all(refreshes)).every(Boolean));
+});
+
+test("a late profile response cannot restore a signed-out session", async t => {
+  const h = harness(t);
+  await h.ready();
+  const pending = deferred();
+  h.profile = config => pending.promise.then(() => response(config, profile));
+  const refresh = h.authSession.refreshUser();
+  await nextTick();
+  await h.authSession.logout();
+  pending.resolve();
+  assert.equal(await refresh, false);
+  assert.equal(h.authSession.getSnapshot().token, null);
+  assert.equal(h.authSession.getSnapshot().user, null);
+});
+
+for (const staleStatus of [200, 401]) {
+  test(`a stale ${staleStatus} profile response cannot overwrite a newer login`, async t => {
+    const h = harness(t);
+    await h.ready();
+    const pending = deferred();
+    let profileCalls = 0;
+    h.profile = async config => {
+      profileCalls++;
+      if (profileCalls === 1) {
+        await pending.promise;
+        if (staleStatus === 401) throw httpError(config, 401);
+      }
+      return response(config, { ...profile, displayName: "Second Hero" });
+    };
+    const refresh = h.authSession.refreshUser();
+    await nextTick();
+    await h.authSession.login("second@example.test", "test-password");
+    pending.resolve();
+    assert.equal(await refresh, false);
+    assert.equal(h.authSession.getSnapshot().token, nextIdentity.token);
+    assert.equal(h.authSession.getSnapshot().user.id, nextIdentity.userId);
+  });
+}
+
+test("failed Cognito sign-out leaves the current account available", async t => {
+  const h = harness(t);
+  await h.ready();
+  h.auth.signOut = async () => { throw new Error("Sign-out unavailable"); };
+  await assert.rejects(h.authSession.logout());
+  assert.equal(h.authSession.getSnapshot().token, identity.token);
+  assert.equal(h.authSession.getSnapshot().user.id, identity.userId);
+});
+
+test("a delayed expiry sign-out finishes before a later login starts", async t => {
+  const h = harness(t);
+  const signOut = deferred();
+  h.profile = config => { throw httpError(config, 401); };
+  h.auth.signOut = async () => {
+    h.authCalls.push(["signOut"]);
+    await signOut.promise;
+  };
+  await h.ready();
+  h.profile = config => response(config, profile);
+  const login = h.authSession.login("second@example.test", "test-password");
+  await nextTick();
+  assert.equal(h.authCalls.some(call => call[0] === "signIn"), false);
+  signOut.resolve();
+  await login;
+  assert.equal(h.authSession.getSnapshot().token, nextIdentity.token);
+});
+
+test("profile mapping preserves progression and premium state", () => {
+  const user = userFromProfile(profile, identity, { plan: "PREMIUM", subscriptionStatus: "ACTIVE" });
+  assert.deepEqual(user, {
+    id: identity.userId,
+    username: profile.displayName,
+    email: identity.email,
+    totalXp: 200,
+    level: 3,
+    xpToNextLevel: 150,
+    progressPercent: 25,
+    currentStreak: 0,
+    longestStreak: 0,
+    coins: 20,
+    premiumActive: true,
+  });
 });

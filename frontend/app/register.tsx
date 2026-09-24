@@ -22,11 +22,13 @@ const skyImage = require("../assets/base/backgrounds/sky.png");
 const baseImage = require("../assets/base/buildings/library/library-level-1.png");
 
 export default function RegisterScreen() {
-  const { register } = useAuth();
+  const { register, confirmRegistration, login } = useAuth();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmationCode, setConfirmationCode] = useState("");
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [bodyType, setBodyType] = useState<"BOY" | "GIRL">("BOY");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,18 +42,41 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (password.length < 4) {
-      setError("Use at least 4 characters for this prototype password.");
+    if (password.length < 8) {
+      setError("Use at least 8 characters for your password.");
       return;
     }
 
     try {
       setLoading(true);
       setError("");
-      await register(trimmedUsername, trimmedEmail, password, bodyType);
-      router.replace("/(tabs)/dashboard");
+      const nextStep = await register(trimmedUsername, trimmedEmail, password, bodyType);
+      if (nextStep === "CONFIRM_SIGN_UP") {
+        setAwaitingConfirmation(true);
+      } else {
+        await login(trimmedEmail, password);
+        router.replace("/(tabs)/dashboard");
+      }
     } catch {
       setError("Could not create that account. Try a different email or username.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleConfirmation() {
+    if (!confirmationCode.trim()) {
+      setError("Enter the confirmation code sent to your email.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+      await confirmRegistration(email.trim(), confirmationCode.trim(), password);
+      router.replace("/(tabs)/dashboard");
+    } catch {
+      setError("Could not confirm that account. Check the code and try again.");
     } finally {
       setLoading(false);
     }
@@ -122,8 +147,25 @@ export default function RegisterScreen() {
           textContentType="newPassword"
         />
         <Text style={styles.helperText}>
-          Prototype rule: 4+ characters. You can strengthen this later.
+          Use 8+ characters with uppercase, lowercase, number, and symbol characters.
         </Text>
+
+        {awaitingConfirmation && (
+          <>
+            <Text style={styles.label}>Email confirmation code</Text>
+            <LifeInput
+              placeholder="123456"
+              value={confirmationCode}
+              onChangeText={(value) => {
+                setConfirmationCode(value);
+                setError("");
+              }}
+              autoCapitalize="none"
+              keyboardType="number-pad"
+              textContentType="oneTimeCode"
+            />
+          </>
+        )}
 
         <Text style={styles.label}>Starter avatar</Text>
         <View style={styles.avatarChoices}>
@@ -161,8 +203,10 @@ export default function RegisterScreen() {
 
         <View style={styles.actions}>
           <LifeButton
-            title={loading ? "Creating..." : "Create LifeXP Account"}
-            onPress={handleRegister}
+            title={loading
+              ? (awaitingConfirmation ? "Confirming..." : "Creating...")
+              : (awaitingConfirmation ? "Confirm Account" : "Create LifeXP Account")}
+            onPress={awaitingConfirmation ? handleConfirmation : handleRegister}
             disabled={loading}
           />
           <LifeButton

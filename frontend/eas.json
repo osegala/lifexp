@@ -6,13 +6,35 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "environment": "development",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "dev",
+        "EXPO_PUBLIC_AWS_REGION": "us-east-2",
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-2_GeLguitkg",
+        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "2d934f22a9lvbppn6m9liistj"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "dev",
+        "EXPO_PUBLIC_AWS_REGION": "us-east-2",
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-2_GeLguitkg",
+        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "2d934f22a9lvbppn6m9liistj"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "prod",
+        "EXPO_PUBLIC_AWS_REGION": "us-east-2",
+        "EXPO_PUBLIC_API_URL": "https://ifzeath0p5.execute-api.us-east-2.amazonaws.com",
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-2_oYWYSCv0W",
+        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "6pnoum6ishq8fcp4cn09jjj68m"
+      }
     }
   },
   "submit": {

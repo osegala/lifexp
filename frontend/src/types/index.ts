@@ -1,5 +1,5 @@
 export type User = {
-  id: number;
+  id: string | number;
   username: string;
   email: string;
   totalXp: number;
@@ -10,11 +10,6 @@ export type User = {
   longestStreak: number;
   coins: number;
   premiumActive: boolean;
-};
-
-export type AuthResponse = {
-  token: string;
-  user: User;
 };
 
 export type Task = {

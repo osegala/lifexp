@@ -1,11 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { AppState, Platform } from "react-native";
-import * as tokenStorage from "../utils/tokenStorage";
 import { api } from "../api/client";
 import { AuthSession } from "../auth/session";
+import { cognitoAuth } from "../auth/cognito";
 
 function useSessionValue() {
-  const [session] = useState(() => new AuthSession(api, tokenStorage));
+  const [session] = useState(() => new AuthSession(api, cognitoAuth));
   const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot, session.getSnapshot);
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
 
@@ -34,6 +34,7 @@ function useSessionValue() {
     triggerDashboardRefresh,
     login: session.login,
     register: session.register,
+    confirmRegistration: session.confirmRegistration,
     logout: session.logout,
     refreshUser: session.refreshUser,
     retrySession: session.retrySession,

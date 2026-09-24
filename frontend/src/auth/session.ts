@@ -1,12 +1,7 @@
 import { isAxiosError, isCancel } from "axios";
 import type { AxiosInstance, InternalAxiosRequestConfig } from "axios";
-import type { AuthResponse, User } from "../types";
-
-type SessionStorage = {
-  getToken: () => Promise<string | null>;
-  setToken: (token: string) => Promise<void>;
-  deleteToken: () => Promise<void>;
-};
+import type { User } from "../types";
+import type { CognitoAuth, CognitoIdentity, RegistrationStep } from "./cognito";
 
 type SessionState = {
   token: string | null;
@@ -16,25 +11,57 @@ type SessionState = {
   sessionNotice: string | null;
 };
 
+type ProfileResponse = {
+  displayName: string;
+  level: number;
+  xp: number;
+  xpIntoLevel: number;
+  xpForNextLevel: number;
+  xpToNextLevel: number;
+  coins: number;
+};
+
+type EntitlementResponse = { plan?: string; subscriptionStatus?: string };
 type SessionRequest = InternalAxiosRequestConfig & { sessionRevision?: number };
 const AUTH_TIMEOUT = 15_000;
-const isPublicAuthRequest = (url?: string) => /\/users\/(login|register)(?:\?|$)/.test(url ?? "");
 
-/** Owns session transitions independently of screen focus and React renders. */
+export function userFromProfile(
+  profile: ProfileResponse,
+  identity: CognitoIdentity,
+  entitlement: EntitlementResponse = {},
+): User {
+  return {
+    id: identity.userId,
+    username: profile.displayName,
+    email: identity.email,
+    totalXp: profile.xp,
+    level: profile.level,
+    xpToNextLevel: profile.xpToNextLevel,
+    progressPercent: profile.xpForNextLevel > 0
+      ? Math.floor((profile.xpIntoLevel / profile.xpForNextLevel) * 100)
+      : 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    coins: profile.coins,
+    premiumActive: entitlement.plan === "PREMIUM" && entitlement.subscriptionStatus !== "EXPIRED",
+  };
+}
+
+/** Owns Cognito and API session transitions independently of React renders. */
 export class AuthSession {
   private state: SessionState = {
     token: null, user: null, loading: true, sessionError: null, sessionNotice: null,
   };
   private revision = 0;
   private listeners = new Set<() => void>();
-  private storageWrites: Promise<void> = Promise.resolve();
   private refresh: { revision: number; promise: Promise<boolean> } | null = null;
+  private signOutPending: Promise<void> = Promise.resolve();
   private client: AxiosInstance;
-  private storage: SessionStorage;
+  private auth: CognitoAuth;
 
-  constructor(client: AxiosInstance, storage: SessionStorage) {
+  constructor(client: AxiosInstance, auth: CognitoAuth) {
     this.client = client;
-    this.storage = storage;
+    this.auth = auth;
   }
 
   getSnapshot = () => this.state;
@@ -49,18 +76,16 @@ export class AuthSession {
     this.listeners.forEach(listener => listener());
   }
 
-  private persist(token: string | null) {
-    // A late token deletion must finish before a subsequent sign-in is saved.
-    const write = this.storageWrites.then(() => token === null
-      ? this.storage.deleteToken() : this.storage.setToken(token));
-    this.storageWrites = write.catch(() => {});
-    return write;
+  private signOutFromCognito() {
+    const request = this.signOutPending.then(() => this.auth.signOut());
+    this.signOutPending = request.catch(() => {});
+    return request;
   }
 
   start = () => {
     const requestId = this.client.interceptors.request.use(config => {
       (config as SessionRequest).sessionRevision = this.revision;
-      if (this.state.token && !isPublicAuthRequest(config.url)) {
+      if (this.state.token) {
         config.headers.set("Authorization", `Bearer ${this.state.token}`);
       } else {
         config.headers.delete("Authorization");
@@ -68,7 +93,7 @@ export class AuthSession {
       return config;
     });
     const responseId = this.client.interceptors.response.use(response => response, error => {
-      if (isAxiosError(error) && error.response?.status === 401 && !isPublicAuthRequest(error.config?.url)) {
+      if (isAxiosError(error) && error.response?.status === 401) {
         this.expire((error.config as SessionRequest | undefined)?.sessionRevision);
       }
       return Promise.reject(error);
@@ -89,19 +114,21 @@ export class AuthSession {
       token: null, user: null, loading: false, sessionError: null,
       sessionNotice: "Your session has expired. Please sign in again.",
     });
-    // This credential is already invalid on the server, even if local removal fails.
-    void this.persist(null).catch(() => {});
+    void this.signOutFromCognito().catch(() => {});
   }
 
   restore = async () => {
     const revision = ++this.revision;
     this.update({ loading: true, sessionError: null });
     try {
-      await this.storageWrites;
-      const token = await this.storage.getToken();
+      const identity = await this.auth.getSession();
       if (revision !== this.revision) return false;
-      this.update({ token, user: null });
-      return token ? await this.refreshUser() : false;
+      if (!identity) {
+        this.update({ token: null, user: null });
+        return false;
+      }
+      this.update({ token: identity.token, user: null });
+      return await this.fetchUser(revision, identity);
     } catch {
       if (revision === this.revision) {
         this.update({ sessionError: "Couldn't restore your saved sign-in. Please try again." });
@@ -117,7 +144,7 @@ export class AuthSession {
     const revision = this.revision;
     if (this.refresh?.revision === revision) return this.refresh.promise;
 
-    const promise = this.fetchUser(revision);
+    const promise = this.refreshSession(revision);
     this.refresh = { revision, promise };
     void promise.finally(() => {
       if (this.refresh?.promise === promise) this.refresh = null;
@@ -125,11 +152,36 @@ export class AuthSession {
     return promise;
   };
 
-  private async fetchUser(revision: number) {
+  private async refreshSession(revision: number) {
     try {
-      const response = await this.client.get<User>("/users/me", { timeout: AUTH_TIMEOUT });
+      const identity = await this.auth.getSession(true);
       if (revision !== this.revision) return false;
-      this.update({ user: response.data, sessionError: null, sessionNotice: null });
+      if (!identity) {
+        this.expire(revision);
+        return false;
+      }
+      this.update({ token: identity.token });
+      return await this.fetchUser(revision, identity);
+    } catch {
+      if (revision === this.revision) {
+        this.update({ sessionError: "Couldn't refresh your account. Your sign-in is saved. Please try again." });
+      }
+      return false;
+    }
+  }
+
+  private async fetchUser(revision: number, identity: CognitoIdentity) {
+    try {
+      const [profile, entitlement] = await Promise.all([
+        this.client.get<ProfileResponse>("/me", { timeout: AUTH_TIMEOUT }),
+        this.client.get<EntitlementResponse>("/entitlements", { timeout: AUTH_TIMEOUT }),
+      ]);
+      if (revision !== this.revision) return false;
+      this.update({
+        user: userFromProfile(profile.data, identity, entitlement.data),
+        sessionError: null,
+        sessionNotice: null,
+      });
       return true;
     } catch (error) {
       if (revision !== this.revision) return false;
@@ -142,42 +194,44 @@ export class AuthSession {
     }
   }
 
-  private async acceptAuth(response: AuthResponse, expectedRevision: number) {
-    if (expectedRevision !== this.revision) throw new Error("The sign-in attempt is no longer current.");
+  login = async (email: string, password: string) => {
+    await this.signOutPending;
+    const expectedRevision = this.revision;
+    const identity = await this.auth.signIn(email, password);
+    if (expectedRevision !== this.revision) {
+      await this.signOutFromCognito();
+      throw new Error("The sign-in attempt is no longer current.");
+    }
     const revision = ++this.revision;
     this.update({
-      token: response.token, user: response.user, loading: false,
+      token: identity.token, user: null, loading: true,
       sessionError: null, sessionNotice: null,
     });
     try {
-      await this.persist(response.token);
-    } catch (error) {
-      if (revision === this.revision) {
-        this.revision++;
-        this.update({ token: null, user: null, sessionNotice: "Couldn't save your sign-in. Please try again." });
+      if (!await this.fetchUser(revision, identity)) {
+        throw new Error("The account profile could not be loaded.");
       }
-      throw error;
+    } finally {
+      if (revision === this.revision) this.update({ loading: false });
     }
-  }
-
-  login = async (email: string, password: string) => {
-    const revision = this.revision;
-    const response = await this.client.post<AuthResponse>("/users/login", { email, password }, { timeout: AUTH_TIMEOUT });
-    await this.acceptAuth(response.data, revision);
   };
 
-  register = async (username: string, email: string, password: string, bodyType: "BOY" | "GIRL") => {
-    const revision = this.revision;
-    const response = await this.client.post<AuthResponse>("/users/register", { username, email, password, bodyType }, { timeout: AUTH_TIMEOUT });
-    await this.acceptAuth(response.data, revision);
+  register = (
+    displayName: string,
+    email: string,
+    password: string,
+    _bodyType: "BOY" | "GIRL",
+  ): Promise<RegistrationStep> => this.auth.signUp(displayName, email, password);
+
+  confirmRegistration = async (email: string, confirmationCode: string, password: string) => {
+    await this.auth.confirmSignUp(email, confirmationCode);
+    await this.login(email, password);
   };
 
   logout = async () => {
-    const revision = ++this.revision;
-    await this.persist(null);
-    if (revision === this.revision) {
-      this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null });
-    }
+    await this.signOutFromCognito();
+    this.revision++;
+    this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null });
   };
 
   retrySession = () => this.state.token ? this.refreshUser() : this.restore();
