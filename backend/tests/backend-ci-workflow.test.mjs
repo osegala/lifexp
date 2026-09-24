@@ -7,6 +7,7 @@ const repository = fileURLToPath(new URL("../../", import.meta.url));
 const workflow = readFileSync(`${repository}/.github/workflows/backend-ci.yml`, "utf8");
 const localValidation = workflow.match(/^  local-validation:[\s\S]*?(?=^  deployed-dev-read-only:)/m)?.[0] ?? "";
 const deployedIntegration = workflow.match(/^  deployed-dev-read-only:[\s\S]*$/m)?.[0] ?? "";
+const deployedIntegrationCondition = deployedIntegration.match(/^    if: >-\n([\s\S]*?)(?=^    runs-on:)/m)?.[1] ?? "";
 
 test("backend CI runs local validation for pushes, pull requests, and manual dispatch", () => {
     assert.match(workflow, /^on:\n[\s\S]*?^  push:/m);
@@ -37,8 +38,10 @@ test("deployed integration uses OIDC, environment secrets, and read-only mode", 
     assert.match(deployedIntegration, /EVRENTHIA_TEST_EMAIL: \$\{\{ secrets\.EVRENTHIA_TEST_EMAIL \}\}/);
     assert.match(deployedIntegration, /EVRENTHIA_TEST_PASSWORD: \$\{\{ secrets\.EVRENTHIA_TEST_PASSWORD \}\}/);
     assert.match(deployedIntegration, /run: node scripts\/integration-test-dev\.mjs --read-only/);
-    assert.match(deployedIntegration, /github\.event_name == 'workflow_dispatch'/);
-    assert.match(deployedIntegration, /github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
+    assert.doesNotMatch(deployedIntegrationCondition, /EVRENTHIA_DEV_CI_ROLE_ARN/);
+    assert.match(deployedIntegrationCondition, /github\.event_name == 'workflow_dispatch'/);
+    assert.match(deployedIntegrationCondition, /github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
+    assert.doesNotMatch(deployedIntegrationCondition, /pull_request/);
 });
 
 test("backend CI contains no deployment, mutating integration, or long-lived AWS credentials", () => {

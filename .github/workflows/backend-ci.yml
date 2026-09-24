@@ -74,9 +74,8 @@ jobs:
     name: Deployed DEV read-only integration
     needs: local-validation
     if: >-
-      vars.EVRENTHIA_DEV_CI_ROLE_ARN != '' &&
-      (github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     environment: dev
     permissions:
