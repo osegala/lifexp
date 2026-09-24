@@ -21,8 +21,8 @@ test("backend CI runs local validation for pushes, pull requests, and manual dis
     assert.match(localValidation, /\[ -d "\$dir" \] \|\| continue/);
     assert.match(localValidation, /find "\$dir"[\s\S]*?node --check "\$file"/);
     assert.match(localValidation, /run: node --test/);
-    assert.match(localValidation, /run: sam validate --lint/);
-    assert.match(localValidation, /run: sam build/);
+    assert.match(localValidation, /run: sam validate --lint --template-file template\.yaml/);
+    assert.match(localValidation, /run: sam build --template-file template\.yaml/);
     assert.match(workflow, /group: backend-ci-\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}/);
     assert.match(workflow, /cancel-in-progress: true/);
 });

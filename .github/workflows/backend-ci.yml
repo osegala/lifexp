@@ -65,10 +65,10 @@ jobs:
         run: node --test
 
       - name: Validate SAM template
-        run: sam validate --lint
+        run: sam validate --lint --template-file template.yaml
 
       - name: Build SAM application
-        run: sam build
+        run: sam build --template-file template.yaml
 
   deployed-dev-read-only:
     name: Deployed DEV read-only integration
