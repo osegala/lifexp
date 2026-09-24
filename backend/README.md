@@ -1,8 +1,8 @@
 # Evrenthia SAM backend
 
-This directory contains the isolated repository-managed development backend. The development stack is `evrenthia-dev` in `us-east-2`.
+This directory contains the repository-managed backend template for isolated environment stacks. The existing development stack is `evrenthia-dev` in `us-east-2`; the reserved production configuration targets a separate future `evrenthia-prod` stack.
 
-When deployed, the stack owns its development DynamoDB table, Cognito user pool, public app client, CreateProfile trigger, HTTP API, and Lambda functions. The separately managed existing backend remains independent and is not imported, modified, copied, or deleted.
+Each stack owns its DynamoDB table, Cognito user pool, public app client, CreateProfile trigger, HTTP API, Lambda functions, logs, alarms, dashboard, and budget. No configuration imports, modifies, or copies another environment's users or data.
 
 ## Structure
 
@@ -14,7 +14,7 @@ When deployed, the stack owns its development DynamoDB table, Cognito user pool,
 - `shared/` — small canonical helpers for auth, dates, DynamoDB values, leveling, and responses
 - `seeds/` — explicit, local-only catalog data and seed command
 - `tests/` — Node test runner regression tests
-- `samconfig.toml` — current development deployment defaults
+- `samconfig.toml` — separate development and production deployment parameters
 
 Each function currently has its own `CodeUri`. Cross-function runtime logic therefore uses explicit SAM layers; repository-only helpers under `shared/` are not imported by Lambda artifacts.
 
@@ -23,8 +23,8 @@ Each function currently has its own `CodeUri`. Cross-function runtime logic ther
 Run from `backend/`:
 
 ```sh
-sam validate --lint
-sam build
+sam validate --lint --template-file template.yaml
+sam build --template-file template.yaml
 node --test
 ```
 
@@ -79,7 +79,7 @@ The deployed DEV read-only job runs only after local validation on pushes to `ma
 Configure GitHub as follows:
 
 1. In **Repository Settings → Environments → dev**, add environment secrets `EVRENTHIA_TEST_EMAIL` and `EVRENTHIA_TEST_PASSWORD`. Optional deployment reviewers can gate manual access to this environment.
-2. In **Repository Settings → Secrets and variables → Actions → Variables**, add `EVRENTHIA_DEV_CI_ROLE_ARN` with the ARN of `Evrenthia-Dev-GitHub-CI`. The job is skipped until this repository variable exists.
+2. In **Repository Settings → Environments → dev → Environment variables**, add `EVRENTHIA_DEV_CI_ROLE_ARN` with the ARN of `Evrenthia-Dev-GitHub-CI`.
 3. In AWS, configure GitHub's OIDC provider and restrict the role trust policy to this repository, audience `sts.amazonaws.com`, and the `dev` environment subject. The workflow requests only `contents: read` and `id-token: write`, then exchanges the GitHub OIDC token for short-lived role credentials. Do not create or store AWS access keys.
 
 The read-only runner makes exactly one IAM-authorized AWS application call: `cloudformation:DescribeStacks` for `evrenthia-dev`. The role's identity policy can therefore be limited to:
@@ -116,8 +116,11 @@ The template accepts:
 
 - `EnvironmentName` — logical environment name; current value is `dev`
 - `FunctionNamePrefix` — physical resource prefix; current value is `Evrenthia-Dev`
+- `LogRetentionDays` — environment-specific CloudWatch Logs retention; dev uses 14 and prod is configured for 30
+- `PushDeliveryMode` — `DRY_RUN` or `LIVE`; the template and both environment configs default explicitly to `DRY_RUN`
+- `BudgetNotificationEmail` — optional budget subscriber; empty by default
 
-The stack creates the `Evrenthia-Dev` table from `FunctionNamePrefix`. Every Lambda receives that table through `TABLE_NAME`, and every DynamoDB policy references the managed table ARN. The HTTP authorizer resolves its issuer and audience from the stack-owned Cognito pool and client.
+The stack creates its table from `FunctionNamePrefix`. Every Lambda receives that table through `TABLE_NAME`, every DynamoDB policy references the managed table ARN, and the HTTP authorizer resolves its issuer and audience from the same stack's Cognito pool and client. Physical Lambda, layer, log-group, EventBridge-rule, alarm, dashboard, and budget names also use the prefix. CloudFormation logical IDs retain `Dev` solely to avoid replacing existing development resources; they do not control physical production names.
 
 A normal development deployment command is:
 
@@ -133,7 +136,46 @@ To create a reviewable CloudFormation change set without executing it:
 sam deploy --config-env default --no-execute-changeset
 ```
 
-This repository does not define or create production resources.
+The `[prod]` SAM configuration reserves stack `evrenthia-prod`, prefix/table `Evrenthia-Prod`, region `us-east-2`, 30-day log retention, and `DRY_RUN` notifications. It contains no AWS profile or credentials; a future operator must deliberately select approved production credentials through local SSO/profile configuration or another short-lived credential source.
+
+## Production deployment checklist
+
+Production deployment is not performed or automated by this repository phase. The following is documentation for a future deliberate production release:
+
+1. Review `git status --short` and confirm the intended revision is clean and reviewed.
+2. From `backend/`, run `node --test`.
+3. Run `sam validate --lint --config-env prod --template-file template.yaml`.
+4. Run `sam build --config-env prod --template-file template.yaml`.
+5. Review `[prod.deploy.parameters]`, especially `EnvironmentName=prod`, `FunctionNamePrefix=Evrenthia-Prod`, `LogRetentionDays=30`, `PushDeliveryMode=DRY_RUN`, the region, budget email, alarm thresholds, and schedule.
+6. **Documentation only—do not run during repository preparation:** use `sam deploy --config-env prod --no-execute-changeset` to create a reviewable production change set without executing it. Do not approve unexpected changes.
+7. Verify every proposed table, function, layer, log group, schedule, alarm, dashboard, and budget name is production-specific.
+8. Verify the change set creates a new Cognito pool and app client and references no development IDs or users.
+9. Verify it creates the separate `Evrenthia-Prod` DynamoDB table and contains no import or data-copy resource.
+10. Verify `NotificationWorker` receives `PUSH_DELIVERY_MODE=DRY_RUN` before any execution is approved.
+11. After the backend is verified, preview only the static catalog seed with `node seeds/seed-catalogs.mjs --table Evrenthia-Prod --region us-east-2 --profile <production-profile>`. Inspect the cosmetics, achievements, and buildings counts before a separately approved `--write`; never seed profiles, tasks, history, devices, reminders, entitlements, or test records.
+12. Only after the production Cognito pool exists, deliberately create a dedicated production smoke-test account. Do not copy or reuse the development integration user. Supply its credentials through `EVRENTHIA_PROD_TEST_EMAIL` and `EVRENTHIA_PROD_TEST_PASSWORD` locally, or future protected production GitHub environment secrets, then manually run `node scripts/integration-test-prod.mjs --read-only`. The runner never creates users or performs writes.
+13. Reconnect the production mobile configuration only after the API URL, new Cognito pool/client, table, notification mode, and read-only smoke-test results are verified.
+
+The generic `ApiUrl`, `TableName`, `UserPoolId`, and `UserPoolClientId` outputs support future production verification. Existing `Dev*` output aliases remain only for backward compatibility with the green development integration runner.
+
+AWS Budgets are account-wide. Although the production budget name resolves separately as `Evrenthia-Prod-Monthly-10-USD`, without activated cost-allocation tags or a separate AWS account it observes total account cost rather than only production resources. Review whether the $10 limit and notifications are appropriate before deployment.
+
+### Production read-only smoke test
+
+`scripts/integration-test-prod.mjs` is reserved for manual use after `evrenthia-prod` and its dedicated smoke-test account exist. It accepts no mutation mode and calls only GET endpoints: profile, tasks, goals, aggregate and completion history, achievements, shop, inventory, world, entitlements, preferences, devices, and reminders. Empty/default account state and unseeded catalogs are valid.
+
+The runner uses CloudFormation only to describe `evrenthia-prod`, then requires generic outputs for `Evrenthia-Prod`, the production API, a new regional Cognito pool/client, and production-prefixed Lambda names. It rejects development or unknown stacks and known non-production Cognito resources. Cognito authentication uses the supplied account credentials; passwords, ID tokens, and authorization headers are redacted and never printed. `EVRENTHIA_PROD_AWS_PROFILE` may select an approved local production profile; when omitted, AWS CLI ambient credentials are used.
+
+Example for future manual use only, after production exists:
+
+```sh
+EVRENTHIA_PROD_TEST_EMAIL="smoke-account@example.com" \
+EVRENTHIA_PROD_TEST_PASSWORD="supply-securely" \
+EVRENTHIA_PROD_AWS_PROFILE="approved-production-profile" \
+node scripts/integration-test-prod.mjs --read-only
+```
+
+Do not run this runner to create the account, seed catalogs, or prepare data. No production CI job is configured; if one is added later, store credentials in a protected production GitHub environment and retain the read-only-only contract.
 
 ## Managed development resources
 

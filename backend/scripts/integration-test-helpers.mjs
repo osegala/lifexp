@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 
 const DEV_SEGMENT = /(?:^|[-_])dev(?:elopment)?(?:$|[-_])/i;
 const SENSITIVE_KEY = /authorization|cookie|password|secret|token/i;
+const KNOWN_NON_PROD_USER_POOLS = new Set(["us-east-2_GeLguitkg", "us-east-2_dP7c0zZRQ"]);
+const KNOWN_NON_PROD_CLIENTS = new Set(["2d934f22a9lvbppn6m9liistj", "6bns1m2f43bkps266bjsirha2r"]);
 
 export class IntegrationAssertionError extends Error {}
 
@@ -9,6 +11,11 @@ export function resolveAwsProfile(environment = {}) {
     const configured = environment.EVRENTHIA_AWS_PROFILE;
     if (configured !== undefined) return configured.trim() || null;
     return environment.GITHUB_ACTIONS === "true" ? null : "evrenthia-admin";
+}
+
+export function resolveProdAwsProfile(environment = {}) {
+    const configured = environment.EVRENTHIA_PROD_AWS_PROFILE;
+    return configured?.trim() || null;
 }
 
 export function cognitoAuthArgs({ region, clientId, email, password, profile }) {
@@ -125,6 +132,38 @@ export function assertDevTarget({ stackName, tableName, apiUrl, region, function
         throw new Error("Refusing stack outputs without development-scoped Lambda names.");
     }
     return true;
+}
+
+export function assertProdTarget({ stackName, tableName, apiUrl, region, userPoolId, clientId, functionNames = [] }) {
+    if (stackName !== "evrenthia-prod") throw new Error("Refusing stack other than evrenthia-prod.");
+    if (tableName !== "Evrenthia-Prod") throw new Error("Refusing table other than Evrenthia-Prod.");
+
+    let parsedApi;
+    try {
+        parsedApi = new URL(apiUrl);
+    } catch {
+        throw new Error("Refusing invalid API URL.");
+    }
+    const expectedSuffix = `.execute-api.${region}.amazonaws.com`;
+    if (parsedApi.protocol !== "https:" || !parsedApi.hostname.endsWith(expectedSuffix)) {
+        throw new Error("Refusing API URL that does not match the production region.");
+    }
+    if (!functionNames.length || functionNames.some((name) => !name?.startsWith("Evrenthia-Prod-"))) {
+        throw new Error("Refusing stack outputs without production-scoped Lambda names.");
+    }
+    if (typeof userPoolId !== "string" || !userPoolId.startsWith(`${region}_`) || KNOWN_NON_PROD_USER_POOLS.has(userPoolId)) {
+        throw new Error("Refusing non-production Cognito user pool.");
+    }
+    if (typeof clientId !== "string" || !clientId || KNOWN_NON_PROD_CLIENTS.has(clientId)) {
+        throw new Error("Refusing non-production Cognito app client.");
+    }
+    return true;
+}
+
+export function parseReadOnlyArgs(argv = []) {
+    const unknown = argv.filter((argument) => argument !== "--read-only");
+    if (unknown.length) throw new Error("Production smoke tests accept only read-only mode.");
+    return "read-only";
 }
 
 export class CleanupStack {

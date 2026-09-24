@@ -1,11 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { loadSeedItems } from "../seeds/seed-catalogs.mjs";
 
+const repository = fileURLToPath(new URL("../../", import.meta.url));
 const backend = fileURLToPath(new URL("../", import.meta.url));
 const template = readFileSync(`${backend}/template.yaml`, "utf8");
 const samconfig = readFileSync(`${backend}/samconfig.toml`, "utf8");
+const workflows = readdirSync(`${repository}/.github/workflows`)
+    .filter((name) => /\.ya?ml$/.test(name))
+    .map((name) => readFileSync(`${repository}/.github/workflows/${name}`, "utf8"))
+    .join("\n");
+
+function configSection(name) {
+    const marker = `[${name}]`;
+    const start = samconfig.indexOf(marker);
+    assert.notEqual(start, -1, name);
+    const remainder = samconfig.slice(start + marker.length);
+    const next = remainder.search(/\n\[[^\]]+\]/);
+    return next < 0 ? remainder : remainder.slice(0, next);
+}
 
 test("template creates and references the isolated development table", () => {
     assert.match(template, /EvrenthiaDevTable:\n    Type: AWS::DynamoDB::Table/);
@@ -34,8 +49,9 @@ function resourceBlock(name) {
     return marker + (next < 0 ? remainder : remainder.slice(0, next));
 }
 
-test("all Lambda log groups use standard names and 14-day development retention", () => {
+test("all Lambda log groups use environment-scoped names and retention", () => {
     assert.match(template, /LoggingConfig:\n\s+LogFormat: JSON\n\s+ApplicationLogLevel: INFO\n\s+SystemLogLevel: WARN/);
+    assert.match(template, /LogRetentionDays:[\s\S]*?Default: 14[\s\S]*?Description: CloudWatch Logs retention period/);
     const functions = [
         "CreateProfile", "GetMe", "GetEntitlements", "GetPreferences", "UpdatePreferences",
         "GetDevices", "RegisterDevice", "DisableDevice", "GetReminders", "CreateReminder",
@@ -48,12 +64,12 @@ test("all Lambda log groups use standard names and 14-day development retention"
     for (const name of functions) {
         const block = resourceBlock(`${name}LogGroup`);
         assert.match(block, new RegExp(`Fn::Sub: "/aws/lambda/\\$\\{FunctionNamePrefix\\}-${name}"`), name);
-        assert.match(block, /RetentionInDays: 14/, name);
+        assert.match(block, /RetentionInDays:\n\s+Ref: LogRetentionDays/, name);
         assert.match(block, /DeletionPolicy: Retain/, name);
     }
 });
 
-test("development alarms cover API, critical Lambdas, and DynamoDB throttling", () => {
+test("environment-scoped alarms cover API, critical Lambdas, and DynamoDB throttling", () => {
     const lambdaAlarms = [
         ["CompleteTaskErrorsAlarm", "CompleteTaskFunction"],
         ["PurchaseItemErrorsAlarm", "PurchaseItemFunction"],
@@ -62,6 +78,7 @@ test("development alarms cover API, critical Lambdas, and DynamoDB throttling", 
         ["CreateProfileErrorsAlarm", "CreateProfileFunction"]
     ];
     const api = resourceBlock("Api5xxAlarm");
+    assert.match(api, /AlarmName:\n\s+Fn::Sub: "\$\{FunctionNamePrefix\}-Api-5XX"/);
     assert.match(api, /Namespace: AWS\/ApiGateway/);
     assert.match(api, /MetricName: 5xx/);
     assert.match(api, /Name: ApiId[\s\S]*?Ref: EvrenthiaDevApi/);
@@ -70,6 +87,7 @@ test("development alarms cover API, critical Lambdas, and DynamoDB throttling", 
 
     for (const [alarm, fn] of lambdaAlarms) {
         const block = resourceBlock(alarm);
+        assert.match(block, /AlarmName:\n\s+Fn::Sub: "\$\{FunctionNamePrefix\}-/);
         assert.match(block, /Namespace: AWS\/Lambda/);
         assert.match(block, /MetricName: Errors/);
         assert.match(block, new RegExp(`Ref: ${fn}`));
@@ -77,6 +95,7 @@ test("development alarms cover API, critical Lambdas, and DynamoDB throttling", 
     }
 
     const dynamo = resourceBlock("DynamoDbThrottleAlarm");
+    assert.match(dynamo, /AlarmName:\n\s+Fn::Sub: "\$\{FunctionNamePrefix\}-DynamoDB-ThrottledRequests"/);
     assert.match(dynamo, /Namespace: AWS\/DynamoDB/);
     assert.match(dynamo, /MetricName: ThrottledRequests/);
     assert.match(dynamo, /Ref: EvrenthiaDevTable/);
@@ -85,7 +104,7 @@ test("development alarms cover API, critical Lambdas, and DynamoDB throttling", 
     assert.doesNotMatch(template, /TreatMissingData: breaching/i);
 });
 
-test("one lightweight development dashboard contains the requested health signals", () => {
+test("one environment-scoped dashboard contains the requested health signals", () => {
     assert.equal((template.match(/Type: AWS::CloudWatch::Dashboard/g) ?? []).length, 1);
     const dashboard = resourceBlock("EvrenthiaDevDashboard");
     assert.match(dashboard, /DashboardName:\n\s+Ref: FunctionNamePrefix/);
@@ -95,10 +114,11 @@ test("one lightweight development dashboard contains the requested health signal
     ]) assert.match(dashboard, new RegExp(signal), signal);
 });
 
-test("development budget is account-wide and conditionally sends 50/80/100 percent alerts", () => {
+test("environment-scoped budget is account-wide and conditionally sends 50/80/100 percent alerts", () => {
     assert.match(template, /BudgetNotificationEmail:[\s\S]*?Default: ""/);
     const budget = resourceBlock("EvrenthiaDevBudget");
     assert.match(budget, /Type: AWS::Budgets::Budget/);
+    assert.match(budget, /BudgetName:\n\s+Fn::Sub: "\$\{FunctionNamePrefix\}-Monthly-10-USD"/);
     assert.match(budget, /Amount: 10\n\s+Unit: USD/);
     assert.match(budget, /BudgetType: COST/);
     assert.deepEqual([...budget.matchAll(/Threshold: (\d+)/g)].map((match) => Number(match[1])), [50, 80, 100]);
@@ -139,12 +159,14 @@ test("preference, device, and reminder routes use JWT auth and least-privilege a
     }
 });
 
-test("one development schedule invokes the notification worker with scoped DynamoDB access", () => {
+test("one environment-scoped schedule invokes the notification worker with safe delivery defaults", () => {
     const block = resourceBlock("NotificationWorkerFunction");
     assert.equal((template.match(/\n\s+Type: Schedule\n/g) ?? []).length, 1);
     assert.match(block, /CodeUri: functions\/notification-worker\//);
-    assert.match(block, /PUSH_DELIVERY_MODE: DRY_RUN/);
+    assert.match(template, /PushDeliveryMode:[\s\S]*?Default: DRY_RUN[\s\S]*?AllowedValues:\n\s+- DRY_RUN\n\s+- LIVE/);
+    assert.match(block, /PUSH_DELIVERY_MODE:\n\s+Ref: PushDeliveryMode/);
     assert.match(block, /Type: Schedule/);
+    assert.match(block, /Name:\n\s+Fn::Sub: "\$\{FunctionNamePrefix\}-NotificationWorker-EveryMinute"/);
     assert.match(block, /Schedule: rate\(1 minute\)/);
     assert.match(block, /NotificationDueIndex/);
     assert.doesNotMatch(block, /dynamodb:(?:Scan|DeleteItem)/);
@@ -216,7 +238,7 @@ test("every public API handler receives and imports the canonical API helper lay
     assert.doesNotMatch(resourceBlock("NotificationWorkerFunction"), /ApiSharedLayer/);
 });
 
-test("HTTP authorizer uses the managed development Cognito resources", () => {
+test("HTTP authorizer uses the stack-managed Cognito resources", () => {
     assert.match(template, /EvrenthiaDevUserPool:\n    Type: AWS::Cognito::UserPool/);
     assert.match(template, /EvrenthiaDevUserPoolClient:\n    Type: AWS::Cognito::UserPoolClient/);
     assert.match(template, /PoolId:\n\s+Ref: EvrenthiaDevUserPool/);
@@ -237,6 +259,11 @@ test("normal development configuration does not reference manual resource identi
 
 test("template exports isolated resource identifiers without secrets", () => {
     for (const output of [
+        "ApiUrl",
+        "TableName",
+        "UserPoolId",
+        "UserPoolClientId",
+        "NotificationDeliveryMode",
         "DevApiUrl",
         "DevTableName",
         "DevUserPoolId",
@@ -246,4 +273,41 @@ test("template exports isolated resource identifiers without secrets", () => {
     ]) {
         assert.match(template, new RegExp(`\\n  ${output}:`));
     }
+});
+
+test("development and production SAM configurations are isolated", () => {
+    const dev = configSection("default.deploy.parameters");
+    const prod = configSection("prod.deploy.parameters");
+
+    assert.match(dev, /stack_name = "evrenthia-dev"/);
+    assert.match(dev, /FunctionNamePrefix=\\"Evrenthia-Dev\\"/);
+    assert.match(dev, /LogRetentionDays=\\"14\\"/);
+    assert.match(prod, /stack_name = "evrenthia-prod"/);
+    assert.match(prod, /s3_prefix = "evrenthia-prod"/);
+    assert.match(prod, /region = "us-east-2"/);
+    assert.match(prod, /confirm_changeset = true/);
+    assert.match(prod, /capabilities = "CAPABILITY_IAM"/);
+    assert.match(prod, /EnvironmentName=\\"prod\\"/);
+    assert.match(prod, /FunctionNamePrefix=\\"Evrenthia-Prod\\"/);
+    assert.match(prod, /LogRetentionDays=\\"30\\"/);
+    assert.match(prod, /PushDeliveryMode=\\"DRY_RUN\\"/);
+    assert.doesNotMatch(prod, /profile\s*=|Evrenthia-Dev|evrenthia-dev/);
+});
+
+test("production uses stack-owned data and identity resources without test users", () => {
+    const productionConfiguration = `${template}\n${configSection("prod.deploy.parameters")}`;
+    assert.match(template, /TableName:\n\s+Ref: FunctionNamePrefix/);
+    assert.match(template, /EvrenthiaDevUserPool:\n\s+Type: AWS::Cognito::UserPool/);
+    assert.match(template, /EvrenthiaDevUserPoolClient:\n\s+Type: AWS::Cognito::UserPoolClient/);
+    assert.doesNotMatch(template, /AWS::Cognito::UserPoolUser/);
+    assert.doesNotMatch(productionConfiguration, /us-east-2_GeLguitkg|2d934f22a9lvbppn6m9liistj/);
+});
+
+test("production catalog seeding contains only static catalog records", () => {
+    const allowedCatalogs = new Set(["CATALOG#COSMETICS", "CATALOG#ACHIEVEMENTS", "CATALOG#BUILDINGS"]);
+    assert.equal(loadSeedItems().every((item) => allowedCatalogs.has(item.PK)), true);
+});
+
+test("GitHub workflows contain no automatic production deployment", () => {
+    assert.doesNotMatch(workflows, /evrenthia-prod|Evrenthia-Prod|sam deploy|cloudformation deploy/);
 });

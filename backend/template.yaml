@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 
-Description: Evrenthia development backend
+Description: Evrenthia backend for isolated environment stacks
 
 # ======================================================
 # PARAMETERS
@@ -17,14 +17,40 @@ Parameters:
   FunctionNamePrefix:
     Type: String
     Default: Evrenthia-Dev
-    Description: Physical development resource prefix; the default preserves existing Lambda names.
+    Description: Physical resource prefix; the default preserves existing development names.
+
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues:
+      - 1
+      - 3
+      - 5
+      - 7
+      - 14
+      - 30
+      - 60
+      - 90
+      - 120
+      - 150
+      - 180
+      - 365
+    Description: CloudWatch Logs retention period for this environment.
+
+  PushDeliveryMode:
+    Type: String
+    Default: DRY_RUN
+    AllowedValues:
+      - DRY_RUN
+      - LIVE
+    Description: Notification delivery mode; DRY_RUN is the safe default for every environment.
 
   BudgetNotificationEmail:
     Type: String
     Default: ""
     AllowedPattern: '^$|^[^@\s]+@[^@\s]+\.[^@\s]+$'
     ConstraintDescription: Must be empty or a valid email address.
-    Description: Optional email subscriber for development budget alerts; no address is hardcoded.
+    Description: Optional email subscriber for this environment's account-wide budget alerts.
 
 Conditions:
   HasBudgetNotificationEmail:
@@ -67,7 +93,8 @@ Globals:
 
 Resources:
   # ----------------------------------------------------
-  # ISOLATED DEVELOPMENT DATA AND IDENTITY
+  # ISOLATED ENVIRONMENT DATA AND IDENTITY
+  # Logical IDs retain Dev for compatibility with the existing development stack.
   # ----------------------------------------------------
 
   EvrenthiaDevTable:
@@ -146,7 +173,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-CreateProfile"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetMeLogGroup:
     Type: AWS::Logs::LogGroup
@@ -155,7 +183,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetMe"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetEntitlementsLogGroup:
     Type: AWS::Logs::LogGroup
@@ -164,7 +193,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetEntitlements"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetPreferencesLogGroup:
     Type: AWS::Logs::LogGroup
@@ -173,7 +203,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetPreferences"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   UpdatePreferencesLogGroup:
     Type: AWS::Logs::LogGroup
@@ -182,7 +213,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UpdatePreferences"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetDevicesLogGroup:
     Type: AWS::Logs::LogGroup
@@ -191,7 +223,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetDevices"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   RegisterDeviceLogGroup:
     Type: AWS::Logs::LogGroup
@@ -200,7 +233,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-RegisterDevice"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   DisableDeviceLogGroup:
     Type: AWS::Logs::LogGroup
@@ -209,7 +243,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-DisableDevice"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetRemindersLogGroup:
     Type: AWS::Logs::LogGroup
@@ -218,7 +253,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetReminders"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   CreateReminderLogGroup:
     Type: AWS::Logs::LogGroup
@@ -227,7 +263,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-CreateReminder"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   UpdateReminderLogGroup:
     Type: AWS::Logs::LogGroup
@@ -236,7 +273,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UpdateReminder"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   DeleteReminderLogGroup:
     Type: AWS::Logs::LogGroup
@@ -245,7 +283,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-DeleteReminder"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   NotificationWorkerLogGroup:
     Type: AWS::Logs::LogGroup
@@ -254,7 +293,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-NotificationWorker"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetTasksLogGroup:
     Type: AWS::Logs::LogGroup
@@ -263,7 +303,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetTasks"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   CreateTaskLogGroup:
     Type: AWS::Logs::LogGroup
@@ -272,7 +313,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-CreateTask"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   UpdateTaskLogGroup:
     Type: AWS::Logs::LogGroup
@@ -281,7 +323,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UpdateTask"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   DeleteTaskLogGroup:
     Type: AWS::Logs::LogGroup
@@ -290,7 +333,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-DeleteTask"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   CompleteTaskLogGroup:
     Type: AWS::Logs::LogGroup
@@ -299,7 +343,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-CompleteTask"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetGoalsLogGroup:
     Type: AWS::Logs::LogGroup
@@ -308,7 +353,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetGoals"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetHistoryLogGroup:
     Type: AWS::Logs::LogGroup
@@ -317,7 +363,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetHistory"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetCompletionHistoryLogGroup:
     Type: AWS::Logs::LogGroup
@@ -326,7 +373,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetCompletionHistory"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetAchievementsLogGroup:
     Type: AWS::Logs::LogGroup
@@ -335,7 +383,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetAchievements"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetWorldLogGroup:
     Type: AWS::Logs::LogGroup
@@ -344,7 +393,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetWorld"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   UpgradeBuildingLogGroup:
     Type: AWS::Logs::LogGroup
@@ -353,7 +403,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UpgradeBuilding"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetShopLogGroup:
     Type: AWS::Logs::LogGroup
@@ -362,7 +413,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetShop"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   PurchaseItemLogGroup:
     Type: AWS::Logs::LogGroup
@@ -371,7 +423,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-PurchaseItem"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   GetInventoryLogGroup:
     Type: AWS::Logs::LogGroup
@@ -380,7 +433,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetInventory"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   EquipItemLogGroup:
     Type: AWS::Logs::LogGroup
@@ -389,7 +443,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-EquipItem"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   UnequipItemLogGroup:
     Type: AWS::Logs::LogGroup
@@ -398,7 +453,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UnequipItem"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   UpdateMeLogGroup:
     Type: AWS::Logs::LogGroup
@@ -407,7 +463,8 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-UpdateMe"
-      RetentionInDays: 14
+      RetentionInDays:
+        Ref: LogRetentionDays
 
   EvrenthiaDevUserPool:
     Type: AWS::Cognito::UserPool
@@ -932,7 +989,8 @@ Resources:
         - Ref: NotificationSharedLayer
       Environment:
         Variables:
-          PUSH_DELIVERY_MODE: DRY_RUN
+          PUSH_DELIVERY_MODE:
+            Ref: PushDeliveryMode
           NOTIFICATION_BATCH_SIZE: "25"
       Policies:
         - Version: "2012-10-17"
@@ -965,7 +1023,7 @@ Resources:
           Properties:
             Name:
               Fn::Sub: "${FunctionNamePrefix}-NotificationWorker-EveryMinute"
-            Description: Development notification worker tick for the isolated Evrenthia backend.
+            Description: Notification worker tick for this isolated Evrenthia environment.
             Schedule: rate(1 minute)
             Enabled: true
 
@@ -1593,7 +1651,7 @@ Resources:
               Authorizer: EvrenthiaCognito
 
   # ----------------------------------------------------
-  # LOW-COST DEVELOPMENT OBSERVABILITY
+  # LOW-COST ENVIRONMENT OBSERVABILITY
   # ----------------------------------------------------
 
   Api5xxAlarm:
@@ -1872,28 +1930,48 @@ Resources:
 
 Outputs:
   ApiUrl:
-    Description: Evrenthia development API URL
+    Description: Evrenthia HTTP API URL
 
     Value:
       Fn::Sub: "https://${EvrenthiaDevApi}.execute-api.${AWS::Region}.amazonaws.com"
 
+  TableName:
+    Description: Managed DynamoDB table name
+    Value:
+      Ref: EvrenthiaDevTable
+
+  UserPoolId:
+    Description: Managed Cognito user pool ID
+    Value:
+      Ref: EvrenthiaDevUserPool
+
+  UserPoolClientId:
+    Description: Managed Cognito app client ID
+    Value:
+      Ref: EvrenthiaDevUserPoolClient
+
+  NotificationDeliveryMode:
+    Description: Configured notification delivery mode
+    Value:
+      Ref: PushDeliveryMode
+
   DevApiUrl:
-    Description: Isolated development HTTP API URL
+    Description: Backward-compatible development tooling alias for ApiUrl
     Value:
       Fn::Sub: "https://${EvrenthiaDevApi}.execute-api.${AWS::Region}.amazonaws.com"
 
   DevTableName:
-    Description: Isolated development DynamoDB table name
+    Description: Backward-compatible development tooling alias for TableName
     Value:
       Ref: EvrenthiaDevTable
 
   DevUserPoolId:
-    Description: Isolated development Cognito user pool ID
+    Description: Backward-compatible development tooling alias for UserPoolId
     Value:
       Ref: EvrenthiaDevUserPool
 
   DevUserPoolClientId:
-    Description: Isolated development Cognito app client ID
+    Description: Backward-compatible development tooling alias for UserPoolClientId
     Value:
       Ref: EvrenthiaDevUserPoolClient
 
