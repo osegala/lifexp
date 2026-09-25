@@ -714,6 +714,14 @@ export function isCosmeticAssetRegistered(assetKey: string) {
   return Boolean(COSMETIC_ASSETS[assetKey]);
 }
 
+export function getCosmeticAssetMetadata(assetKey: string) {
+  const definition = COSMETIC_ASSETS[assetKey];
+  return definition ? {
+    slot: definition.slot,
+    fullOutfit: definition.sprites?.some((sprite) => sprite.fullOutfit) ?? false,
+  } : null;
+}
+
 export const DEFAULT_CHARACTER_SPRITES = [
   ...(COSMETIC_ASSETS["avatar-v2/hair/windblown-layers"].sprites ?? []),
   ...TRAVELER_TROUSERS_SPRITES,

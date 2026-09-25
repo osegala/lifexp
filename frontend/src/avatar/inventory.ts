@@ -2,8 +2,10 @@ import type {
   Avatar,
   Cosmetic,
   CosmeticType,
+  EquipmentSlot,
   InventoryResponse,
 } from "../types/avatar";
+import type { ShopItem, ShopResponse } from "../types";
 
 const CATEGORY_TYPES: Record<string, CosmeticType> = {
   tunic: "TOP",
@@ -33,36 +35,26 @@ export function avatarAssetKey(assetKey: string | null) {
   return assetKey ? LOCAL_ASSET_KEYS[assetKey] ?? assetKey : "";
 }
 
-export function inventoryCosmetics(
-  inventory: InventoryResponse,
-  isAssetRegistered: (assetKey: string) => boolean = () => true,
-  reportUnresolved?: (itemId: string, assetKey: string) => void,
-): Cosmetic[] {
-  return inventory.items.flatMap((item) => {
-    const type = CATEGORY_TYPES[item.category.toLowerCase()];
-    const imageUrl = avatarAssetKey(item.assetKey);
-    if (!imageUrl || !isAssetRegistered(imageUrl)) {
-      reportUnresolved?.(item.itemId, imageUrl);
-    }
-    return type
-      ? [{
-          id: item.itemId,
-          name: item.name,
-          type,
-          requiredLevel: 1,
-          imageUrl,
-          unlocked: true,
-          equipped: item.equipped,
-        }]
-      : [];
-  });
+export function catalogCosmeticReference(
+  item: Pick<ShopItem, "itemId" | "category" | "assetKey">,
+) {
+  const type = CATEGORY_TYPES[item.category.toLowerCase()];
+  return type ? {
+    id: item.itemId,
+    type,
+    imageUrl: avatarAssetKey(item.assetKey),
+  } : null;
 }
 
 export function wardrobeCosmetics(
+  shop: ShopResponse,
   inventory: InventoryResponse,
   builtInHairIds: readonly string[],
   selectedHairId: string | null,
-  isAssetRegistered?: (assetKey: string) => boolean,
+  assetMetadata: (assetKey: string) => {
+    slot: EquipmentSlot;
+    fullOutfit: boolean;
+  } | null,
   reportUnresolved?: (itemId: string, assetKey: string) => void,
 ): Cosmetic[] {
   const hair = builtInHairIds.map((id) => ({
@@ -71,14 +63,50 @@ export function wardrobeCosmetics(
     type: "HAIR" as const,
     requiredLevel: 1,
     imageUrl: id,
+    owned: true,
     unlocked: true,
     equipped: id === selectedHairId,
+    slot: "hair" as const,
+    fullOutfit: false,
+    shopStatus: "OWNED" as const,
+    requirementText: null,
   }));
+  const ownedById = new Map(inventory.items.map((item) => [item.itemId, item]));
+  const catalog = shop.items.flatMap((item) => {
+    const reference = catalogCosmeticReference(item);
+    if (!reference || reference.type === "HAIR") return [];
+    const metadata = assetMetadata(reference.imageUrl);
+    if (!metadata) reportUnresolved?.(item.itemId, reference.imageUrl);
+    const owned = ownedById.get(item.itemId);
+    return [{
+      ...reference,
+      name: item.name,
+      requiredLevel: item.effectiveRequiredLevel,
+      owned: Boolean(owned),
+      unlocked: Boolean(owned),
+      equipped: owned?.equipped === true,
+      slot: metadata?.slot,
+      fullOutfit: metadata?.fullOutfit ?? false,
+      shopStatus: item.status,
+      requirementText: wardrobeRequirement(item, shop.player.level, Boolean(owned)),
+    }];
+  });
   return [
     ...hair,
-    ...inventoryCosmetics(inventory, isAssetRegistered, reportUnresolved)
-      .filter((cosmetic) => cosmetic.type !== "HAIR"),
+    ...catalog,
   ];
+}
+
+function wardrobeRequirement(item: ShopItem, playerLevel: number, owned: boolean) {
+  if (owned) return null;
+  const requirements = [];
+  if (playerLevel < item.effectiveRequiredLevel) {
+    requirements.push(`Reach level ${item.effectiveRequiredLevel}`);
+  }
+  if (item.requiredAchievement && !item.requirementSatisfied) {
+    requirements.push(`Complete "${item.achievementRequirement?.name ?? item.requiredAchievement}"`);
+  }
+  return requirements.join(" · ") || `Available in the Shop · ${item.effectivePrice} coins`;
 }
 
 export async function loadOptionalAppearance(

@@ -17,10 +17,10 @@ import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
 import {
   getCosmeticAssetIds,
+  getCosmeticAssetMetadata,
   getCosmeticPreviewCrop,
   getCosmeticPreviewSource,
   getEquippedSceneSource,
-  isCosmeticAssetRegistered,
 } from "../../src/avatar/assetRegistry";
 import {
   avatarFromInventory,
@@ -33,6 +33,7 @@ import AvatarRenderer from "../../src/components/AvatarRenderer";
 import LifeCard from "../../src/components/LifeCard";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme/theme";
+import type { ShopResponse } from "../../src/types";
 import { Avatar, Cosmetic, CosmeticId, CosmeticType, InventoryResponse } from "../../src/types/avatar";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -68,17 +69,19 @@ export default function AvatarScreen() {
   const loadAvatarData = useCallback(async () => {
     try {
       setLoading(true);
-      const [inventoryResponse, appearance] = await Promise.all([
+      const [shopResponse, inventoryResponse, appearance] = await Promise.all([
+        api.get<ShopResponse>(apiRoutes.shop),
         api.get<InventoryResponse>(apiRoutes.inventory),
         loadOptionalAppearance(getLocalBodyType, getLocalHairId),
       ]);
       const { bodyType, hairId } = appearance;
       setAvatar(avatarFromInventory(inventoryResponse.data, bodyType, hairId));
       setCosmetics(wardrobeCosmetics(
+        shopResponse.data,
         inventoryResponse.data,
         BUILT_IN_HAIR_IDS,
         hairId,
-        isCosmeticAssetRegistered,
+        getCosmeticAssetMetadata,
         (itemId, assetKey) => {
           if (__DEV__) console.warn(`Unresolved wardrobe asset for ${itemId}: ${assetKey || "<missing>"}`);
         },
@@ -284,7 +287,6 @@ export default function AvatarScreen() {
               cosmetic={cosmetic}
               width={cardWidth}
               loading={loadingId === cosmetic.id}
-              currentLevel={user?.level ?? 1}
               onEquip={toggleCosmetic}
             />
           ))
@@ -298,17 +300,14 @@ function CosmeticCard({
   cosmetic,
   width,
   loading,
-  currentLevel,
   onEquip,
 }: {
   cosmetic: Cosmetic;
   width: number;
   loading: boolean;
-  currentLevel: number;
   onEquip: (cosmetic: Cosmetic) => void;
 }) {
   const previewSource = getCosmeticPreviewSource(cosmetic);
-  const levelsAway = Math.max(0, cosmetic.requiredLevel - currentLevel);
 
   return (
     <View
@@ -349,9 +348,7 @@ function CosmeticCard({
       <Text style={styles.cosmeticMeta}>
         {cosmetic.unlocked
           ? "In your collection"
-          : levelsAway > 0
-            ? `Unlocks in ${levelsAway} level${levelsAway === 1 ? "" : "s"}`
-            : "Available in the Shop"}
+          : cosmetic.requirementText ?? "Available in the Shop"}
       </Text>
 
       <Pressable

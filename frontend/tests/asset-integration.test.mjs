@@ -6,6 +6,16 @@ import test from "node:test";
 const avatarRegistry = readFileSync(new URL("../src/avatar/assetRegistry.ts", import.meta.url), "utf8");
 const mapRegistry = readFileSync(new URL("../src/base/mapAssetRegistry.ts", import.meta.url), "utf8");
 const cosmetics = JSON.parse(readFileSync(new URL("../../backend/seeds/cosmetics.json", import.meta.url), "utf8"));
+const runtimeAssetKeys = new Set(
+  [...avatarRegistry.matchAll(/^  "(avatar-v2\/[^"]+)":/gm)].map((match) => match[1]),
+);
+const compatibilityAssetKeys = new Map([
+  ["starter-tunic.png", "avatar-v2/tops/guild-tunic"],
+  ["forest-tunic.png", "avatar-v2/tops/forest-ranger"],
+]);
+const canonicalCatalogKeys = new Set(
+  cosmetics.map((item) => compatibilityAssetKeys.get(item.assetKey) ?? item.assetKey),
+);
 
 const achievementAssetKeys = {
   forestbound_tunic: "avatar-v2/tops/crimson-guard",
@@ -28,6 +38,28 @@ test("achievement cosmetics use existing central avatar registry keys", () => {
     assert.equal(byId.get(itemId)?.assetKey, assetKey, itemId);
     assert.match(avatarRegistry, new RegExp(`"${assetKey}":`), assetKey);
   }
+});
+
+test("every runtime non-hair cosmetic has a backend catalog mapping", () => {
+  const nonHair = [...runtimeAssetKeys].filter((assetKey) => !assetKey.includes("/hair/"));
+  assert.equal(runtimeAssetKeys.size, 94);
+  assert.equal(nonHair.length, 84);
+  assert.deepEqual(nonHair.filter((assetKey) => !canonicalCatalogKeys.has(assetKey)), []);
+});
+
+test("every backend cosmetic asset resolves in the frontend registry", () => {
+  const unknown = cosmetics.filter((item) => {
+    const canonical = compatibilityAssetKeys.get(item.assetKey) ?? item.assetKey;
+    return !runtimeAssetKeys.has(canonical);
+  });
+  assert.deepEqual(unknown, []);
+  assert.equal(cosmetics.length, 85);
+});
+
+test("hair and Dragon Helm remain absent from the backend catalog", () => {
+  assert.ok([...runtimeAssetKeys].filter((assetKey) => assetKey.includes("/hair/")).length === 10);
+  assert.ok(cosmetics.every((item) => !item.assetKey.includes("/hair/")));
+  assert.ok(cosmetics.every((item) => item.itemId !== "dragon_helm" && item.assetKey !== "dragon-helm.png"));
 });
 
 test("all extracted terrain and decoration art is statically registered", () => {

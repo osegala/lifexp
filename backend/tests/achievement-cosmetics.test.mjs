@@ -57,6 +57,21 @@ test("catalog defines exactly the 12 intended achievement-gated cosmetics", () =
     assert.ok(cosmeticsById.has("forest_tunic"));
 });
 
+test("expanded cosmetic catalog uses the documented level and price progression", () => {
+    const newItems = cosmetics.filter((item) => item.sortOrder >= 100);
+    assert.equal(cosmetics.length, 85);
+    assert.equal(newItems.length, 71);
+    assert.ok(newItems.every((item) => item.active === true));
+    assert.ok(newItems.every((item) => item.requiredAchievement === null));
+    assert.ok(newItems.every((item) => item.price >= 50 && item.price <= 800));
+    assert.ok(newItems.every((item) => item.requiredLevel >= 1 && item.requiredLevel <= 12));
+    const counts = Object.fromEntries(Object.entries(Object.groupBy(cosmetics, (item) => item.category))
+        .map(([category, items]) => [category, items.length]));
+    assert.deepEqual(counts, {
+        tunic: 22, hat: 11, pet: 10, pants: 11, boots: 11, aura: 10, background: 10
+    });
+});
+
 test("every cosmetic achievement key resolves and matching existing task achievements are reused", () => {
     for (const item of cosmetics.filter((entry) => entry.requiredAchievement)) {
         assert.ok(achievementsById.has(item.requiredAchievement), `${item.itemId}: ${item.requiredAchievement}`);
@@ -172,7 +187,7 @@ test("achievement responses expose their cosmetic rewards", () => {
 
 test("expanded catalog is split into DynamoDB-safe repeatable write batches", () => {
     const batches = catalogBatches(seed);
-    assert.deepEqual(batches.map((batch) => batch.length), [25, 10]);
+    assert.deepEqual(batches.map((batch) => batch.length), [25, 25, 25, 25, 6]);
     assert.ok(batches.every((batch) => batch.length <= 25));
     assert.equal(batches.flat().length, seed.length);
 });

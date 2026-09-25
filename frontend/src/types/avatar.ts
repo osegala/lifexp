@@ -42,8 +42,13 @@ export type Cosmetic = {
   type: CosmeticType;
   requiredLevel: number;
   imageUrl: string;
+  owned: boolean;
   unlocked: boolean;
   equipped: boolean;
+  slot?: EquipmentSlot;
+  fullOutfit?: boolean;
+  shopStatus?: "LOCKED" | "PURCHASABLE" | "NOT_ENOUGH_COINS" | "OWNED";
+  requirementText?: string | null;
 };
 
 export type InventoryEquipment = {

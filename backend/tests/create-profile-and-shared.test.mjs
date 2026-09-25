@@ -119,10 +119,10 @@ test("catalog seeds contain the required stable logical keys", () => {
         sortOrder: 10,
         active: true
     });
-    assert.equal(cosmetics.size, 14);
+    assert.equal(cosmetics.size, 85);
     assert.equal(items.filter((item) => item.PK === "CATALOG#ACHIEVEMENTS").length, 15);
     assert.equal(items.filter((item) => item.PK === "CATALOG#BUILDINGS").length, 6);
-    assert.equal(items.length, 35);
+    assert.equal(items.length, 106);
     assert.equal(JSON.stringify(items).includes("dragon-helm.png"), false);
     assert.equal(JSON.stringify(items).includes("dragon_helm"), false);
     assert.equal(JSON.stringify(items).includes("Dragon Helm"), false);

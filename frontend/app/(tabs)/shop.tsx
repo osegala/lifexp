@@ -6,20 +6,12 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
 import { getCosmeticPreviewCrop, getCosmeticPreviewSource } from "../../src/avatar/assetRegistry";
-import { avatarAssetKey } from "../../src/avatar/inventory";
+import { catalogCosmeticReference } from "../../src/avatar/inventory";
 import CosmeticImage from "../../src/components/CosmeticImage";
 import LifeCard from "../../src/components/LifeCard";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme/theme";
 import type { EntitlementResponse, ShopItem, ShopResponse } from "../../src/types";
-import type { CosmeticType } from "../../src/types/avatar";
-
-const CATEGORY_TYPES: Record<string, CosmeticType> = {
-  tunic: "TOP", tunics: "TOP", pants: "BOTTOM", boots: "BOOTS", boot: "BOOTS",
-  hat: "HAT", hats: "HAT", hair: "HAIR", hairstyle: "HAIR", hairstyles: "HAIR",
-  background: "BACKGROUND", backgrounds: "BACKGROUND", pet: "PET", pets: "PET",
-  aura: "AURA", auras: "AURA",
-};
 
 export default function ShopScreen() {
   const { refreshUser } = useAuth();
@@ -90,9 +82,8 @@ export default function ShopScreen() {
 }
 
 function ShopItemRow({ item, busy, onPurchase }: { item: ShopItem; busy: boolean; onPurchase: () => void }) {
-  const type = CATEGORY_TYPES[item.category.toLowerCase()] ?? "TOP";
-  const cosmetic = { id: item.itemId, type, imageUrl: avatarAssetKey(item.assetKey) };
-  const preview = getCosmeticPreviewSource(cosmetic);
+  const cosmetic = catalogCosmeticReference(item);
+  const preview = cosmetic ? getCosmeticPreviewSource(cosmetic) : undefined;
   const label = item.owned
     ? "Owned"
     : item.status === "LOCKED"
@@ -113,7 +104,7 @@ function ShopItemRow({ item, busy, onPurchase }: { item: ShopItem; busy: boolean
   return (
     <LifeCard compact style={styles.item}>
       <View style={styles.preview}>
-        {preview ? <CosmeticImage source={preview} crop={getCosmeticPreviewCrop(cosmetic)} style={styles.image} />
+        {preview && cosmetic ? <CosmeticImage source={preview} crop={getCosmeticPreviewCrop(cosmetic)} style={styles.image} />
           : <MaterialCommunityIcons name="hanger" size={30} color={colors.mutedText} />}
       </View>
       <View style={styles.itemCopy}>
