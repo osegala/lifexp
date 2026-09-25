@@ -15,9 +15,19 @@ import {
 
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
-import { getCosmeticPreviewCrop, getCosmeticPreviewSource, getEquippedSceneSource } from "../../src/avatar/assetRegistry";
-import { avatarFromInventory, inventoryCosmetics } from "../../src/avatar/inventory";
-import { getLocalBodyType } from "../../src/avatar/localAppearance";
+import {
+  getCosmeticAssetIds,
+  getCosmeticPreviewCrop,
+  getCosmeticPreviewSource,
+  getEquippedSceneSource,
+  isCosmeticAssetRegistered,
+} from "../../src/avatar/assetRegistry";
+import {
+  avatarFromInventory,
+  loadOptionalAppearance,
+  wardrobeCosmetics,
+} from "../../src/avatar/inventory";
+import { getLocalBodyType, getLocalHairId, setLocalHairId } from "../../src/avatar/localAppearance";
 import CosmeticImage from "../../src/components/CosmeticImage";
 import AvatarRenderer from "../../src/components/AvatarRenderer";
 import LifeCard from "../../src/components/LifeCard";
@@ -43,6 +53,7 @@ const WARDROBE_SECTIONS: WardrobeSection[] = [
   { title: "Pets", type: "PET", icon: "paw" },
   { title: "Auras", type: "AURA", icon: "star-four-points" },
 ];
+const BUILT_IN_HAIR_IDS = getCosmeticAssetIds("hair");
 
 export default function AvatarScreen() {
   const { user } = useAuth();
@@ -57,12 +68,21 @@ export default function AvatarScreen() {
   const loadAvatarData = useCallback(async () => {
     try {
       setLoading(true);
-      const [inventoryResponse, bodyType] = await Promise.all([
+      const [inventoryResponse, appearance] = await Promise.all([
         api.get<InventoryResponse>(apiRoutes.inventory),
-        getLocalBodyType(),
+        loadOptionalAppearance(getLocalBodyType, getLocalHairId),
       ]);
-      setAvatar(avatarFromInventory(inventoryResponse.data, bodyType));
-      setCosmetics(inventoryCosmetics(inventoryResponse.data));
+      const { bodyType, hairId } = appearance;
+      setAvatar(avatarFromInventory(inventoryResponse.data, bodyType, hairId));
+      setCosmetics(wardrobeCosmetics(
+        inventoryResponse.data,
+        BUILT_IN_HAIR_IDS,
+        hairId,
+        isCosmeticAssetRegistered,
+        (itemId, assetKey) => {
+          if (__DEV__) console.warn(`Unresolved wardrobe asset for ${itemId}: ${assetKey || "<missing>"}`);
+        },
+      ));
     } catch (error) {
       Alert.alert("Character", apiError(error, "Could not load your wardrobe.").message);
     } finally {
@@ -83,6 +103,17 @@ export default function AvatarScreen() {
 
     try {
       setLoadingId(cosmetic.id);
+      if (cosmetic.type === "HAIR") {
+        const hairId = cosmetic.equipped ? null : String(cosmetic.id);
+        setAvatar((current) => current
+          ? { ...current, equippedHairId: hairId }
+          : current);
+        setCosmetics((current) => current.map((item) => item.type === "HAIR"
+          ? { ...item, equipped: item.id === hairId }
+          : item));
+        await setLocalHairId(hairId);
+        return;
+      }
       await api.post(
         cosmetic.equipped ? apiRoutes.inventoryUnequip : apiRoutes.inventoryEquip,
         { itemId: String(cosmetic.id) },
@@ -140,9 +171,6 @@ export default function AvatarScreen() {
             topId={avatar?.equippedTopId}
             bottomId={avatar?.equippedBottomId}
             bootsId={avatar?.equippedBootsId}
-            capeId={avatar?.equippedCapeId}
-            weaponId={avatar?.equippedWeaponId}
-            shieldId={avatar?.equippedShieldId}
             backgroundId={avatar?.equippedBackgroundId}
             petId={avatar?.equippedPetId}
             auraId={avatar?.equippedAuraId}

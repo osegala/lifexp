@@ -28,26 +28,26 @@ const shop = (items, earned = [], owned = [], coins = 10_000, level = 1) => buil
 
 test("catalog defines exactly the 12 intended achievement-gated cosmetics", () => {
     const expected = {
-        forestbound_tunic: ["Forestbound Tunic", 150, "COMPLETE_25_TASKS", "tunic"],
-        forestbound_dress: ["Forestbound Dress", 150, "COMPLETE_25_TASKS", "tunic"],
-        forestbound_cap: ["Forestbound Cap", 150, "COMPLETE_25_TASKS", "hat"],
-        starweaver_tunic: ["Starweaver Tunic", 300, "REACH_LEVEL_5", "tunic"],
-        starweaver_dress: ["Starweaver Dress", 300, "REACH_LEVEL_5", "tunic"],
-        starweaver_hat: ["Starweaver Hat", 300, "REACH_LEVEL_5", "hat"],
-        dawnkeeper_tunic: ["Dawnkeeper Tunic", 500, "COMPLETE_100_TASKS", "tunic"],
-        dawnkeeper_dress: ["Dawnkeeper Dress", 500, "COMPLETE_100_TASKS", "tunic"],
-        dawnkeeper_headpiece: ["Dawnkeeper Headpiece", 500, "COMPLETE_100_TASKS", "hat"],
-        mossling: ["Mossling", 200, "COMPLETE_10_TASKS", "pet"],
-        emberfox: ["Emberfox", 400, "COMPLETE_DAILY_GOAL_7_DAYS", "pet"],
-        moonwing: ["Moonwing", 600, "REACH_LEVEL_10", "pet"]
+        forestbound_tunic: ["Forestbound Tunic", 150, "COMPLETE_25_TASKS", "tunic", "avatar-v2/tops/crimson-guard"],
+        forestbound_dress: ["Forestbound Dress", 150, "COMPLETE_25_TASKS", "tunic", "avatar-v2/dresses/forest-ranger"],
+        forestbound_cap: ["Forestbound Cap", 150, "COMPLETE_25_TASKS", "hat", "avatar-v2/hats/forest-ranger-hat"],
+        starweaver_tunic: ["Starweaver Tunic", 300, "REACH_LEVEL_5", "tunic", "avatar-v2/tops/forest-ranger"],
+        starweaver_dress: ["Starweaver Dress", 300, "REACH_LEVEL_5", "tunic", "avatar-v2/dresses/starlight"],
+        starweaver_hat: ["Starweaver Hat", 300, "REACH_LEVEL_5", "hat", "avatar-v2/hats/starlight-hat"],
+        dawnkeeper_tunic: ["Dawnkeeper Tunic", 500, "COMPLETE_100_TASKS", "tunic", "avatar-v2/tops/midnight-vanguard"],
+        dawnkeeper_dress: ["Dawnkeeper Dress", 500, "COMPLETE_100_TASKS", "tunic", "avatar-v2/dresses/celestial-acolyte"],
+        dawnkeeper_headpiece: ["Dawnkeeper Headpiece", 500, "COMPLETE_100_TASKS", "hat", "avatar-v2/hats/celestial-acolyte-hat"],
+        mossling: ["Mossling", 200, "COMPLETE_10_TASKS", "pet", "avatar-v2/pets/moss-golem"],
+        emberfox: ["Emberfox", 400, "COMPLETE_DAILY_GOAL_7_DAYS", "pet", "avatar-v2/pets/sunfire-fox"],
+        moonwing: ["Moonwing", 600, "REACH_LEVEL_10", "pet", "avatar-v2/pets/scholar-owl"]
     };
 
-    for (const [itemId, [name, price, requiredAchievement, category]] of Object.entries(expected)) {
+    for (const [itemId, [name, price, requiredAchievement, category, assetKey]] of Object.entries(expected)) {
         const item = cosmeticsById.get(itemId);
         assert.ok(item, itemId);
         assert.deepEqual(
             [item.name, item.price, item.requiredAchievement, item.category, item.assetKey, item.active],
-            [name, price, requiredAchievement, category, null, true]
+            [name, price, requiredAchievement, category, assetKey, true]
         );
     }
     assert.equal(new Set(cosmetics.map((item) => item.itemId)).size, cosmetics.length);

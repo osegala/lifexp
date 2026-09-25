@@ -36,7 +36,7 @@ test("successful deletion clears account-local data and session before returning
   assert.ok(request >= 0 && localCleanup > request && sessionCleanup > request && navigation > sessionCleanup);
 
   const cleanup = read("src/storage/localAccountData.ts");
-  assert.match(cleanup, /clearLocalBodyType\(\)/);
+  assert.match(cleanup, /clearLocalAppearance\(\)/);
   assert.match(cleanup, /SecureStore\.deleteItemAsync\(BASE_LAYOUT_STORAGE_KEY\)/);
   assert.match(cleanup, /localStorage\?\.removeItem\(BASE_LAYOUT_STORAGE_KEY\)/);
 });

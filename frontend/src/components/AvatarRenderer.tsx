@@ -24,9 +24,6 @@ type Props = {
   topId?: CosmeticId | null;
   bottomId?: CosmeticId | null;
   bootsId?: CosmeticId | null;
-  capeId?: CosmeticId | null;
-  weaponId?: CosmeticId | null;
-  shieldId?: CosmeticId | null;
   backgroundId?: CosmeticId | null;
   petId?: CosmeticId | null;
   auraId?: CosmeticId | null;
@@ -42,9 +39,6 @@ export default function AvatarRenderer({
   topId,
   bottomId,
   bootsId,
-  capeId,
-  weaponId,
-  shieldId,
   backgroundId,
   petId,
   auraId,
@@ -61,11 +55,8 @@ export default function AvatarRenderer({
   const petImage = getEquippedSceneSource(cosmetics, petId, "PET");
 
   const equippedSprites = [
-    ...getEquippedCharacterSprites(cosmetics, capeId, "CAPE"),
     ...getEquippedCharacterSprites(cosmetics, hairId, "HAIR"),
     ...getEquippedCharacterSprites(cosmetics, hatId, "HAT"),
-    ...getEquippedCharacterSprites(cosmetics, weaponId, "WEAPON"),
-    ...getEquippedCharacterSprites(cosmetics, shieldId, "SHIELD"),
     ...resolveSpriteSet(`base-body:${bodyType}`, BASE_BODY_SPRITES[bodyType]),
     ...(cosmetics === undefined
       ? resolveSpriteSet("registration-default", DEFAULT_CHARACTER_SPRITES)

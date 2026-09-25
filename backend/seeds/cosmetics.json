@@ -34,7 +34,7 @@
     "price": 150,
     "requiredLevel": 1,
     "requiredAchievement": "COMPLETE_25_TASKS",
-    "assetKey": null,
+    "assetKey": "avatar-v2/tops/crimson-guard",
     "sortOrder": 20,
     "active": true
   },
@@ -47,7 +47,7 @@
     "price": 150,
     "requiredLevel": 1,
     "requiredAchievement": "COMPLETE_25_TASKS",
-    "assetKey": null,
+    "assetKey": "avatar-v2/dresses/forest-ranger",
     "sortOrder": 21,
     "active": true
   },
@@ -60,7 +60,7 @@
     "price": 150,
     "requiredLevel": 1,
     "requiredAchievement": "COMPLETE_25_TASKS",
-    "assetKey": null,
+    "assetKey": "avatar-v2/hats/forest-ranger-hat",
     "sortOrder": 22,
     "active": true
   },
@@ -73,7 +73,7 @@
     "price": 300,
     "requiredLevel": 1,
     "requiredAchievement": "REACH_LEVEL_5",
-    "assetKey": null,
+    "assetKey": "avatar-v2/tops/forest-ranger",
     "sortOrder": 30,
     "active": true
   },
@@ -86,7 +86,7 @@
     "price": 300,
     "requiredLevel": 1,
     "requiredAchievement": "REACH_LEVEL_5",
-    "assetKey": null,
+    "assetKey": "avatar-v2/dresses/starlight",
     "sortOrder": 31,
     "active": true
   },
@@ -99,7 +99,7 @@
     "price": 300,
     "requiredLevel": 1,
     "requiredAchievement": "REACH_LEVEL_5",
-    "assetKey": null,
+    "assetKey": "avatar-v2/hats/starlight-hat",
     "sortOrder": 32,
     "active": true
   },
@@ -112,7 +112,7 @@
     "price": 500,
     "requiredLevel": 1,
     "requiredAchievement": "COMPLETE_100_TASKS",
-    "assetKey": null,
+    "assetKey": "avatar-v2/tops/midnight-vanguard",
     "sortOrder": 40,
     "active": true
   },
@@ -125,7 +125,7 @@
     "price": 500,
     "requiredLevel": 1,
     "requiredAchievement": "COMPLETE_100_TASKS",
-    "assetKey": null,
+    "assetKey": "avatar-v2/dresses/celestial-acolyte",
     "sortOrder": 41,
     "active": true
   },
@@ -138,7 +138,7 @@
     "price": 500,
     "requiredLevel": 1,
     "requiredAchievement": "COMPLETE_100_TASKS",
-    "assetKey": null,
+    "assetKey": "avatar-v2/hats/celestial-acolyte-hat",
     "sortOrder": 42,
     "active": true
   },
@@ -151,7 +151,7 @@
     "price": 200,
     "requiredLevel": 1,
     "requiredAchievement": "COMPLETE_10_TASKS",
-    "assetKey": null,
+    "assetKey": "avatar-v2/pets/moss-golem",
     "sortOrder": 50,
     "active": true
   },
@@ -164,7 +164,7 @@
     "price": 400,
     "requiredLevel": 1,
     "requiredAchievement": "COMPLETE_DAILY_GOAL_7_DAYS",
-    "assetKey": null,
+    "assetKey": "avatar-v2/pets/sunfire-fox",
     "sortOrder": 51,
     "active": true
   },
@@ -177,7 +177,7 @@
     "price": 600,
     "requiredLevel": 1,
     "requiredAchievement": "REACH_LEVEL_10",
-    "assetKey": null,
+    "assetKey": "avatar-v2/pets/scholar-owl",
     "sortOrder": 52,
     "active": true
   }

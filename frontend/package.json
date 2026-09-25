@@ -10,7 +10,10 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test:session": "node --test tests/auth-session.test.mjs",
-    "validate:avatar-assets": "node ./scripts/validate-avatar-layers.js"
+    "validate:avatar-assets": "node ./scripts/validate-avatar-layers.js",
+    "audit:assets": "node ./scripts/audit-assets.js",
+    "validate:assets": "node ./scripts/audit-assets.js",
+    "inventory:assets": "node ./scripts/audit-assets.js --write"
   },
   "dependencies": {
     "@aws-amplify/react-native": "^1.3.3",

@@ -2,6 +2,23 @@ import { ImageSourcePropType } from "react-native";
 
 export type PathTileMask = number;
 
+export type TerrainTile =
+  | "grass"
+  | "grass-grass"
+  | "grass-flowers"
+  | "grass-rocks"
+  | "grass-worn";
+
+// Keep every extracted terrain tile statically visible to Metro, even while
+// the current base scene uses the precomposed tiled-ground background.
+export const TERRAIN_TILE_IMAGES: Record<TerrainTile, ImageSourcePropType> = {
+  grass: require("../../assets/base/tiles/grass.png"),
+  "grass-grass": require("../../assets/base/tiles/grass-grass.png"),
+  "grass-flowers": require("../../assets/base/tiles/grass-flowers.png"),
+  "grass-rocks": require("../../assets/base/tiles/grass-rocks.png"),
+  "grass-worn": require("../../assets/base/tiles/grass-worn.png"),
+};
+
 // Grid-neighbor bits project onto the diamond's shared edges as follows:
 // 1=south-west, 2=south-east, 4=north-east, 8=north-west. The generated
 // artwork uses those exact edge contacts, so adjacent tiles meet seamlessly.
@@ -44,6 +61,7 @@ export type DecorationAsset =
   | "planter-flowers"
   | "rock-cluster"
   | "rock-large"
+  | "stone-wall"
   | "well"
   | "wood-fence";
 
@@ -63,6 +81,7 @@ export const DECORATION_IMAGES: Record<DecorationAsset, ImageSourcePropType> = {
   "planter-flowers": require("../../assets/base/decorations/planter-flowers.png"),
   "rock-cluster": require("../../assets/base/decorations/rock-cluster.png"),
   "rock-large": require("../../assets/base/decorations/rock-large.png"),
+  "stone-wall": require("../../assets/base/decorations/stone-wall.png"),
   well: require("../../assets/base/decorations/well.png"),
   "wood-fence": require("../../assets/base/decorations/wood-fence.png"),
 };

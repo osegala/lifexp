@@ -704,6 +704,16 @@ const COSMETIC_ASSETS: Record<string, CosmeticAssetDefinition> = {
     [121, 204, 582, 1027], [669, 204, 1130, 1027], [280, 551, 309], [704, 975, 309]),
 };
 
+export function getCosmeticAssetIds(slot: EquipmentSlot) {
+  return Object.entries(COSMETIC_ASSETS)
+    .filter(([, definition]) => definition.slot === slot)
+    .map(([assetKey]) => assetKey);
+}
+
+export function isCosmeticAssetRegistered(assetKey: string) {
+  return Boolean(COSMETIC_ASSETS[assetKey]);
+}
+
 export const DEFAULT_CHARACTER_SPRITES = [
   ...(COSMETIC_ASSETS["avatar-v2/hair/windblown-layers"].sprites ?? []),
   ...TRAVELER_TROUSERS_SPRITES,
@@ -767,9 +777,6 @@ const FALLBACK_CHARACTER_LAYER: Partial<Record<CosmeticType, CharacterLayer>> = 
   TOP: "upperBody",
   BOTTOM: "bottoms",
   BOOTS: "boots",
-  CAPE: "capeBack",
-  WEAPON: "weapon",
-  SHIELD: "shield",
 };
 
 type CosmeticAssetReference = Pick<Cosmetic, "id" | "type"> &

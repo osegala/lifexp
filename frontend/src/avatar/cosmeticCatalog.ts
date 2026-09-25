@@ -17,7 +17,6 @@ export type BodyRegion =
  * of this list because it is rendered by AvatarScene, not CharacterCanvas.
  */
 export const CHARACTER_LAYER_PRIORITY = {
-  capeBack: 20,
   hairBack: 30,
   backAccessory: 35,
   bodyBack: 38,
@@ -30,12 +29,9 @@ export const CHARACTER_LAYER_PRIORITY = {
   hairDrape: 125, // Over clothing and shoulders, behind the head and ears.
   bodyFront: 130,
   clothingFront: 135,
-  capeFront: 140,
   face: 150,
   hairFront: 160,
   headwear: 170,
-  weapon: 190,
-  shield: 210,
 } as const;
 
 export type CharacterLayer = keyof typeof CHARACTER_LAYER_PRIORITY;
@@ -56,9 +52,6 @@ export const COSMETIC_TYPE_TO_SLOT: Partial<Record<CosmeticType, EquipmentSlot>>
   TOP: "upperBody",
   BOTTOM: "bottoms",
   BOOTS: "boots",
-  CAPE: "cape",
-  WEAPON: "weapon",
-  SHIELD: "shield",
   BACKGROUND: "scene",
   PET: "pet",
   AURA: "aura",

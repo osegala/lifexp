@@ -4,9 +4,6 @@ export type CosmeticType =
   | "TOP"
   | "BOTTOM"
   | "BOOTS"
-  | "CAPE"
-  | "WEAPON"
-  | "SHIELD"
   | "BACKGROUND"
   | "PET"
   | "AURA";
@@ -22,9 +19,6 @@ export type Avatar = {
   equippedTopId: CosmeticId | null;
   equippedBottomId: CosmeticId | null;
   equippedBootsId: CosmeticId | null;
-  equippedCapeId: CosmeticId | null;
-  equippedWeaponId: CosmeticId | null;
-  equippedShieldId: CosmeticId | null;
   equippedBackgroundId: CosmeticId | null;
   equippedPetId: CosmeticId | null;
   equippedAuraId: CosmeticId | null;
@@ -36,9 +30,6 @@ export type EquipmentSlot =
   | "upperBody"
   | "bottoms"
   | "boots"
-  | "cape"
-  | "weapon"
-  | "shield"
   | "scene"
   | "pet"
   | "aura";
