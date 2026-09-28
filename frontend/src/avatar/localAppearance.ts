@@ -1,9 +1,12 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-const BODY_TYPE_KEY = "evrenthia.avatar.bodyType";
-const HAIR_ID_KEY = "evrenthia.avatar.hairId";
-export type BodyType = "BOY" | "GIRL";
+import { DEFAULT_APPEARANCE, normalizeAppearance } from "./appearance";
+import type { AvatarAppearance } from "./appearance";
+
+export function appearanceStorageKey(userId: string | number) {
+  return `evrenthia.avatar.${encodeURIComponent(String(userId))}.appearance`;
+}
 
 async function readAppearanceValue(key: string) {
   try {
@@ -31,27 +34,23 @@ async function writeAppearanceValue(key: string, value: string | null) {
   }
 }
 
-export async function getLocalBodyType(): Promise<BodyType> {
-  return (await readAppearanceValue(BODY_TYPE_KEY)) === "GIRL"
-    ? "GIRL"
-    : "BOY";
+export async function getLocalAppearance(userId: string | number): Promise<AvatarAppearance> {
+  const stored = await readAppearanceValue(appearanceStorageKey(userId));
+  if (!stored) return DEFAULT_APPEARANCE;
+  try {
+    return normalizeAppearance(JSON.parse(stored));
+  } catch {
+    return DEFAULT_APPEARANCE;
+  }
 }
 
-export async function setLocalBodyType(bodyType: BodyType) {
-  await writeAppearanceValue(BODY_TYPE_KEY, bodyType);
+export async function setLocalAppearance(userId: string | number, appearance: AvatarAppearance) {
+  await writeAppearanceValue(
+    appearanceStorageKey(userId),
+    JSON.stringify(normalizeAppearance(appearance)),
+  );
 }
 
-export async function getLocalHairId() {
-  return readAppearanceValue(HAIR_ID_KEY);
-}
-
-export async function setLocalHairId(hairId: string | null) {
-  await writeAppearanceValue(HAIR_ID_KEY, hairId);
-}
-
-export async function clearLocalAppearance() {
-  await Promise.all([
-    writeAppearanceValue(BODY_TYPE_KEY, null),
-    writeAppearanceValue(HAIR_ID_KEY, null),
-  ]);
+export async function clearLocalAppearance(userId: string | number) {
+  await writeAppearanceValue(appearanceStorageKey(userId), null);
 }

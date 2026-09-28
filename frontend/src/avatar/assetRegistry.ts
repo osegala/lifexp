@@ -18,6 +18,7 @@ export type CharacterSpriteDefinition = {
   hairPart?: "ponytail";
   tuckPonytail?: boolean;
   fullOutfit?: boolean;
+  tint?: "skin" | "hair" | "eyes";
 };
 
 export type BaseBodySpriteDefinition = CharacterSpriteDefinition & { region?: BodyRegion };
@@ -39,6 +40,7 @@ export type ResolvedCharacterSprite = {
   hairPart?: "ponytail";
   tuckPonytail?: boolean;
   fullOutfit?: boolean;
+  tint?: "skin" | "hair" | "eyes";
 };
 
 type CosmeticAssetDefinition = {
@@ -67,29 +69,39 @@ const HAIR_EAR_OPENINGS = [
 
 function layeredHair(source: ImageSourcePropType, frame?: SpriteFrame, drape = false): CharacterSpriteSet {
   return [
-    { id: "back", layer: drape ? "hairDrape" : "hairBack", source, frame },
+    { id: "back", layer: drape ? "hairDrape" : "hairBack", source, frame, tint: "hair" },
     { id: "front", layer: "hairFront", source, frame,
-      clipPath: drape ? HAIR_FRINGE_CLIP : SHORT_HAIR_FRINGE_CLIP },
+      clipPath: drape ? HAIR_FRINGE_CLIP : SHORT_HAIR_FRINGE_CLIP, tint: "hair" },
   ];
 }
 
 // The flattened master remains in assets as a registration reference only.
 // It is intentionally not registered or rendered while the modular body is tested.
-const BODY_HEAD = require("../../assets/avatar/v2/body/head.png");
-const BODY_NECK = require("../../assets/avatar/v2/body/neck.png");
-const BODY_TORSO = require("../../assets/avatar/v2/body/torso.png");
-const BODY_LEFT_ARM = require("../../assets/avatar/v2/body/left-arm.png");
-const BODY_RIGHT_ARM = require("../../assets/avatar/v2/body/right-arm.png");
-const BODY_LEFT_LEG = require("../../assets/avatar/v2/body/left-leg.png");
-const BODY_RIGHT_LEG = require("../../assets/avatar/v2/body/right-leg.png");
+const BOY_SKIN = {
+  head: [require("../../assets/avatar/v2/appearance/skin/boy/head-neutral.png"), require("../../assets/avatar/v2/appearance/skin/boy/head-details.png")],
+  neck: [require("../../assets/avatar/v2/appearance/skin/boy/neck-neutral.png"), require("../../assets/avatar/v2/appearance/skin/boy/neck-details.png")],
+  torso: [require("../../assets/avatar/v2/appearance/skin/boy/torso-neutral.png"), require("../../assets/avatar/v2/appearance/skin/boy/torso-details.png")],
+  "left-arm": [require("../../assets/avatar/v2/appearance/skin/boy/left-arm-neutral.png"), require("../../assets/avatar/v2/appearance/skin/boy/left-arm-details.png")],
+  "right-arm": [require("../../assets/avatar/v2/appearance/skin/boy/right-arm-neutral.png"), require("../../assets/avatar/v2/appearance/skin/boy/right-arm-details.png")],
+  "left-leg": [require("../../assets/avatar/v2/appearance/skin/boy/left-leg-neutral.png"), require("../../assets/avatar/v2/appearance/skin/boy/left-leg-details.png")],
+  "right-leg": [require("../../assets/avatar/v2/appearance/skin/boy/right-leg-neutral.png"), require("../../assets/avatar/v2/appearance/skin/boy/right-leg-details.png")],
+} as const;
+const BOY_EYES = [
+  require("../../assets/avatar/v2/appearance/eyes/boy/iris-mask.png"),
+  require("../../assets/avatar/v2/appearance/eyes/boy/eye-details.png"),
+] as const;
 
-const WINDBLOWN_LAYERS_HAIR = require("../../assets/avatar/v2/aligned/windblown-layers-hair.png");
-const SIDE_SWEPT_LAYERS_HAIR = require("../../assets/avatar/v2/aligned/side-swept-layers-hair.png");
-const SPRING_CURLS_HAIR = require("../../assets/avatar/v2/aligned/spring-curls-hair.png");
-const SKYWARD_SPIKES_HAIR = require("../../assets/avatar/v2/aligned/skyward-spikes-hair.png");
-const TOUSLED_LAYERS_HAIR = require("../../assets/avatar/v2/aligned/tousled-layers-hair.png");
-const CURTAIN_BOB_HAIR = require("../../assets/avatar/v2/aligned/curtain-bob-hair.png");
-const FEATHERED_SWEEP_HAIR = require("../../assets/avatar/v2/aligned/feathered-sweep-hair.png");
+const WINDBLOWN_LAYERS_HAIR = require("../../assets/avatar/v2/appearance/hair/aligned/windblown-layers-neutral.png");
+const SIDE_SWEPT_LAYERS_HAIR = require("../../assets/avatar/v2/appearance/hair/aligned/side-swept-layers-neutral.png");
+const SPRING_CURLS_HAIR = require("../../assets/avatar/v2/appearance/hair/aligned/spring-curls-neutral.png");
+const SKYWARD_SPIKES_HAIR = require("../../assets/avatar/v2/appearance/hair/aligned/skyward-spikes-neutral.png");
+const TOUSLED_LAYERS_HAIR = require("../../assets/avatar/v2/appearance/hair/aligned/tousled-layers-neutral.png");
+const CURTAIN_BOB_HAIR = require("../../assets/avatar/v2/appearance/hair/aligned/curtain-bob-neutral.png");
+const FEATHERED_SWEEP_HAIR = require("../../assets/avatar/v2/appearance/hair/aligned/feathered-sweep-neutral.png");
+const HIGH_PONYTAIL_HAIR = require("../../assets/avatar/v2/appearance/hair/framed/high-ponytail-neutral.png");
+const TWIN_BRAIDS_HAIR = require("../../assets/avatar/v2/appearance/hair/framed/twin-braids-neutral.png");
+const TWIN_BRAIDS_DETAILS = require("../../assets/avatar/v2/appearance/hair/framed/twin-braids-details.png");
+const LONG_SHAG_HAIR = require("../../assets/avatar/v2/appearance/hair/framed/long-shag-neutral.png");
 const AZURE_FEATHER_CAP = require("../../assets/avatar/v2/aligned/azure-feather-cap.png");
 const GUILD_TUNIC = require("../../assets/avatar/v2/aligned/guild-tunic.png");
 const GUILD_BELT = require("../../assets/avatar/v2/aligned/guild-belt.png");
@@ -208,12 +220,14 @@ function dressAsset(
 }
 
 function framedHair(
+  previewSource: ImageSourcePropType,
   source: ImageSourcePropType,
   bounds: ArtworkBounds,
   anchor: readonly [number, number],
   scale: readonly [number, number],
   target: readonly [number, number],
   ponytail = false,
+  details?: ImageSourcePropType,
 ): CosmeticAssetDefinition {
   const crop = artworkCrop(bounds);
   const frame = {
@@ -224,17 +238,24 @@ function framedHair(
     },
   };
   return {
-    slot: "hair", previewSource: source, previewCrop: crop,
+    slot: "hair", previewSource, previewCrop: crop,
     // The main crown overlaps the rear tail above the ears so the head cannot
     // reveal a bare strip along the curved split. Only the tail moves under caps.
     sprites: ponytail ? [
-      { id: "tail", layer: "hairBack", source, frame, hairPart: "ponytail",
+      { id: "tail", layer: "hairBack", source, frame, hairPart: "ponytail", tint: "hair",
         clipPath: "M609 -64H1254V1254H714V216Q736 122 695 69Q663 36 609 42Z" },
-      { id: "back", layer: "hairDrape", source, frame,
+      { id: "back", layer: "hairDrape", source, frame, tint: "hair",
         clipPath: "M0 -64H609V42Q663 36 695 69Q736 122 714 216V1254H0Z" },
-      { id: "front", layer: "hairFront", source, frame,
+      { id: "front", layer: "hairFront", source, frame, tint: "hair",
         clipPath: `M0 -64H1254V158H725Q725 190 714 216V1254H0Z ${HAIR_EAR_OPENINGS}` },
-    ] : layeredHair(source, frame, true),
+    ] : [
+      ...layeredHair(source, frame, true),
+      ...(details ? layeredHair(details, frame, true).map((part) => ({
+        ...part,
+        id: `${part.id}-details`,
+        tint: undefined,
+      })) : []),
+    ],
   };
 }
 
@@ -526,21 +547,21 @@ const COSMETIC_ASSETS: Record<string, CosmeticAssetDefinition> = {
   "avatar-v2/hair/curtain-bob": {
     slot: "hair",
     previewSource: require("../../assets/avatar/v2/hair/curtain-bob.png"),
-    sprites: [sprite("front", "hairFront", CURTAIN_BOB_HAIR)],
+    sprites: [{ ...sprite("front", "hairFront", CURTAIN_BOB_HAIR), tint: "hair" }],
   },
   "avatar-v2/hair/high-ponytail": framedHair(
-    require("../../assets/avatar/v2/hair/high-ponytail.png"), [198, 46, 1143, 1209],
+    require("../../assets/avatar/v2/hair/high-ponytail.png"), HIGH_PONYTAIL_HAIR, [198, 46, 1143, 1209],
     [577, 680], [0.33, 0.285], [627, 187], true),
   "avatar-v2/hair/twin-braids": framedHair(
-    require("../../assets/avatar/v2/hair/twin-braids.png"), [269, 54, 990, 1196],
-    [630, 548], [0.354, 0.34], [627, 188]),
+    require("../../assets/avatar/v2/hair/twin-braids.png"), TWIN_BRAIDS_HAIR, [269, 54, 990, 1196],
+    [630, 548], [0.354, 0.34], [627, 188], false, TWIN_BRAIDS_DETAILS),
   "avatar-v2/hair/feathered-sweep": {
     slot: "hair",
     previewSource: require("../../assets/avatar/v2/hair/feathered-sweep.png"),
     sprites: layeredHair(FEATHERED_SWEEP_HAIR),
   },
   "avatar-v2/hair/long-shag": framedHair(
-    require("../../assets/avatar/v2/hair/long-shag.png"), [179, 65, 1072, 1168],
+    require("../../assets/avatar/v2/hair/long-shag.png"), LONG_SHAG_HAIR, [179, 65, 1072, 1168],
     [630, 700], [0.30, 0.255], [627, 188]),
   "avatar-v2/hats/azure-feather-cap": {
     slot: "head",
@@ -729,41 +750,70 @@ export const DEFAULT_CHARACTER_SPRITES = [
   ...GUILD_TUNIC_SPRITES,
 ] satisfies CharacterSpriteSet;
 
+function skinPair(
+  id: string,
+  sources: readonly [ImageSourcePropType, ImageSourcePropType],
+  region: BodyRegion,
+  layer: CharacterLayer,
+  frame?: SpriteFrame,
+  detailLayer: CharacterLayer = layer,
+): BaseBodySpriteDefinition[] {
+  return [
+    { id: `${id}-0-skin`, source: sources[0], region, layer, frame, tint: "skin" },
+    { id: `${id}-3-details`, source: sources[1], region, layer: detailLayer, frame },
+  ];
+}
+
+function eyePair(id: string, sources: readonly [ImageSourcePropType, ImageSourcePropType], frame?: SpriteFrame): BaseBodySpriteDefinition[] {
+  return [
+    { id: `${id}-1-iris`, source: sources[0], region: "head", layer: "face", frame, tint: "eyes" },
+    { id: `${id}-2-eye-details`, source: sources[1], region: "head", layer: "face", frame },
+  ];
+}
+
 const ADVENTURER_BODY_SPRITES = [
-  { id: "left-leg", source: BODY_LEFT_LEG, region: "upperLegLeft", layer: "bodyBack" },
-  { id: "right-leg", source: BODY_RIGHT_LEG, region: "upperLegRight", layer: "bodyBack" },
-  { id: "torso", source: BODY_TORSO, region: "torso", layer: "baseBody" },
-  { id: "left-arm", source: BODY_LEFT_ARM, region: "upperArmLeft", layer: "bodyBack" },
-  { id: "right-arm", source: BODY_RIGHT_ARM, region: "upperArmRight", layer: "bodyBack" },
-  { id: "neck", source: BODY_NECK, region: "neck", layer: "baseBody" },
-  { id: "head", source: BODY_HEAD, region: "head", layer: "bodyFront" },
+  ...skinPair("left-leg", BOY_SKIN["left-leg"], "upperLegLeft", "bodyBack"),
+  ...skinPair("right-leg", BOY_SKIN["right-leg"], "upperLegRight", "bodyBack"),
+  ...skinPair("torso", BOY_SKIN.torso, "torso", "baseBody"),
+  ...skinPair("left-arm", BOY_SKIN["left-arm"], "upperArmLeft", "bodyBack"),
+  ...skinPair("right-arm", BOY_SKIN["right-arm"], "upperArmRight", "bodyBack"),
+  ...skinPair("neck", BOY_SKIN.neck, "neck", "baseBody"),
+  ...skinPair("head", BOY_SKIN.head, "head", "bodyFront", undefined, "face"),
+  ...eyePair("head", BOY_EYES),
 ] satisfies readonly BaseBodySpriteDefinition[];
 
 // Both rigs use the same shoulders, ear line, waist, and ground anchors so every
 // cosmetic remains available on either body. Keep the supplied source PNGs intact.
-const GIRL_HEAD = require("../../assets/avatar/v2/body-girl/head.png");
+const GIRL_SKIN = {
+  head: [require("../../assets/avatar/v2/appearance/skin/girl/head-neutral.png"), require("../../assets/avatar/v2/appearance/skin/girl/head-details.png")],
+  torso: [require("../../assets/avatar/v2/appearance/skin/girl/torso-neutral.png"), require("../../assets/avatar/v2/appearance/skin/girl/torso-details.png")],
+  "left-arm": [require("../../assets/avatar/v2/appearance/skin/girl/left-arm-neutral.png"), require("../../assets/avatar/v2/appearance/skin/girl/left-arm-details.png")],
+  "right-arm": [require("../../assets/avatar/v2/appearance/skin/girl/right-arm-neutral.png"), require("../../assets/avatar/v2/appearance/skin/girl/right-arm-details.png")],
+  "left-leg": [require("../../assets/avatar/v2/appearance/skin/girl/left-leg-neutral.png"), require("../../assets/avatar/v2/appearance/skin/girl/left-leg-details.png")],
+  "right-leg": [require("../../assets/avatar/v2/appearance/skin/girl/right-leg-neutral.png"), require("../../assets/avatar/v2/appearance/skin/girl/right-leg-details.png")],
+} as const;
+const GIRL_EYES = [
+  require("../../assets/avatar/v2/appearance/eyes/girl/iris-mask.png"),
+  require("../../assets/avatar/v2/appearance/eyes/girl/eye-details.png"),
+] as const;
+const GIRL_LEFT_LEG_FRAME = sourceFrame([1024, 1536], [397, 82, 739, 1435], [597.8, 584.15, 205.2, 623.5], girlSilhouettes["left-leg"], -0.02);
+const GIRL_RIGHT_LEG_FRAME = sourceFrame([1024, 1536], [381, 47, 642, 1397], [465, 584.15, 156.6, 623.5], girlSilhouettes["right-leg"], -0.045);
+const GIRL_LEFT_ARM_FRAME = sourceFrame([1024, 1536], [342, 73, 799, 1502], [706.48, 289.975, 155.38, 464.425], girlSilhouettes["left-arm"]);
+const GIRL_RIGHT_ARM_FRAME = sourceFrame([1024, 1536], [283, 73, 682, 1474], [411.82, 289.975, 135.66, 455.325], girlSilhouettes["right-arm"]);
+const GIRL_TORSO_FRAME = sourceFrame([1086, 1448], [219, 188, 868, 1294], [490.92, 244.36, 272.58, 453.46]);
+const GIRL_NECK_FRAME = sourceFrame([1254, 1254], [200, 992, 1050, 1159], [520.75, 265.16, 212.5, 55.67]);
+const GIRL_HEAD_FRAME = sourceFrame([1254, 1254], [200, 615, 1050, 995], [520.75, 160, 212.5, 106]);
+const GIRL_CROWN_FRAME = sourceFrame([1254, 1254], [200, 99, 1050, 615.5], [520.75, 38.055, 212.5, 122.085]);
 const GIRL_BODY_SPRITES = [
-  { id: "left-leg", region: "upperLegLeft", layer: "bodyBack",
-    source: require("../../assets/avatar/v2/body-girl/left-leg.png"),
-    frame: sourceFrame([1024, 1536], [397, 82, 739, 1435], [597.8, 584.15, 205.2, 623.5], girlSilhouettes["left-leg"], -0.02) },
-  { id: "right-leg", region: "upperLegRight", layer: "bodyBack",
-    source: require("../../assets/avatar/v2/body-girl/right-leg.png"),
-    frame: sourceFrame([1024, 1536], [381, 47, 642, 1397], [465, 584.15, 156.6, 623.5], girlSilhouettes["right-leg"], -0.045) },
-  { id: "left-arm", region: "upperArmLeft", layer: "bodyBack",
-    source: require("../../assets/avatar/v2/body-girl/left-arm.png"),
-    frame: sourceFrame([1024, 1536], [342, 73, 799, 1502], [706.48, 289.975, 155.38, 464.425], girlSilhouettes["left-arm"]) },
-  { id: "right-arm", region: "upperArmRight", layer: "bodyBack",
-    source: require("../../assets/avatar/v2/body-girl/right-arm.png"),
-    frame: sourceFrame([1024, 1536], [283, 73, 682, 1474], [411.82, 289.975, 135.66, 455.325], girlSilhouettes["right-arm"]) },
-  { id: "torso", region: "torso", layer: "baseBody",
-    source: require("../../assets/avatar/v2/body-girl/torso.png"),
-    frame: sourceFrame([1086, 1448], [219, 188, 868, 1294], [490.92, 244.36, 272.58, 453.46]) },
-  { id: "neck", region: "neck", layer: "bodyBack", source: GIRL_HEAD,
-    frame: sourceFrame([1254, 1254], [200, 992, 1050, 1159], [520.75, 265.16, 212.5, 55.67]) },
-  { id: "head", region: "head", layer: "bodyFront", source: GIRL_HEAD,
-    frame: sourceFrame([1254, 1254], [200, 615, 1050, 995], [520.75, 160, 212.5, 106]) },
-  { id: "crown", region: "head", layer: "bodyFront", source: GIRL_HEAD,
-    frame: sourceFrame([1254, 1254], [200, 99, 1050, 615.5], [520.75, 38.055, 212.5, 122.085]) },
+  ...skinPair("left-leg", GIRL_SKIN["left-leg"], "upperLegLeft", "bodyBack", GIRL_LEFT_LEG_FRAME),
+  ...skinPair("right-leg", GIRL_SKIN["right-leg"], "upperLegRight", "bodyBack", GIRL_RIGHT_LEG_FRAME),
+  ...skinPair("left-arm", GIRL_SKIN["left-arm"], "upperArmLeft", "bodyBack", GIRL_LEFT_ARM_FRAME),
+  ...skinPair("right-arm", GIRL_SKIN["right-arm"], "upperArmRight", "bodyBack", GIRL_RIGHT_ARM_FRAME),
+  ...skinPair("torso", GIRL_SKIN.torso, "torso", "baseBody", GIRL_TORSO_FRAME),
+  ...skinPair("neck", GIRL_SKIN.head, "neck", "bodyBack", GIRL_NECK_FRAME),
+  ...skinPair("head", GIRL_SKIN.head, "head", "bodyFront", GIRL_HEAD_FRAME, "face"),
+  ...eyePair("head", GIRL_EYES, GIRL_HEAD_FRAME),
+  ...skinPair("crown", GIRL_SKIN.head, "head", "bodyFront", GIRL_CROWN_FRAME, "face"),
 ] satisfies readonly BaseBodySpriteDefinition[];
 
 export const BASE_BODY_SPRITES: Record<
@@ -875,6 +925,7 @@ export function resolveSpriteSet(
     hairPart: definition.hairPart,
     tuckPonytail: definition.tuckPonytail,
     fullOutfit: definition.fullOutfit,
+    tint: definition.tint,
     region: "region" in definition ? definition.region : undefined,
     covers,
   }));

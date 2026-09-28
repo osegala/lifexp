@@ -14,6 +14,9 @@ export type Avatar = {
   id: string;
   baseStyle: string;
   bodyType: "BOY" | "GIRL";
+  skinColorId: string;
+  hairColorId: string;
+  eyeColorId: string;
   equippedHairId: CosmeticId | null;
   equippedHatId: CosmeticId | null;
   equippedTopId: CosmeticId | null;

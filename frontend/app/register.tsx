@@ -18,7 +18,8 @@ import AvatarRenderer from "../src/components/AvatarRenderer";
 import { authErrorMessage } from "../src/auth/errors";
 import { useAuth } from "../src/context/AuthContext";
 import { colors, radius, spacing } from "../src/theme/theme";
-import { setLocalBodyType } from "../src/avatar/localAppearance";
+import { api } from "../src/api/client";
+import { apiRoutes } from "../src/api/routes";
 
 const skyImage = require("../assets/base/backgrounds/sky.png");
 const baseImage = require("../assets/base/buildings/library/library-level-1.png");
@@ -53,11 +54,11 @@ export default function RegisterScreen() {
       setLoading(true);
       setError("");
       const nextStep = await register(trimmedUsername, trimmedEmail, password, bodyType);
-      await setLocalBodyType(bodyType);
       if (nextStep === "CONFIRM_SIGN_UP") {
         setAwaitingConfirmation(true);
       } else {
         await login(trimmedEmail, password);
+        await api.patch(apiRoutes.me, { bodyType });
         router.replace("/(tabs)/dashboard");
       }
     } catch (error) {
@@ -77,6 +78,7 @@ export default function RegisterScreen() {
       setLoading(true);
       setError("");
       await confirmRegistration(email.trim(), confirmationCode.trim(), password);
+      await api.patch(apiRoutes.me, { bodyType });
       router.replace("/(tabs)/dashboard");
     } catch (error) {
       setError(authErrorMessage(error, "confirm"));

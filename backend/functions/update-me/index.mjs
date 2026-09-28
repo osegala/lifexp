@@ -1,6 +1,10 @@
 import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import { ProfilePatchError, validateProfilePatch } from "./logic.mjs";
 import {
+    APPEARANCE_VALUES,
+    normalizeAppearance
+} from "/opt/nodejs/appearance.mjs";
+import {
     authSubject,
     badRequest,
     handleApiError,
@@ -28,7 +32,7 @@ export const handler = async (event) => {
     catch (error) { return handleApiError(error, "Update profile JSON parsing failed"); }
 
     let patch;
-    try { patch = validateProfilePatch(body); }
+    try { patch = validateProfilePatch(body, APPEARANCE_VALUES); }
     catch (error) {
         if (error instanceof ProfilePatchError) return badRequest(error.code, error.message);
         throw error;
@@ -53,10 +57,12 @@ export const handler = async (event) => {
             ReturnValues: "ALL_NEW"
         }));
 
+        const appearance = normalizeAppearance(result.Attributes);
         return response(200, {
             message: "Profile updated",
             displayName: result.Attributes?.displayName?.S ?? "Adventurer",
             timeZone: result.Attributes?.timeZone?.S ?? "UTC",
+            ...appearance,
             updatedAt: result.Attributes?.updatedAt?.S ?? values[":updatedAt"].S
         });
     } catch (error) {

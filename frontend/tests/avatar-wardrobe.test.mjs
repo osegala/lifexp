@@ -5,9 +5,9 @@ import test from "node:test";
 import {
   avatarFromInventory,
   catalogCosmeticReference,
-  loadOptionalAppearance,
   wardrobeCosmetics,
 } from "../src/avatar/inventory.ts";
+import { DEFAULT_APPEARANCE, loadOptionalAppearance } from "../src/avatar/appearance.ts";
 
 const hairIds = [
   "avatar-v2/hair/windblown-layers",
@@ -121,13 +121,12 @@ test("inventory remains authoritative for ownership and equipped state", () => {
   );
   assert.equal(withInventory.unlocked, true);
   assert.equal(withInventory.equipped, true);
-  assert.equal(avatarFromInventory(equippedInventory).equippedTopId, "starter_tunic");
+  assert.equal(avatarFromInventory(equippedInventory, DEFAULT_APPEARANCE).equippedTopId, "starter_tunic");
 });
 
 test("optional local appearance failures retain the catalog wardrobe", async () => {
   const appearance = await loadOptionalAppearance(
-    async () => { throw new Error("body storage unavailable"); },
-    async () => { throw new Error("hair storage unavailable"); },
+    async () => { throw new Error("appearance storage unavailable"); },
   );
   const cosmetics = wardrobeCosmetics(
     shop([shopItem({ owned: true, status: "OWNED" })]),
@@ -136,7 +135,13 @@ test("optional local appearance failures retain the catalog wardrobe", async () 
     appearance.hairId,
     metadata,
   );
-  assert.deepEqual(appearance, { bodyType: "BOY", hairId: null });
+  assert.deepEqual(appearance, {
+    bodyType: "BOY",
+    hairId: "avatar-v2/hair/windblown-layers",
+    skinColorId: "skin_04",
+    hairColorId: "brown",
+    eyeColorId: "brown",
+  });
   assert.equal(cosmetics.length, 11);
 });
 
@@ -146,6 +151,7 @@ test("appearance storage uses web localStorage, native SecureStore, and safe fal
   assert.match(source, /globalThis\.localStorage\?\.getItem/);
   assert.match(source, /globalThis\.localStorage\?\.setItem/);
   assert.match(source, /SecureStore\.getItemAsync/);
+  assert.match(source, /evrenthia\.avatar\.\$\{encodeURIComponent\(String\(userId\)\)\}\.appearance/);
   assert.match(source, /catch \(error\)[\s\S]*return null/);
 });
 
@@ -249,11 +255,11 @@ test("retired equipment concepts are absent from active types and rendering", ()
   ]) assert.ok(activeSources.every((source) => !source.includes(retired)), retired);
 });
 
-test("hair remains local while hats retain clipping and ponytail rules", () => {
+test("hair is server-saved while hats retain clipping and ponytail rules", () => {
   const avatarScreen = readFileSync(new URL("../app/(tabs)/avatar.tsx", import.meta.url), "utf8");
   const registry = readFileSync(new URL("../src/avatar/assetRegistry.ts", import.meta.url), "utf8");
-  assert.match(avatarScreen, /cosmetic\.type === "HAIR"[\s\S]*?setLocalHairId/);
-  assert.match(avatarScreen, /setAvatar\(\(current\)[\s\S]*equippedHairId/);
+  assert.match(avatarScreen, /cosmetic\.type === "HAIR"[\s\S]*?updateAppearance/);
+  assert.match(avatarScreen, /api\.patch<AvatarAppearance>\(apiRoutes\.me, draftAppearance\)/);
   assert.match(registry, /hairClip/);
   assert.match(registry, /headClip/);
   assert.match(registry, /tuckPonytail/);

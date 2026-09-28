@@ -1,12 +1,14 @@
 import { useId } from "react";
-import Svg, { ClipPath, Defs, G, Image, Path, Rect, Use } from "react-native-svg";
+import Svg, { ClipPath, Defs, FeColorMatrix, Filter, G, Image, Path, Rect, Use } from "react-native-svg";
 
 import type { ResolvedCharacterSprite } from "../avatar/assetRegistry";
 import { sourceFrameTransform, spriteImageRect, spriteTransform, trouserTuckPath, trouserTuckSlices } from "../avatar/spriteLayout";
+import { grayscaleTintMatrix } from "../avatar/colorize";
 
 /** One shared coordinate space keeps clipping identical at every avatar size. */
-export default function CharacterSpriteLayers({ sprites }: {
+export default function CharacterSpriteLayers({ sprites, tintColors }: {
   sprites: readonly ResolvedCharacterSprite[];
+  tintColors: Readonly<Record<"skin" | "hair" | "eyes", string>>;
 }) {
   const id = useId().replace(/:/g, "");
   const tuckId = `${id}-tuck`;
@@ -22,6 +24,11 @@ export default function CharacterSpriteLayers({ sprites }: {
   return (
     <Svg width="100%" height="100%" viewBox="0 -64 1254 1318">
       <Defs>
+        {Object.entries(tintColors).map(([channel, color]) => (
+          <Filter key={channel} id={`${id}-tint-${channel}`} x="-10%" y="-10%" width="120%" height="120%">
+            <FeColorMatrix type="matrix" values={grayscaleTintMatrix(color)} />
+          </Filter>
+        ))}
         {hairClip && <ClipPath id={`${id}-hair`}><Path d={hairClip} /></ClipPath>}
         {headClip && <ClipPath id={`${id}-head`}><Path d={headClip} /></ClipPath>}
         {tuckPath && <ClipPath id={tuckId}><Path d={tuckPath} /></ClipPath>}
@@ -30,14 +37,18 @@ export default function CharacterSpriteLayers({ sprites }: {
         {/* Keep skin inside the neckline, without the starter shirt or hip edges. */}
         <ClipPath id={`${id}-dress-underlay`}><Rect x={584} y={0} width={86} height={390} /></ClipPath>
         <ClipPath id={`${id}-dress-legs`}><Rect x={0} y={900} width={1254} height={354} /></ClipPath>
-        {sprites.map(({ frame, source, clipPath }, index) => (
+        {sprites.map(({ frame, source, clipPath, tint }, index) => (
           <G key={index}>
             {frame && <ClipPath id={`${id}-frame-${index}`}><Rect {...frame.destination} /></ClipPath>}
             {frame?.sourceClipPath && <ClipPath id={`${id}-source-${index}`}>
               <Path d={frame.sourceClipPath} transform={sourceFrameTransform(frame)} clipRule="evenodd" fillRule="evenodd" />
             </ClipPath>}
             {clipPath && <ClipPath id={`${id}-shape-${index}`}><Path d={clipPath} clipRule="evenodd" fillRule="evenodd" /></ClipPath>}
-            <G id={`${id}-image-${index}`} clipPath={frame ? `url(#${id}-frame-${index})` : undefined}>
+            <G
+              id={`${id}-image-${index}`}
+              clipPath={frame ? `url(#${id}-frame-${index})` : undefined}
+              filter={tint ? `url(#${id}-tint-${tint})` : undefined}
+            >
               <G clipPath={clipPath ? `url(#${id}-shape-${index})` : undefined}>
                 <G clipPath={frame?.sourceClipPath ? `url(#${id}-source-${index})` : undefined}>
                   <Image href={source} {...spriteImageRect(frame)} preserveAspectRatio="none" />

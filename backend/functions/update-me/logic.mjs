@@ -16,11 +16,20 @@ export function isValidTimeZone(value) {
     }
 }
 
-export function validateProfilePatch(body) {
+const APPEARANCE_ERROR_CODES = {
+    bodyType: "INVALID_BODY_TYPE",
+    hairId: "INVALID_HAIR_ID",
+    skinColorId: "INVALID_SKIN_COLOR",
+    hairColorId: "INVALID_HAIR_COLOR",
+    eyeColorId: "INVALID_EYE_COLOR"
+};
+
+export function validateProfilePatch(body, appearanceValues = {}) {
     if (!body || typeof body !== "object" || Array.isArray(body)) {
         throw new ProfilePatchError("VALIDATION_ERROR", "Request body must be a JSON object.");
     }
-    const allowed = new Set(["displayName", "timeZone"]);
+    const appearanceFields = Object.keys(appearanceValues);
+    const allowed = new Set(["displayName", "timeZone", ...appearanceFields]);
     const unsupported = Object.keys(body).filter((key) => !allowed.has(key));
     if (unsupported.length) {
         throw new ProfilePatchError("VALIDATION_ERROR", `Field cannot be updated: ${unsupported[0]}.`);
@@ -41,6 +50,16 @@ export function validateProfilePatch(body) {
             throw new ProfilePatchError("INVALID_TIME_ZONE", "timeZone must be a valid IANA time zone.");
         }
         patch.timeZone = body.timeZone;
+    }
+    for (const field of appearanceFields) {
+        if (!Object.hasOwn(body, field)) continue;
+        if (typeof body[field] !== "string" || !appearanceValues[field].includes(body[field])) {
+            throw new ProfilePatchError(
+                APPEARANCE_ERROR_CODES[field] ?? "VALIDATION_ERROR",
+                `${field} is not a supported appearance value.`
+            );
+        }
+        patch[field] = body[field];
     }
     return patch;
 }

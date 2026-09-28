@@ -71,7 +71,7 @@ export default function ProfileScreen() {
     try {
       await api.delete(apiRoutes.me);
       await Promise.allSettled([
-        clearLocalAccountData(),
+        clearLocalAccountData(user?.id),
         clearDeletedAccountSession(),
       ]);
       router.replace({ pathname: "/login" });

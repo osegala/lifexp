@@ -30,13 +30,13 @@ test("confirmed deletion uses the canonical API and blocks repeated submissions"
 
 test("successful deletion clears account-local data and session before returning to login", () => {
   const request = profile.indexOf("await api.delete(apiRoutes.me)");
-  const localCleanup = profile.indexOf("clearLocalAccountData()", request);
+  const localCleanup = profile.indexOf("clearLocalAccountData(user?.id)", request);
   const sessionCleanup = profile.indexOf("clearDeletedAccountSession()", request);
   const navigation = profile.indexOf('router.replace({ pathname: "/login" })', request);
   assert.ok(request >= 0 && localCleanup > request && sessionCleanup > request && navigation > sessionCleanup);
 
   const cleanup = read("src/storage/localAccountData.ts");
-  assert.match(cleanup, /clearLocalAppearance\(\)/);
+  assert.match(cleanup, /clearLocalAppearance\(userId\)/);
   assert.match(cleanup, /SecureStore\.deleteItemAsync\(BASE_LAYOUT_STORAGE_KEY\)/);
   assert.match(cleanup, /localStorage\?\.removeItem\(BASE_LAYOUT_STORAGE_KEY\)/);
 });

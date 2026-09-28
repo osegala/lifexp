@@ -7,6 +7,7 @@ import { planEquip, EquipError } from "../functions/equip-item/logic.mjs";
 import { planUnequip, UnequipError } from "../functions/unequip-item/logic.mjs";
 import { validateProfilePatch, ProfilePatchError } from "../functions/update-me/logic.mjs";
 import { levelFromXp } from "../layers/api-shared/nodejs/leveling.mjs";
+import { APPEARANCE_VALUES } from "../layers/api-shared/nodejs/appearance.mjs";
 
 const catalogItem = {
     itemId: "moon-hat",
@@ -113,4 +114,22 @@ test("profile patch accepts editable fields and rejects invalid time zones", () 
         () => validateProfilePatch({ timeZone: "Moon/Tranquility" }),
         (error) => error instanceof ProfilePatchError && error.code === "INVALID_TIME_ZONE"
     );
+});
+
+test("profile patch preserves existing settings while accepting canonical appearance fields", () => {
+    assert.deepEqual(validateProfilePatch({
+        displayName: "Nova",
+        bodyType: "GIRL",
+        hairId: "avatar-v2/hair/long-shag",
+        skinColorId: "skin_12",
+        hairColorId: "purple",
+        eyeColorId: "green"
+    }, APPEARANCE_VALUES), {
+        displayName: "Nova",
+        bodyType: "GIRL",
+        hairId: "avatar-v2/hair/long-shag",
+        skinColorId: "skin_12",
+        hairColorId: "purple",
+        eyeColorId: "green"
+    });
 });

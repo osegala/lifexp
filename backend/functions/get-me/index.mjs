@@ -12,6 +12,7 @@ import {
     unauthorized
 } from "/opt/nodejs/http.mjs";
 import { levelInfo as progressionForXp } from "/opt/nodejs/leveling.mjs";
+import { normalizeAppearance } from "/opt/nodejs/appearance.mjs";
 
 const client =
     new DynamoDBClient({});
@@ -75,6 +76,8 @@ async (event) => {
                         ?.S
                     ??
                     "UTC",
+
+                ...normalizeAppearance(profile),
 
                 level:
                     levelInfo.level,

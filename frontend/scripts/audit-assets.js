@@ -129,6 +129,7 @@ function describe(file) {
       pets: "pets",
       auras: "auras",
       backgrounds: "backgrounds",
+      appearance: "avatar appearance layers",
     };
 
     if (group === "aligned") {
@@ -148,13 +149,13 @@ function describe(file) {
         type = "tunics";
         id = basename === "guild-belt" ? "avatar-v2/tops/guild-tunic" : `avatar-v2/tops/${basename}`;
       }
-      intentionalUnregistered = ["high-ponytail-hair", "long-shag-hair", "twin-braids-hair"].includes(basename);
+      intentionalUnregistered = basename.endsWith("-hair");
     } else if (avatarTypes[group]) {
       type = avatarTypes[group];
       id = ["body", "body-girl"].includes(group)
         ? `body:${group === "body" ? "BOY" : "GIRL"}/${basename}`
         : `avatar-v2/${group}/${basename}`;
-      intentionalUnregistered = group === "body" && basename === "head-neck";
+      intentionalUnregistered = ["body", "body-girl"].includes(group);
     }
   } else if (parts[0] === "base") {
     if (parts[1] === "buildings") {

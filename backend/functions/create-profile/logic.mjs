@@ -35,6 +35,11 @@ export function profilePutRequest(tableName, event, now = new Date().toISOString
             worldPoints: { N: "0" },
             tasksCompleted: { N: "0" },
             timeZone: { S: "UTC" },
+            bodyType: { S: "BOY" },
+            hairId: { S: "avatar-v2/hair/windblown-layers" },
+            skinColorId: { S: "skin_04" },
+            hairColorId: { S: "brown" },
+            eyeColorId: { S: "brown" },
             createdAt: { S: now },
             updatedAt: { S: now }
         },

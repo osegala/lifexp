@@ -16,10 +16,20 @@ import {
 } from "../avatar/cosmeticCatalog";
 import { Cosmetic, CosmeticId } from "../types/avatar";
 import { colors } from "../theme/theme";
+import {
+  appearanceColor,
+  DEFAULT_APPEARANCE,
+  EYE_COLORS,
+  HAIR_COLORS,
+  SKIN_COLORS,
+} from "../avatar/appearance";
 
 type Props = {
   bodyType?: "BOY" | "GIRL";
   hairId?: CosmeticId | null;
+  skinColorId?: string;
+  hairColorId?: string;
+  eyeColorId?: string;
   hatId?: CosmeticId | null;
   topId?: CosmeticId | null;
   bottomId?: CosmeticId | null;
@@ -35,6 +45,9 @@ type Props = {
 export default function AvatarRenderer({
   bodyType = "BOY",
   hairId,
+  skinColorId = DEFAULT_APPEARANCE.skinColorId,
+  hairColorId = DEFAULT_APPEARANCE.hairColorId,
+  eyeColorId = DEFAULT_APPEARANCE.eyeColorId,
   hatId,
   topId,
   bottomId,
@@ -73,6 +86,11 @@ export default function AvatarRenderer({
       ({ region }) => region === undefined || !coveredBodyRegions.has(region),
     ),
   );
+  const tintColors = {
+    skin: appearanceColor(SKIN_COLORS, skinColorId, DEFAULT_APPEARANCE.skinColorId),
+    hair: appearanceColor(HAIR_COLORS, hairColorId, DEFAULT_APPEARANCE.hairColorId),
+    eyes: appearanceColor(EYE_COLORS, eyeColorId, DEFAULT_APPEARANCE.eyeColorId),
+  };
 
   if (__DEV__ && SHOW_CHARACTER_LAYER_DEBUG) {
     console.info(
@@ -112,7 +130,7 @@ export default function AvatarRenderer({
           .map(({ layer }) => layer)
           .join(", ")}`}
       >
-        <CharacterSpriteLayers sprites={characterSprites} />
+        <CharacterSpriteLayers sprites={characterSprites} tintColors={tintColors} />
       </View>
 
       {petImage ? (

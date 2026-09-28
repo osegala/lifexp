@@ -6,6 +6,7 @@ import type {
   InventoryResponse,
 } from "../types/avatar";
 import type { ShopItem, ShopResponse } from "../types";
+import type { AvatarAppearance } from "./appearance";
 
 const CATEGORY_TYPES: Record<string, CosmeticType> = {
   tunic: "TOP",
@@ -109,20 +110,6 @@ function wardrobeRequirement(item: ShopItem, playerLevel: number, owned: boolean
   return requirements.join(" · ") || `Available in the Shop · ${item.effectivePrice} coins`;
 }
 
-export async function loadOptionalAppearance(
-  getBodyType: () => Promise<"BOY" | "GIRL">,
-  getHairId: () => Promise<string | null>,
-) {
-  const [bodyType, hairId] = await Promise.allSettled([
-    getBodyType(),
-    getHairId(),
-  ]);
-  return {
-    bodyType: bodyType.status === "fulfilled" ? bodyType.value : "BOY" as const,
-    hairId: hairId.status === "fulfilled" ? hairId.value : null,
-  };
-}
-
 function titleFromAssetId(assetId: string) {
   return assetId.split("/").at(-1)?.replace(/(^|-)([a-z])/g, (_, separator, letter) =>
     `${separator ? " " : ""}${letter.toUpperCase()}`) ?? assetId;
@@ -130,15 +117,17 @@ function titleFromAssetId(assetId: string) {
 
 export function avatarFromInventory(
   inventory: InventoryResponse,
-  bodyType: "BOY" | "GIRL" = "BOY",
-  localHairId?: string | null,
+  appearance: AvatarAppearance,
 ): Avatar {
   const equipment = inventory.equipped;
   return {
     id: "local-avatar",
     baseStyle: "default",
-    bodyType,
-    equippedHairId: localHairId === undefined ? equipment.hair : localHairId,
+    bodyType: appearance.bodyType,
+    skinColorId: appearance.skinColorId,
+    hairColorId: appearance.hairColorId,
+    eyeColorId: appearance.eyeColorId,
+    equippedHairId: appearance.hairId,
     equippedHatId: equipment.hat,
     equippedTopId: equipment.tunic,
     equippedBottomId: equipment.pants,

@@ -24,12 +24,17 @@ import {
 } from "../../src/avatar/assetRegistry";
 import {
   avatarFromInventory,
-  loadOptionalAppearance,
   wardrobeCosmetics,
 } from "../../src/avatar/inventory";
-import { getLocalBodyType, getLocalHairId, setLocalHairId } from "../../src/avatar/localAppearance";
+import {
+  getLocalAppearance,
+  setLocalAppearance,
+} from "../../src/avatar/localAppearance";
+import { loadPreferredAppearance, normalizeAppearance } from "../../src/avatar/appearance";
+import type { AvatarAppearance } from "../../src/avatar/appearance";
 import CosmeticImage from "../../src/components/CosmeticImage";
 import AvatarRenderer from "../../src/components/AvatarRenderer";
+import AppearanceEditor from "../../src/components/AppearanceEditor";
 import LifeCard from "../../src/components/LifeCard";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme/theme";
@@ -64,23 +69,30 @@ export default function AvatarScreen() {
   const [cosmetics, setCosmetics] = useState<Cosmetic[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingId, setLoadingId] = useState<CosmeticId | null>(null);
+  const [savingAppearance, setSavingAppearance] = useState(false);
+  const [savedAppearance, setSavedAppearance] = useState<AvatarAppearance | null>(null);
   const [selectedType, setSelectedType] = useState<CosmeticType>("HAIR");
 
   const loadAvatarData = useCallback(async () => {
+    if (!user) return;
     try {
       setLoading(true);
       const [shopResponse, inventoryResponse, appearance] = await Promise.all([
         api.get<ShopResponse>(apiRoutes.shop),
         api.get<InventoryResponse>(apiRoutes.inventory),
-        loadOptionalAppearance(getLocalBodyType, getLocalHairId),
+        loadPreferredAppearance(
+          async () => (await api.get<AvatarAppearance>(apiRoutes.me)).data,
+          () => getLocalAppearance(user.id),
+          (serverAppearance) => setLocalAppearance(user.id, serverAppearance),
+        ),
       ]);
-      const { bodyType, hairId } = appearance;
-      setAvatar(avatarFromInventory(inventoryResponse.data, bodyType, hairId));
+      setSavedAppearance(appearance);
+      setAvatar(avatarFromInventory(inventoryResponse.data, appearance));
       setCosmetics(wardrobeCosmetics(
         shopResponse.data,
         inventoryResponse.data,
         BUILT_IN_HAIR_IDS,
-        hairId,
+        appearance.hairId,
         getCosmeticAssetMetadata,
         (itemId, assetKey) => {
           if (__DEV__) console.warn(`Unresolved wardrobe asset for ${itemId}: ${assetKey || "<missing>"}`);
@@ -91,7 +103,7 @@ export default function AvatarScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -107,14 +119,7 @@ export default function AvatarScreen() {
     try {
       setLoadingId(cosmetic.id);
       if (cosmetic.type === "HAIR") {
-        const hairId = cosmetic.equipped ? null : String(cosmetic.id);
-        setAvatar((current) => current
-          ? { ...current, equippedHairId: hairId }
-          : current);
-        setCosmetics((current) => current.map((item) => item.type === "HAIR"
-          ? { ...item, equipped: item.id === hairId }
-          : item));
-        await setLocalHairId(hairId);
+        updateAppearance({ hairId: String(cosmetic.id) });
         return;
       }
       await api.post(
@@ -129,6 +134,46 @@ export default function AvatarScreen() {
     }
   }
 
+  function updateAppearance(patch: Partial<AvatarAppearance>) {
+    setAvatar((current) => current ? {
+      ...current,
+      ...(patch.bodyType ? { bodyType: patch.bodyType } : {}),
+      ...(patch.hairId ? { equippedHairId: patch.hairId } : {}),
+      ...(patch.skinColorId ? { skinColorId: patch.skinColorId } : {}),
+      ...(patch.hairColorId ? { hairColorId: patch.hairColorId } : {}),
+      ...(patch.eyeColorId ? { eyeColorId: patch.eyeColorId } : {}),
+    } : current);
+    if (patch.hairId) {
+      setCosmetics((current) => current.map((item) => item.type === "HAIR"
+        ? { ...item, equipped: item.id === patch.hairId }
+        : item));
+    }
+  }
+
+  async function saveAppearance() {
+    if (!user || !draftAppearance || !appearanceDirty || savingAppearance) return;
+    try {
+      setSavingAppearance(true);
+      const response = await api.patch<AvatarAppearance>(apiRoutes.me, draftAppearance);
+      const persisted = normalizeAppearance(response.data);
+      setSavedAppearance(persisted);
+      setAvatar((current) => current ? {
+        ...current,
+        bodyType: persisted.bodyType,
+        equippedHairId: persisted.hairId,
+        skinColorId: persisted.skinColorId,
+        hairColorId: persisted.hairColorId,
+        eyeColorId: persisted.eyeColorId,
+      } : current);
+      await setLocalAppearance(user.id, persisted);
+      Alert.alert("Appearance", "Your appearance is saved.");
+    } catch (error) {
+      Alert.alert("Appearance not saved", apiError(error, "Could not save your appearance.").message);
+    } finally {
+      setSavingAppearance(false);
+    }
+  }
+
   const activeSection =
     WARDROBE_SECTIONS.find((section) => section.type === selectedType) ??
     WARDROBE_SECTIONS[0];
@@ -137,6 +182,15 @@ export default function AvatarScreen() {
     [cosmetics, selectedType],
   );
   const equippedCosmetics = cosmetics.filter((cosmetic) => cosmetic.equipped);
+  const draftAppearance = avatar ? normalizeAppearance({
+    bodyType: avatar.bodyType,
+    hairId: typeof avatar.equippedHairId === "string" ? avatar.equippedHairId : undefined,
+    skinColorId: avatar.skinColorId,
+    hairColorId: avatar.hairColorId,
+    eyeColorId: avatar.eyeColorId,
+  }) : null;
+  const appearanceDirty = Boolean(draftAppearance && savedAppearance
+    && JSON.stringify(draftAppearance) !== JSON.stringify(savedAppearance));
   const backgroundImage = getEquippedSceneSource(cosmetics, avatar?.equippedBackgroundId, "BACKGROUND");
   const mobileGridWidth = width - spacing.lg * 2;
   const cardWidth = width >= 900 ? 210 : width >= 620 ? 190
@@ -178,6 +232,9 @@ export default function AvatarScreen() {
             petId={avatar?.equippedPetId}
             auraId={avatar?.equippedAuraId}
             bodyType={avatar?.bodyType}
+            skinColorId={avatar?.skinColorId}
+            hairColorId={avatar?.hairColorId}
+            eyeColorId={avatar?.eyeColorId}
             cosmetics={cosmetics}
           />
         </View>
@@ -203,6 +260,16 @@ export default function AvatarScreen() {
           </View>
         </View>
       </LifeCard>
+
+      {draftAppearance && (
+        <AppearanceEditor
+          appearance={draftAppearance}
+          dirty={appearanceDirty}
+          saving={savingAppearance}
+          onChange={updateAppearance}
+          onSave={() => void saveAppearance()}
+        />
+      )}
 
       <ScrollView
         horizontal
@@ -356,7 +423,8 @@ function CosmeticCard({
         disabled={!cosmetic.unlocked || loading}
         style={({ pressed }) => [
           styles.equipButton,
-          cosmetic.equipped && styles.unequipButton,
+          cosmetic.equipped && cosmetic.type !== "HAIR" && styles.unequipButton,
+          cosmetic.equipped && cosmetic.type === "HAIR" && styles.selectedHairButton,
           !cosmetic.unlocked && styles.lockedButton,
           pressed && styles.pressedButton,
         ]}
@@ -372,7 +440,7 @@ function CosmeticCard({
             ]}
           >
             {cosmetic.equipped
-              ? "Unequip"
+              ? cosmetic.type === "HAIR" ? "Selected" : "Unequip"
               : cosmetic.unlocked
                 ? "Equip"
                 : "Locked"}
@@ -663,6 +731,9 @@ const styles = StyleSheet.create({
   },
   unequipButton: {
     backgroundColor: "#7A3E46",
+  },
+  selectedHairButton: {
+    backgroundColor: "#285C49",
   },
   lockedButton: {
     backgroundColor: colors.cardLight,

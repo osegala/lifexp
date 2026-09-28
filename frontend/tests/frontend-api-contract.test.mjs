@@ -126,11 +126,11 @@ test("social and interior screens are inert and hidden from tab navigation", () 
   assert.match(read("app/(tabs)/_layout.tsx"), /name="social"[\s\S]*?href: null/);
 });
 
-test("body type stays in local appearance storage and PATCH me sends only supported fields", () => {
+test("body type persists through PATCH me and profile settings remain narrowly scoped", () => {
   const register = read("app/register.tsx");
   const profile = read("app/(tabs)/profile.tsx");
   const session = read("src/auth/session.ts");
-  assert.match(register, /setLocalBodyType\(bodyType\)/);
+  assert.match(register, /api\.patch\(apiRoutes\.me, \{ bodyType \}\)/);
   assert.match(profile, /api\.patch\(apiRoutes\.me, \{\s*displayName: displayName\.trim\(\),\s*timeZone: timeZone\.trim\(\),\s*\}\)/);
   assert.doesNotMatch(profile, /bodyType|xp\s*:|coins\s*:|worldPoints\s*:/);
   assert.doesNotMatch(session, /api\.patch|client\.patch/);

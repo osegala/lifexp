@@ -29,6 +29,58 @@ for (const [, source] of fs.readFileSync(registryPath, "utf8")
   sourceSizes.set(path.relative(avatarRoot, path.resolve(path.dirname(registryPath), source)), [1086, 1448]);
 }
 
+const appearancePairs = [];
+for (const part of ["head", "neck", "torso", "left-arm", "right-arm", "left-leg", "right-leg"]) {
+  appearancePairs.push([
+    `appearance/skin/boy/${part}-neutral.png`,
+    `appearance/skin/boy/${part}-details.png`,
+    [1254, 1254],
+  ]);
+}
+appearancePairs.push([
+  "appearance/skin/girl/head-neutral.png",
+  "appearance/skin/girl/head-details.png",
+  [1254, 1254],
+]);
+appearancePairs.push([
+  "appearance/skin/girl/torso-neutral.png",
+  "appearance/skin/girl/torso-details.png",
+  [1086, 1448],
+]);
+for (const part of ["left-arm", "right-arm", "left-leg", "right-leg"]) {
+  appearancePairs.push([
+    `appearance/skin/girl/${part}-neutral.png`,
+    `appearance/skin/girl/${part}-details.png`,
+    [1024, 1536],
+  ]);
+}
+for (const bodyType of ["boy", "girl"]) {
+  appearancePairs.push([
+    `appearance/eyes/${bodyType}/iris-mask.png`,
+    `appearance/eyes/${bodyType}/eye-details.png`,
+    [1254, 1254],
+  ]);
+}
+for (const [first, second, dimensions] of appearancePairs) {
+  sourceSizes.set(first, dimensions);
+  sourceSizes.set(second, dimensions);
+}
+for (const file of [
+  "aligned/windblown-layers-neutral.png",
+  "aligned/side-swept-layers-neutral.png",
+  "aligned/spring-curls-neutral.png",
+  "aligned/skyward-spikes-neutral.png",
+  "aligned/tousled-layers-neutral.png",
+  "aligned/curtain-bob-neutral.png",
+  "aligned/feathered-sweep-neutral.png",
+  "framed/high-ponytail-neutral.png",
+  "framed/long-shag-neutral.png",
+  "framed/twin-braids-neutral.png",
+  "framed/twin-braids-details.png",
+]) {
+  sourceSizes.set(`appearance/hair/${file}`, [1254, 1254]);
+}
+
 let hasErrors = false;
 
 for (const [relativePath, [expectedWidth, expectedHeight]] of sourceSizes) {
