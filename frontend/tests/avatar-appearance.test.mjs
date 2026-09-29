@@ -156,12 +156,13 @@ test("existing hat clips, ponytail tuck, dress coverage, and paid ownership gate
   assert.match(inventorySource, /unlocked: Boolean\(owned\)/);
 });
 
-test("starter tunic and normalized dresses opt into shoulder-cap coverage", () => {
+test("starter tunic retains shoulder coverage while corrected dresses expose their armholes", () => {
   const registry = read("../src/avatar/assetRegistry.ts");
   const layers = read("../src/components/CharacterSpriteLayers.tsx");
-  assert.equal((registry.match(/coversShoulderCaps: true/g) ?? []).length, 2);
+  assert.equal((registry.match(/coversShoulderCaps: true/g) ?? []).length, 1);
   assert.match(registry, /sprite\("vest", "upperBody", GUILD_TUNIC\), coversShoulderCaps: true/);
-  assert.match(registry, /layer: "upperBody", source, fullOutfit: true, coversShoulderCaps: true/);
+  assert.match(registry, /layer: "upperBody", source, fullOutfit: true,/);
+  assert.doesNotMatch(registry, /layer: "upperBody", source, fullOutfit: true, coversShoulderCaps: true/);
   assert.match(layers, /covered-shoulders/);
   assert.match(layers, /region === "torso" \|\| region === "upperArmLeft" \|\| region === "upperArmRight"/);
   assert.match(layers, /fullOutfit && \(region === "torso" \|\| region === "neck"\)/);
@@ -172,24 +173,24 @@ test("starter tunic and normalized dresses opt into shoulder-cap coverage", () =
   );
 });
 
-test("corrected dresses can use body-specific front and back rig layers", () => {
+test("dress correction contract keeps one shared sprite and no unused split-layer rig", () => {
   const registry = read("../src/avatar/assetRegistry.ts");
   const renderer = read("../src/components/AvatarRenderer.tsx");
   const catalog = read("../src/avatar/cosmeticCatalog.ts");
   const contract = read("../assets/avatar/v2/dresses/REPLACEMENT_SPEC.md");
-  assert.match(registry, /bodyType\?: BodyType/);
-  assert.match(registry, /!definition\.bodyType \|\| definition\.bodyType === bodyType/);
-  assert.equal((renderer.match(/getEquippedCharacterSprites\([^\n]+bodyType\)/g) ?? []).length, 1);
-  assert.match(renderer, /getEquippedCharacterSprites\(cosmetics, topId, "TOP", bodyType\)/);
-  assert.ok(catalog.indexOf("clothingBack: 36") < catalog.indexOf("bodyBack: 38"));
+  assert.doesNotMatch(registry, /bodyType\?: BodyType/);
+  assert.doesNotMatch(registry, /definition\.bodyType/);
+  assert.match(renderer, /getEquippedCharacterSprites\(cosmetics, topId, "TOP"\)/);
+  assert.doesNotMatch(catalog, /clothingBack/);
+  assert.match(contract, /Keep one flattened sprite per dress/);
+  assert.match(contract, /artwork-candidates\/avatar\/v2\/dresses\/forest-ranger-armhole-candidate\.png/);
+  assert.match(contract, /GO for applying the same[\s\S]*remaining nine dresses/);
+  assert.doesNotMatch(contract, /aligned\/boy|aligned\/girl|-front\.png|-back\.png/);
   for (const id of [
     "starlight", "forest-ranger", "frostbound", "teal-wayfarer", "crimson-guard",
     "royal-vanguard", "royal-bard", "harbor-scout", "verdant-warden", "celestial-acolyte",
   ]) {
-    assert.match(contract, new RegExp(`aligned/boy/${id}-front\\.png`));
-    assert.match(contract, new RegExp(`aligned/boy/${id}-back\\.png`));
-    assert.match(contract, new RegExp(`aligned/girl/${id}-front\\.png`));
-    assert.match(contract, new RegExp(`aligned/girl/${id}-back\\.png`));
+    assert.match(contract, new RegExp(`artwork-candidates/avatar/v2/dresses/${id}-armhole-candidate\\.png`));
   }
 });
 

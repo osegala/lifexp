@@ -1,7 +1,6 @@
 import { ImageSourcePropType } from "react-native";
 
 import type { BodyRegion, CharacterLayer } from "./cosmeticCatalog";
-import type { BodyType } from "./appearance";
 import type { BootCuff, ImageCrop, SpriteFrame, TrouserLeg } from "./spriteLayout";
 import { Cosmetic, CosmeticId, CosmeticType, EquipmentSlot } from "../types/avatar";
 import girlSilhouettes from "../../assets/avatar/v2/body-girl/silhouettes.json";
@@ -20,7 +19,6 @@ export type CharacterSpriteDefinition = {
   tuckPonytail?: boolean;
   fullOutfit?: boolean;
   coversShoulderCaps?: boolean;
-  bodyType?: BodyType;
   tint?: "skin" | "hair" | "eyes";
 };
 
@@ -206,7 +204,7 @@ function sourceFrame(
   };
 }
 
-/** Legacy presentation-art fallback; corrected dresses should use aligned front/back rig sprites. */
+/** Dresses share the outfit slot on both bodies; saved trousers stay underneath. */
 function dressAsset(
   source: ImageSourcePropType,
   bounds: ArtworkBounds,
@@ -222,7 +220,7 @@ function dressAsset(
       { id: "bodice", from: shoulderY, to: waistY, y: 295, height: 275 },
       { id: "skirt", from: waistY, to: bottom + 4, y: 570, height: 610 },
     ].map(({ id, from, to, y, height }) => ({
-      id, layer: "upperBody", source, fullOutfit: true, coversShoulderCaps: true,
+      id, layer: "upperBody", source, fullOutfit: true,
       frame: sourceFrame([1086, 1448], [0, from, 1086, to], [274.05, y, 705.9, height]),
     })),
   };
@@ -868,7 +866,6 @@ export function getEquippedCharacterSprites(
   cosmetics: Cosmetic[] | undefined,
   cosmeticId: CosmeticId | null | undefined,
   type: CosmeticType,
-  bodyType?: BodyType,
 ): ResolvedCharacterSprite[] {
   if (!cosmeticId) return [];
 
@@ -883,7 +880,7 @@ export function getEquippedCharacterSprites(
   const definition = assetKey ? COSMETIC_ASSETS[assetKey] : undefined;
 
   if (assetKey && definition?.sprites) {
-    return resolveSpriteSet(assetKey, definition.sprites, definition.covers, bodyType);
+    return resolveSpriteSet(assetKey, definition.sprites, definition.covers);
   }
 
   const fallbackSource = typeof cosmeticId === "number"
@@ -926,9 +923,8 @@ export function resolveSpriteSet(
   assetKey: string,
   sprites: readonly (CharacterSpriteDefinition | BaseBodySpriteDefinition)[],
   covers: readonly BodyRegion[] = [],
-  bodyType?: BodyType,
 ): ResolvedCharacterSprite[] {
-  return sprites.filter((definition) => !definition.bodyType || definition.bodyType === bodyType).map((definition) => ({
+  return sprites.map((definition) => ({
     key: `${assetKey}:${definition.id}`,
     layer: definition.layer,
     source: definition.source,
