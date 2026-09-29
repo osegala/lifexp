@@ -19,6 +19,7 @@ export type BodyRegion =
 export const CHARACTER_LAYER_PRIORITY = {
   hairBack: 30,
   backAccessory: 35,
+  clothingBack: 36,
   bodyBack: 38,
   baseBody: 40,
   bottoms: 60,

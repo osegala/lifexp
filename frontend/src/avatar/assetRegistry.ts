@@ -1,6 +1,7 @@
 import { ImageSourcePropType } from "react-native";
 
 import type { BodyRegion, CharacterLayer } from "./cosmeticCatalog";
+import type { BodyType } from "./appearance";
 import type { BootCuff, ImageCrop, SpriteFrame, TrouserLeg } from "./spriteLayout";
 import { Cosmetic, CosmeticId, CosmeticType, EquipmentSlot } from "../types/avatar";
 import girlSilhouettes from "../../assets/avatar/v2/body-girl/silhouettes.json";
@@ -19,6 +20,7 @@ export type CharacterSpriteDefinition = {
   tuckPonytail?: boolean;
   fullOutfit?: boolean;
   coversShoulderCaps?: boolean;
+  bodyType?: BodyType;
   tint?: "skin" | "hair" | "eyes";
 };
 
@@ -204,7 +206,7 @@ function sourceFrame(
   };
 }
 
-/** Dresses share the outfit slot on both bodies; saved trousers stay underneath. */
+/** Legacy presentation-art fallback; corrected dresses should use aligned front/back rig sprites. */
 function dressAsset(
   source: ImageSourcePropType,
   bounds: ArtworkBounds,
@@ -866,6 +868,7 @@ export function getEquippedCharacterSprites(
   cosmetics: Cosmetic[] | undefined,
   cosmeticId: CosmeticId | null | undefined,
   type: CosmeticType,
+  bodyType?: BodyType,
 ): ResolvedCharacterSprite[] {
   if (!cosmeticId) return [];
 
@@ -880,7 +883,7 @@ export function getEquippedCharacterSprites(
   const definition = assetKey ? COSMETIC_ASSETS[assetKey] : undefined;
 
   if (assetKey && definition?.sprites) {
-    return resolveSpriteSet(assetKey, definition.sprites, definition.covers);
+    return resolveSpriteSet(assetKey, definition.sprites, definition.covers, bodyType);
   }
 
   const fallbackSource = typeof cosmeticId === "number"
@@ -923,8 +926,9 @@ export function resolveSpriteSet(
   assetKey: string,
   sprites: readonly (CharacterSpriteDefinition | BaseBodySpriteDefinition)[],
   covers: readonly BodyRegion[] = [],
+  bodyType?: BodyType,
 ): ResolvedCharacterSprite[] {
-  return sprites.map((definition) => ({
+  return sprites.filter((definition) => !definition.bodyType || definition.bodyType === bodyType).map((definition) => ({
     key: `${assetKey}:${definition.id}`,
     layer: definition.layer,
     source: definition.source,

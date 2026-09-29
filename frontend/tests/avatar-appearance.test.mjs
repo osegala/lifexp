@@ -11,7 +11,7 @@ import {
   normalizeAppearance,
   SKIN_COLORS,
 } from "../src/avatar/appearance.ts";
-import { avatarTintMatrix, grayscaleTintMatrix, skinTintMatrix } from "../src/avatar/colorize.ts";
+import { avatarTintMatrix, grayscaleTintMatrix, skinTintMatrix, skinToneRamp } from "../src/avatar/colorize.ts";
 import { avatarFromInventory } from "../src/avatar/inventory.ts";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -81,33 +81,42 @@ test("color matrix preserves grayscale luminance and alpha instead of flattening
   ]);
   const skinMatrix = avatarTintMatrix("skin", "#804020");
   assert.deepEqual(skinMatrix, skinTintMatrix("#804020"));
-  assert.equal(skinMatrix[4], (128 / 255) * 0.18 + 0.018);
-  assert.equal(skinMatrix[9], (64 / 255) * 0.1);
-  assert.equal(skinMatrix[14], (32 / 255) * 0.055);
+  assert.equal(skinMatrix[4], 0);
+  assert.equal(skinMatrix[9], 0);
+  assert.equal(skinMatrix[14], 0);
   assert.equal(skinMatrix[18], 1);
-  for (const [offset, target] of [[0, 128 / 255], [5, 64 / 255], [10, 32 / 255]]) {
-    const whiteOutput = skinMatrix[offset] + skinMatrix[offset + 1]
-      + skinMatrix[offset + 2] + skinMatrix[offset + 4];
-    assert.ok(Math.abs(whiteOutput - target) < 1e-12);
+  const ramp = skinToneRamp("#804020");
+  const applySkinMatrix = (gray, alpha = 1) => [0, 5, 10].map((offset) => (
+    skinMatrix[offset] * gray + skinMatrix[offset + 1] * gray
+      + skinMatrix[offset + 2] * gray + skinMatrix[offset + 3] * alpha
+      + skinMatrix[offset + 4]
+  ));
+  for (const [gray, target] of [[0.6, ramp.shadow], [0.78, ramp.midtone], [0.9, ramp.highlight]]) {
+    applySkinMatrix(gray).forEach((value, index) => {
+      assert.ok(Math.abs(value - target[index]) < 1e-12);
+    });
   }
+  assert.deepEqual(applySkinMatrix(0, 0), [0, 0, 0], "transparent pixels must remain colorless");
   assert.deepEqual(avatarTintMatrix("hair", "#804020"), grayscaleTintMatrix("#804020"));
+  assert.deepEqual(avatarTintMatrix("eyes", "#804020"), grayscaleTintMatrix("#804020"));
   const layers = read("../src/components/CharacterSpriteLayers.tsx");
   assert.match(layers, /values=\{avatarTintMatrix\(channel as "skin" \| "hair" \| "eyes", color\)\}/);
   assert.match(layers, /filter=\{tint \? `url\(#\$\{id\}-tint-\$\{tint\}\)`/);
 });
 
-test("light skin swatches remain warm and skin shadows retain color", () => {
+test("all skin presets produce warm shadow, midtone, and highlight ramps", () => {
   for (const { color } of SKIN_COLORS) {
     const red = Number.parseInt(color.slice(1, 3), 16);
     const green = Number.parseInt(color.slice(3, 5), 16);
     const blue = Number.parseInt(color.slice(5, 7), 16);
     assert.ok(red > green && green > blue, `${color} should retain a warm undertone`);
+    const ramp = skinToneRamp(color);
+    for (const [name, tone] of Object.entries(ramp)) {
+      assert.ok(tone[0] > tone[1] && tone[1] > tone[2], `${color} ${name} should stay warm`);
+      assert.ok(tone.every((channel) => channel >= 0 && channel <= 1), `${color} ${name} should be display-safe`);
+    }
+    assert.ok(ramp.shadow[0] / ramp.shadow[1] > ramp.midtone[0] / ramp.midtone[1]);
   }
-
-  const paleSkin = avatarTintMatrix("skin", SKIN_COLORS[0].color);
-  assert.ok(paleSkin[4] > paleSkin[9] && paleSkin[9] > paleSkin[14]);
-  assert.ok(paleSkin[14] > 0, "skin shadows should not collapse to neutral black");
-  assert.ok(paleSkin[4] / paleSkin[9] > 2, "skin shadows should retain a warm chromatic bias");
 });
 
 test("neutral skin, iris, and detail layers are independently registered", () => {
@@ -161,6 +170,27 @@ test("starter tunic and normalized dresses opt into shoulder-cap coverage", () =
       < layers.indexOf('coveredShoulder ? `${id}-covered-shoulders`'),
     "dress torso clipping must take precedence over shoulder-cap clipping",
   );
+});
+
+test("corrected dresses can use body-specific front and back rig layers", () => {
+  const registry = read("../src/avatar/assetRegistry.ts");
+  const renderer = read("../src/components/AvatarRenderer.tsx");
+  const catalog = read("../src/avatar/cosmeticCatalog.ts");
+  const contract = read("../assets/avatar/v2/dresses/REPLACEMENT_SPEC.md");
+  assert.match(registry, /bodyType\?: BodyType/);
+  assert.match(registry, /!definition\.bodyType \|\| definition\.bodyType === bodyType/);
+  assert.equal((renderer.match(/getEquippedCharacterSprites\([^\n]+bodyType\)/g) ?? []).length, 1);
+  assert.match(renderer, /getEquippedCharacterSprites\(cosmetics, topId, "TOP", bodyType\)/);
+  assert.ok(catalog.indexOf("clothingBack: 36") < catalog.indexOf("bodyBack: 38"));
+  for (const id of [
+    "starlight", "forest-ranger", "frostbound", "teal-wayfarer", "crimson-guard",
+    "royal-vanguard", "royal-bard", "harbor-scout", "verdant-warden", "celestial-acolyte",
+  ]) {
+    assert.match(contract, new RegExp(`aligned/boy/${id}-front\\.png`));
+    assert.match(contract, new RegExp(`aligned/boy/${id}-back\\.png`));
+    assert.match(contract, new RegExp(`aligned/girl/${id}-front\\.png`));
+    assert.match(contract, new RegExp(`aligned/girl/${id}-back\\.png`));
+  }
 });
 
 test("Avatar screen previews drafts and saves all five fields with one PATCH", () => {

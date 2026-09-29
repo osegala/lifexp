@@ -77,7 +77,7 @@ export default function AvatarRenderer({
       : []),
     ...getEquippedCharacterSprites(cosmetics, bottomId, "BOTTOM"),
     ...getEquippedCharacterSprites(cosmetics, bootsId, "BOOTS"),
-    ...getEquippedCharacterSprites(cosmetics, topId, "TOP"),
+    ...getEquippedCharacterSprites(cosmetics, topId, "TOP", bodyType),
   ];
   const coveredBodyRegions = new Set(
     equippedSprites.flatMap(({ covers }) => covers ?? []),
