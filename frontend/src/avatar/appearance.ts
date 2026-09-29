@@ -28,22 +28,22 @@ export const HAIR_STYLE_IDS = [
 ] as const;
 
 export const SKIN_COLORS: readonly AppearanceColor[] = [
-  { id: "skin_01", name: "Porcelain", color: "#F8E1D2" },
-  { id: "skin_02", name: "Ivory", color: "#F3D3BC" },
-  { id: "skin_03", name: "Light Neutral", color: "#EBC4A8" },
-  { id: "skin_04", name: "Light Warm", color: "#E7B392" },
-  { id: "skin_05", name: "Peach", color: "#DFA27F" },
-  { id: "skin_06", name: "Golden Beige", color: "#D1946F" },
-  { id: "skin_07", name: "Warm Beige", color: "#C48562" },
-  { id: "skin_08", name: "Tan", color: "#B87552" },
-  { id: "skin_09", name: "Warm Tan", color: "#A96645" },
-  { id: "skin_10", name: "Amber", color: "#98583D" },
-  { id: "skin_11", name: "Sienna", color: "#824A35" },
-  { id: "skin_12", name: "Chestnut", color: "#713E2F" },
-  { id: "skin_13", name: "Deep Neutral", color: "#603429" },
-  { id: "skin_14", name: "Deep Warm", color: "#512B24" },
-  { id: "skin_15", name: "Espresso", color: "#41231F" },
-  { id: "skin_16", name: "Ebony", color: "#321B19" },
+  { id: "skin_01", name: "Porcelain", color: "#FFD0B7" },
+  { id: "skin_02", name: "Ivory", color: "#F8C2A1" },
+  { id: "skin_03", name: "Light Neutral", color: "#F0B58E" },
+  { id: "skin_04", name: "Light Warm", color: "#E6A77F" },
+  { id: "skin_05", name: "Peach", color: "#DC9971" },
+  { id: "skin_06", name: "Golden Beige", color: "#D08C63" },
+  { id: "skin_07", name: "Warm Beige", color: "#C17D56" },
+  { id: "skin_08", name: "Tan", color: "#B16D49" },
+  { id: "skin_09", name: "Warm Tan", color: "#A16040" },
+  { id: "skin_10", name: "Amber", color: "#91533A" },
+  { id: "skin_11", name: "Sienna", color: "#814735" },
+  { id: "skin_12", name: "Chestnut", color: "#704032" },
+  { id: "skin_13", name: "Deep Neutral", color: "#60352B" },
+  { id: "skin_14", name: "Deep Warm", color: "#512D26" },
+  { id: "skin_15", name: "Espresso", color: "#43251F" },
+  { id: "skin_16", name: "Ebony", color: "#361E1A" },
 ];
 
 export const HAIR_COLORS: readonly AppearanceColor[] = [

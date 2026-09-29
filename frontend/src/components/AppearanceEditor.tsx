@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import {
   EYE_COLORS,
   HAIR_COLORS,
+  HAIR_STYLE_IDS,
   SKIN_COLORS,
 } from "../avatar/appearance";
 import type { AppearanceColor, AvatarAppearance, BodyType } from "../avatar/appearance";
@@ -15,9 +16,17 @@ type Props = {
   saving: boolean;
   onChange: (patch: Partial<AvatarAppearance>) => void;
   onSave: () => void;
+  showSaveButton?: boolean;
 };
 
-export default function AppearanceEditor({ appearance, dirty, saving, onChange, onSave }: Props) {
+export default function AppearanceEditor({
+  appearance,
+  dirty,
+  saving,
+  onChange,
+  onSave,
+  showSaveButton = true,
+}: Props) {
   return (
     <LifeCard style={styles.card}>
       <View style={styles.headingRow}>
@@ -40,6 +49,30 @@ export default function AppearanceEditor({ appearance, dirty, saving, onChange, 
         ))}
       </View>
 
+      <Text style={styles.label}>Hair style</Text>
+      <View accessibilityRole="radiogroup" style={styles.hairStyles}>
+        {HAIR_STYLE_IDS.map((hairId) => {
+          const selected = appearance.hairId === hairId;
+          return (
+            <Pressable
+              key={hairId}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: selected }}
+              onPress={() => onChange({ hairId })}
+              style={({ pressed }) => [
+                styles.hairStyle,
+                selected && styles.hairStyleSelected,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.hairStyleText, selected && styles.hairStyleTextSelected]}>
+                {hairStyleName(hairId)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <Text style={styles.label}>Skin tone</Text>
       <Swatches options={SKIN_COLORS} selectedId={appearance.skinColorId} onSelect={(skinColorId) => onChange({ skinColorId })} />
 
@@ -49,26 +82,32 @@ export default function AppearanceEditor({ appearance, dirty, saving, onChange, 
       <Text style={styles.label}>Eye color</Text>
       <Swatches options={EYE_COLORS} selectedId={appearance.eyeColorId} onSelect={(eyeColorId) => onChange({ eyeColorId })} />
 
-      <Text style={styles.hairHint}>Choose a hair style from the Hair shelf below.</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Save appearance"
-        disabled={!dirty || saving}
-        onPress={onSave}
-        style={({ pressed }) => [
-          styles.saveButton,
-          (!dirty || saving) && styles.saveButtonDisabled,
-          pressed && dirty && !saving && styles.pressed,
-        ]}
-      >
-        {saving ? <ActivityIndicator size="small" color={colors.background} /> : (
-          <Text style={[styles.saveText, !dirty && styles.saveTextDisabled]}>
-            {dirty ? "Save Appearance" : "Appearance Saved"}
-          </Text>
-        )}
-      </Pressable>
+      {showSaveButton && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Save appearance"
+          disabled={!dirty || saving}
+          onPress={onSave}
+          style={({ pressed }) => [
+            styles.saveButton,
+            (!dirty || saving) && styles.saveButtonDisabled,
+            pressed && dirty && !saving && styles.pressed,
+          ]}
+        >
+          {saving ? <ActivityIndicator size="small" color={colors.background} /> : (
+            <Text style={[styles.saveText, !dirty && styles.saveTextDisabled]}>
+              {dirty ? "Save Appearance" : "Appearance Saved"}
+            </Text>
+          )}
+        </Pressable>
+      )}
     </LifeCard>
   );
+}
+
+function hairStyleName(hairId: string) {
+  return hairId.split("/").at(-1)?.replace(/(^|-)([a-z])/g, (_, separator, letter) =>
+    `${separator ? " " : ""}${letter.toUpperCase()}`) ?? hairId;
 }
 
 function BodyChoice({ bodyType, selected, onPress }: {
@@ -135,11 +174,15 @@ const styles = StyleSheet.create({
   bodyChoiceSelected: { borderColor: colors.accent, backgroundColor: "#173329" },
   bodyChoiceText: { color: colors.mutedText, fontSize: 14, fontWeight: "800" },
   bodyChoiceTextSelected: { color: colors.accent },
+  hairStyles: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
+  hairStyle: { minHeight: 36, justifyContent: "center", borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardLight, paddingHorizontal: spacing.sm },
+  hairStyleSelected: { borderColor: colors.accent, backgroundColor: "#173329" },
+  hairStyleText: { color: colors.mutedText, fontSize: 11, fontWeight: "700" },
+  hairStyleTextSelected: { color: colors.accent },
   swatches: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   swatchShell: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "transparent" },
   swatchSelected: { borderColor: colors.accent, backgroundColor: colors.cardLight },
   swatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
-  hairHint: { color: colors.mutedText, fontSize: 12 },
   saveButton: { minHeight: 46, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.accent },
   saveButtonDisabled: { backgroundColor: colors.cardLight },
   saveText: { color: colors.background, fontSize: 13, fontWeight: "900" },

@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -38,6 +39,7 @@ import AppearanceEditor from "../../src/components/AppearanceEditor";
 import LifeCard from "../../src/components/LifeCard";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme/theme";
+import { environment } from "../../src/config/environment";
 import type { ShopResponse } from "../../src/types";
 import { Avatar, Cosmetic, CosmeticId, CosmeticType, InventoryResponse } from "../../src/types/avatar";
 
@@ -60,6 +62,19 @@ const WARDROBE_SECTIONS: WardrobeSection[] = [
   { title: "Auras", type: "AURA", icon: "star-four-points" },
 ];
 const BUILT_IN_HAIR_IDS = getCosmeticAssetIds("hair");
+const CAN_PREVIEW_ALL_COSMETICS = __DEV__ && environment.environment === "dev";
+const AVATAR_SLOT: Record<CosmeticType, keyof Pick<Avatar,
+  "equippedHairId" | "equippedHatId" | "equippedTopId" | "equippedBottomId"
+  | "equippedBootsId" | "equippedBackgroundId" | "equippedPetId" | "equippedAuraId">> = {
+  HAIR: "equippedHairId",
+  HAT: "equippedHatId",
+  TOP: "equippedTopId",
+  BOTTOM: "equippedBottomId",
+  BOOTS: "equippedBootsId",
+  BACKGROUND: "equippedBackgroundId",
+  PET: "equippedPetId",
+  AURA: "equippedAuraId",
+};
 
 export default function AvatarScreen() {
   const { user } = useAuth();
@@ -71,6 +86,8 @@ export default function AvatarScreen() {
   const [loadingId, setLoadingId] = useState<CosmeticId | null>(null);
   const [savingAppearance, setSavingAppearance] = useState(false);
   const [savedAppearance, setSavedAppearance] = useState<AvatarAppearance | null>(null);
+  const [editingAppearance, setEditingAppearance] = useState(false);
+  const [previewAllCosmetics, setPreviewAllCosmetics] = useState(false);
   const [selectedType, setSelectedType] = useState<CosmeticType>("HAIR");
 
   const loadAvatarData = useCallback(async () => {
@@ -112,6 +129,10 @@ export default function AvatarScreen() {
   );
 
   async function toggleCosmetic(cosmetic: Cosmetic) {
+    if (CAN_PREVIEW_ALL_COSMETICS && previewAllCosmetics) {
+      previewCosmetic(cosmetic);
+      return;
+    }
     if (!cosmetic.unlocked) {
       return;
     }
@@ -132,6 +153,21 @@ export default function AvatarScreen() {
     } finally {
       setLoadingId(null);
     }
+  }
+
+  function previewCosmetic(cosmetic: Cosmetic) {
+    const slot = AVATAR_SLOT[cosmetic.type];
+    const nextId = cosmetic.equipped ? null : cosmetic.id;
+    setAvatar((current) => current ? { ...current, [slot]: nextId } : current);
+    setCosmetics((current) => current.map((item) => item.type === cosmetic.type
+      ? { ...item, equipped: nextId !== null && item.id === cosmetic.id }
+      : item));
+  }
+
+  function toggleCosmeticPreview() {
+    const enabled = !previewAllCosmetics;
+    setPreviewAllCosmetics(enabled);
+    if (!enabled) void loadAvatarData();
   }
 
   function updateAppearance(patch: Partial<AvatarAppearance>) {
@@ -166,12 +202,35 @@ export default function AvatarScreen() {
         eyeColorId: persisted.eyeColorId,
       } : current);
       await setLocalAppearance(user.id, persisted);
+      setEditingAppearance(false);
       Alert.alert("Appearance", "Your appearance is saved.");
     } catch (error) {
       Alert.alert("Appearance not saved", apiError(error, "Could not save your appearance.").message);
     } finally {
       setSavingAppearance(false);
     }
+  }
+
+  function closeAppearanceEditor() {
+    if (!appearanceDirty) {
+      setEditingAppearance(false);
+      return;
+    }
+    Alert.alert(
+      "Discard appearance changes?",
+      "Your unsaved appearance choices will be reset.",
+      [
+        { text: "Keep Editing", style: "cancel" },
+        {
+          text: "Discard",
+          style: "destructive",
+          onPress: () => {
+            if (savedAppearance) updateAppearance(savedAppearance);
+            setEditingAppearance(false);
+          },
+        },
+      ],
+    );
   }
 
   const activeSection =
@@ -248,6 +307,36 @@ export default function AvatarScreen() {
             build your hero; dresses cover your saved bottoms while worn.
           </Text>
 
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setEditingAppearance(true)}
+            style={({ pressed }) => [styles.editAppearanceButton, pressed && styles.pressedButton]}
+          >
+            <MaterialCommunityIcons name="account-edit" size={18} color={colors.accent} />
+            <Text style={styles.editAppearanceText}>Edit Appearance</Text>
+          </Pressable>
+
+          {CAN_PREVIEW_ALL_COSMETICS && (
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityState={{ checked: previewAllCosmetics }}
+              onPress={toggleCosmeticPreview}
+              style={({ pressed }) => [
+                styles.previewAllButton,
+                previewAllCosmetics && styles.previewAllButtonActive,
+                pressed && styles.pressedButton,
+              ]}
+            >
+              <MaterialCommunityIcons name="test-tube" size={18} color={colors.primary} />
+              <View>
+                <Text style={styles.previewAllText}>
+                  {previewAllCosmetics ? "Exit Cosmetic Preview" : "Preview All Cosmetics"}
+                </Text>
+                <Text style={styles.previewAllHint}>DEV only · changes are not saved</Text>
+              </View>
+            </Pressable>
+          )}
+
           <View style={styles.equippedList}>
             {equippedCosmetics.slice(0, 6).map((cosmetic) => (
               <View key={cosmetic.id} style={styles.equippedChip}>
@@ -260,16 +349,6 @@ export default function AvatarScreen() {
           </View>
         </View>
       </LifeCard>
-
-      {draftAppearance && (
-        <AppearanceEditor
-          appearance={draftAppearance}
-          dirty={appearanceDirty}
-          saving={savingAppearance}
-          onChange={updateAppearance}
-          onSave={() => void saveAppearance()}
-        />
-      )}
 
       <ScrollView
         horizontal
@@ -354,11 +433,73 @@ export default function AvatarScreen() {
               cosmetic={cosmetic}
               width={cardWidth}
               loading={loadingId === cosmetic.id}
+              previewMode={previewAllCosmetics}
               onEquip={toggleCosmetic}
             />
           ))
         )}
       </View>
+
+      <Modal
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+        visible={editingAppearance}
+        onRequestClose={closeAppearanceEditor}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.appearanceSheet}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalEyebrow}>CHARACTER</Text>
+                <Text accessibilityRole="header" style={styles.modalTitle}>Edit Appearance</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close appearance editor"
+                hitSlop={8}
+                onPress={closeAppearanceEditor}
+                style={({ pressed }) => [styles.closeButton, pressed && styles.pressedButton]}
+              >
+                <MaterialCommunityIcons name="close" size={22} color={colors.text} />
+              </Pressable>
+            </View>
+            <ScrollView
+              contentContainerStyle={styles.modalContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.modalPreview}>
+                <AvatarRenderer
+                  showBackground={false}
+                  hairId={avatar?.equippedHairId}
+                  hatId={avatar?.equippedHatId}
+                  topId={avatar?.equippedTopId}
+                  bottomId={avatar?.equippedBottomId}
+                  bootsId={avatar?.equippedBootsId}
+                  backgroundId={avatar?.equippedBackgroundId}
+                  petId={avatar?.equippedPetId}
+                  auraId={avatar?.equippedAuraId}
+                  bodyType={avatar?.bodyType}
+                  skinColorId={avatar?.skinColorId}
+                  hairColorId={avatar?.hairColorId}
+                  eyeColorId={avatar?.eyeColorId}
+                  cosmetics={cosmetics}
+                />
+              </View>
+              {draftAppearance && (
+                <AppearanceEditor
+                  appearance={draftAppearance}
+                  dirty={appearanceDirty}
+                  saving={savingAppearance}
+                  onChange={updateAppearance}
+                  onSave={() => void saveAppearance()}
+                />
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -367,11 +508,13 @@ function CosmeticCard({
   cosmetic,
   width,
   loading,
+  previewMode,
   onEquip,
 }: {
   cosmetic: Cosmetic;
   width: number;
   loading: boolean;
+  previewMode: boolean;
   onEquip: (cosmetic: Cosmetic) => void;
 }) {
   const previewSource = getCosmeticPreviewSource(cosmetic);
@@ -402,7 +545,7 @@ function CosmeticCard({
           </View>
         )}
 
-        {!cosmetic.unlocked && (
+        {!cosmetic.unlocked && !previewMode && (
           <View style={styles.lockBadge}>
             <MaterialCommunityIcons name="lock" size={14} color={colors.text} />
           </View>
@@ -413,19 +556,21 @@ function CosmeticCard({
         {cosmetic.name}
       </Text>
       <Text style={styles.cosmeticMeta}>
-        {cosmetic.unlocked
+        {previewMode && !cosmetic.owned
+          ? "DEV preview · not owned"
+          : cosmetic.unlocked
           ? "In your collection"
           : cosmetic.requirementText ?? "Available in the Shop"}
       </Text>
 
       <Pressable
         onPress={() => onEquip(cosmetic)}
-        disabled={!cosmetic.unlocked || loading}
+        disabled={!(previewMode || cosmetic.unlocked) || loading}
         style={({ pressed }) => [
           styles.equipButton,
           cosmetic.equipped && cosmetic.type !== "HAIR" && styles.unequipButton,
           cosmetic.equipped && cosmetic.type === "HAIR" && styles.selectedHairButton,
-          !cosmetic.unlocked && styles.lockedButton,
+          !(previewMode || cosmetic.unlocked) && styles.lockedButton,
           pressed && styles.pressedButton,
         ]}
       >
@@ -435,12 +580,14 @@ function CosmeticCard({
           <Text
             style={[
               styles.equipButtonText,
-              !cosmetic.unlocked &&
+              !(previewMode || cosmetic.unlocked) &&
                 styles.disabledButtonText,
             ]}
           >
             {cosmetic.equipped
-              ? cosmetic.type === "HAIR" ? "Selected" : "Unequip"
+              ? previewMode ? "Previewing" : cosmetic.type === "HAIR" ? "Selected" : "Unequip"
+              : previewMode
+                ? "Preview"
               : cosmetic.unlocked
                 ? "Equip"
                 : "Locked"}
@@ -555,6 +702,50 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     marginTop: spacing.md,
+  },
+  editAppearanceButton: {
+    alignSelf: "flex-start",
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+  },
+  editAppearanceText: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  previewAllButton: {
+    alignSelf: "flex-start",
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.cardLight,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  previewAllButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: "#172820",
+  },
+  previewAllText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  previewAllHint: {
+    color: colors.mutedText,
+    fontSize: 10,
+    marginTop: 1,
   },
   equippedList: {
     flexDirection: "row",
@@ -765,5 +956,65 @@ const styles = StyleSheet.create({
     color: colors.mutedText,
     textAlign: "center",
     marginTop: 4,
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(4, 10, 8, 0.72)",
+  },
+  appearanceSheet: {
+    width: "100%",
+    maxHeight: "92%",
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    minHeight: 70,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+  },
+  modalEyebrow: {
+    color: colors.accent,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+  },
+  modalTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  closeButton: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: colors.cardLight,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+    gap: spacing.md,
+    padding: spacing.lg,
+    paddingBottom: 48,
+  },
+  modalPreview: {
+    height: 350,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.lg,
+    backgroundColor: "#101D2B",
+    overflow: "hidden",
   },
 });

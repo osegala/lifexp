@@ -11,7 +11,7 @@ import {
   normalizeAppearance,
   SKIN_COLORS,
 } from "../src/avatar/appearance.ts";
-import { grayscaleTintMatrix } from "../src/avatar/colorize.ts";
+import { avatarTintMatrix, grayscaleTintMatrix, skinTintMatrix } from "../src/avatar/colorize.ts";
 import { avatarFromInventory } from "../src/avatar/inventory.ts";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -79,9 +79,35 @@ test("color matrix preserves grayscale luminance and alpha instead of flattening
     0, 0, 32 / 255, 0, 0,
     0, 0, 0, 1, 0,
   ]);
+  const skinMatrix = avatarTintMatrix("skin", "#804020");
+  assert.deepEqual(skinMatrix, skinTintMatrix("#804020"));
+  assert.equal(skinMatrix[4], (128 / 255) * 0.18 + 0.018);
+  assert.equal(skinMatrix[9], (64 / 255) * 0.1);
+  assert.equal(skinMatrix[14], (32 / 255) * 0.055);
+  assert.equal(skinMatrix[18], 1);
+  for (const [offset, target] of [[0, 128 / 255], [5, 64 / 255], [10, 32 / 255]]) {
+    const whiteOutput = skinMatrix[offset] + skinMatrix[offset + 1]
+      + skinMatrix[offset + 2] + skinMatrix[offset + 4];
+    assert.ok(Math.abs(whiteOutput - target) < 1e-12);
+  }
+  assert.deepEqual(avatarTintMatrix("hair", "#804020"), grayscaleTintMatrix("#804020"));
   const layers = read("../src/components/CharacterSpriteLayers.tsx");
-  assert.match(layers, /FeColorMatrix type="matrix" values=\{grayscaleTintMatrix\(color\)\}/);
+  assert.match(layers, /values=\{avatarTintMatrix\(channel as "skin" \| "hair" \| "eyes", color\)\}/);
   assert.match(layers, /filter=\{tint \? `url\(#\$\{id\}-tint-\$\{tint\}\)`/);
+});
+
+test("light skin swatches remain warm and skin shadows retain color", () => {
+  for (const { color } of SKIN_COLORS) {
+    const red = Number.parseInt(color.slice(1, 3), 16);
+    const green = Number.parseInt(color.slice(3, 5), 16);
+    const blue = Number.parseInt(color.slice(5, 7), 16);
+    assert.ok(red > green && green > blue, `${color} should retain a warm undertone`);
+  }
+
+  const paleSkin = avatarTintMatrix("skin", SKIN_COLORS[0].color);
+  assert.ok(paleSkin[4] > paleSkin[9] && paleSkin[9] > paleSkin[14]);
+  assert.ok(paleSkin[14] > 0, "skin shadows should not collapse to neutral black");
+  assert.ok(paleSkin[4] / paleSkin[9] > 2, "skin shadows should retain a warm chromatic bias");
 });
 
 test("neutral skin, iris, and detail layers are independently registered", () => {
@@ -92,6 +118,10 @@ test("neutral skin, iris, and detail layers are independently registered", () =>
   assert.match(registry, /appearance\/eyes\/girl\/eye-details\.png/);
   assert.match(registry, /tint: "skin"/);
   assert.match(registry, /tint: "eyes"/);
+  assert.match(registry, /HEAD_DETAIL_CLIP/);
+  assert.match(registry, /CROWN_DETAIL_CLIP/);
+  assert.match(registry, /skinPair\("head", BOY_SKIN\.head[\s\S]*?HEAD_DETAIL_CLIP\)/);
+  assert.match(registry, /skinPair\("crown", GIRL_SKIN\.head[\s\S]*?CROWN_DETAIL_CLIP\)/);
 });
 
 test("all hairstyles use neutral tint sources and Twin Braids bows remain untinted", () => {
@@ -117,6 +147,22 @@ test("existing hat clips, ponytail tuck, dress coverage, and paid ownership gate
   assert.match(inventorySource, /unlocked: Boolean\(owned\)/);
 });
 
+test("starter tunic and normalized dresses opt into shoulder-cap coverage", () => {
+  const registry = read("../src/avatar/assetRegistry.ts");
+  const layers = read("../src/components/CharacterSpriteLayers.tsx");
+  assert.equal((registry.match(/coversShoulderCaps: true/g) ?? []).length, 2);
+  assert.match(registry, /sprite\("vest", "upperBody", GUILD_TUNIC\), coversShoulderCaps: true/);
+  assert.match(registry, /layer: "upperBody", source, fullOutfit: true, coversShoulderCaps: true/);
+  assert.match(layers, /covered-shoulders/);
+  assert.match(layers, /region === "torso" \|\| region === "upperArmLeft" \|\| region === "upperArmRight"/);
+  assert.match(layers, /fullOutfit && \(region === "torso" \|\| region === "neck"\)/);
+  assert.ok(
+    layers.indexOf('fullOutfit && (region === "torso" || region === "neck")')
+      < layers.indexOf('coveredShoulder ? `${id}-covered-shoulders`'),
+    "dress torso clipping must take precedence over shoulder-cap clipping",
+  );
+});
+
 test("Avatar screen previews drafts and saves all five fields with one PATCH", () => {
   const screen = read("../app/(tabs)/avatar.tsx");
   assert.match(screen, /skinColorId=\{avatar\?\.skinColorId\}/);
@@ -125,6 +171,20 @@ test("Avatar screen previews drafts and saves all five fields with one PATCH", (
   assert.match(screen, /api\.patch<AvatarAppearance>\(apiRoutes\.me, draftAppearance\)/);
   assert.match(screen, /setLocalAppearance\(user\.id, persisted\)/);
   assert.doesNotMatch(screen, /api\.patch[\s\S]{0,120}onSelect/);
+});
+
+test("Avatar screen keeps appearance controls in an on-demand modal", () => {
+  const screen = read("../app/(tabs)/avatar.tsx");
+  assert.match(screen, /<Text style=\{styles\.editAppearanceText\}>Edit Appearance<\/Text>/);
+  assert.match(screen, /<Modal[\s\S]*?visible=\{editingAppearance\}[\s\S]*?<AppearanceEditor/);
+  assert.ok(screen.indexOf("<Modal") < screen.indexOf("<AppearanceEditor"));
+});
+
+test("registration reuses the complete appearance editor and persists one appearance model", () => {
+  const register = read("../app/register.tsx");
+  assert.match(register, /<AppearanceEditor[\s\S]*?appearance=\{appearance\}[\s\S]*?showSaveButton=\{false\}/);
+  assert.match(register, /<AvatarRenderer[\s\S]*?bodyType=\{appearance\.bodyType\}[\s\S]*?eyeColorId=\{appearance\.eyeColorId\}/);
+  assert.match(register, /api\.patch\(apiRoutes\.me, appearance\)/);
 });
 
 test("appearance cache keys are isolated by authenticated user and account deletion targets that key", () => {

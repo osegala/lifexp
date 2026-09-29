@@ -235,11 +235,14 @@ test("Shop and Avatar share canonical catalog category and asset mapping", () =>
   assert.match(avatarScreen, /api\.get<InventoryResponse>\(apiRoutes\.inventory\)/);
 });
 
-test("locked cards cannot equip while owned cards use backend equip endpoints", () => {
+test("production ownership gates remain intact and DEV preview never calls equip endpoints", () => {
   const avatarScreen = readFileSync(new URL("../app/(tabs)/avatar.tsx", import.meta.url), "utf8");
+  assert.match(avatarScreen, /CAN_PREVIEW_ALL_COSMETICS = __DEV__ && environment\.environment === "dev"/);
+  assert.match(avatarScreen, /if \(CAN_PREVIEW_ALL_COSMETICS && previewAllCosmetics\) \{\s*previewCosmetic\(cosmetic\);\s*return;/);
   assert.match(avatarScreen, /if \(!cosmetic\.unlocked\) \{\s*return;/);
-  assert.match(avatarScreen, /disabled=\{!cosmetic\.unlocked \|\| loading\}/);
+  assert.match(avatarScreen, /disabled=\{!\(previewMode \|\| cosmetic\.unlocked\) \|\| loading\}/);
   assert.match(avatarScreen, /inventoryEquip[\s\S]*?itemId: String\(cosmetic\.id\)/);
+  assert.match(avatarScreen, /DEV only · changes are not saved/);
 });
 
 test("retired equipment concepts are absent from active types and rendering", () => {

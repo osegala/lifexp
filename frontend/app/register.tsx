@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   Image,
   ImageBackground,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,11 +14,14 @@ import LifeButton from "../src/components/LifeButton";
 import LifeCard from "../src/components/LifeCard";
 import LifeInput from "../src/components/LifeInput";
 import AvatarRenderer from "../src/components/AvatarRenderer";
+import AppearanceEditor from "../src/components/AppearanceEditor";
 import { authErrorMessage } from "../src/auth/errors";
 import { useAuth } from "../src/context/AuthContext";
 import { colors, radius, spacing } from "../src/theme/theme";
 import { api } from "../src/api/client";
 import { apiRoutes } from "../src/api/routes";
+import { DEFAULT_APPEARANCE } from "../src/avatar/appearance";
+import type { AvatarAppearance } from "../src/avatar/appearance";
 
 const skyImage = require("../assets/base/backgrounds/sky.png");
 const baseImage = require("../assets/base/buildings/library/library-level-1.png");
@@ -32,7 +34,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
-  const [bodyType, setBodyType] = useState<"BOY" | "GIRL">("BOY");
+  const [appearance, setAppearance] = useState<AvatarAppearance>(DEFAULT_APPEARANCE);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -53,12 +55,12 @@ export default function RegisterScreen() {
     try {
       setLoading(true);
       setError("");
-      const nextStep = await register(trimmedUsername, trimmedEmail, password, bodyType);
+      const nextStep = await register(trimmedUsername, trimmedEmail, password, appearance.bodyType);
       if (nextStep === "CONFIRM_SIGN_UP") {
         setAwaitingConfirmation(true);
       } else {
         await login(trimmedEmail, password);
-        await api.patch(apiRoutes.me, { bodyType });
+        await api.patch(apiRoutes.me, appearance);
         router.replace("/(tabs)/dashboard");
       }
     } catch (error) {
@@ -78,7 +80,7 @@ export default function RegisterScreen() {
       setLoading(true);
       setError("");
       await confirmRegistration(email.trim(), confirmationCode.trim(), password);
-      await api.patch(apiRoutes.me, { bodyType });
+      await api.patch(apiRoutes.me, appearance);
       router.replace("/(tabs)/dashboard");
     } catch (error) {
       setError(authErrorMessage(error, "confirm"));
@@ -173,36 +175,23 @@ export default function RegisterScreen() {
         )}
 
         <Text style={styles.label}>Starter avatar</Text>
-        <View style={styles.avatarChoices}>
-          {(["BOY", "GIRL"] as const).map((choice) => (
-            <Pressable
-              key={choice}
-              accessibilityRole="radio"
-              accessibilityLabel={choice === "BOY" ? "Boy Hero" : "Girl Hero"}
-              accessibilityState={{ checked: bodyType === choice }}
-              aria-checked={bodyType === choice}
-              onPress={() => setBodyType(choice)}
-              style={[
-                styles.avatarChoice,
-                bodyType === choice && styles.selectedAvatarChoice,
-              ]}
-            >
-              <View style={styles.avatarPreview}>
-                <AvatarRenderer bodyType={choice} />
-              </View>
-              <Text
-                style={[
-                  styles.avatarChoiceText,
-                  bodyType === choice && styles.selectedAvatarChoiceText,
-                ]}
-              >
-                {choice === "BOY" ? "Boy Hero" : "Girl Hero"}
-              </Text>
-            </Pressable>
-          ))}
+        <View style={styles.avatarPreview}>
+          <AvatarRenderer
+            bodyType={appearance.bodyType}
+            hairId={appearance.hairId}
+            skinColorId={appearance.skinColorId}
+            hairColorId={appearance.hairColorId}
+            eyeColorId={appearance.eyeColorId}
+          />
         </View>
-
-        <Text style={styles.helperText}>Both characters can wear every outfit and hairstyle.</Text>
+        <AppearanceEditor
+          appearance={appearance}
+          dirty={false}
+          saving={false}
+          showSaveButton={false}
+          onChange={(patch) => setAppearance((current) => ({ ...current, ...patch }))}
+          onSave={() => {}}
+        />
 
         {!!error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -293,38 +282,10 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginTop: spacing.sm,
   },
-  avatarChoices: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  avatarChoice: {
-    flex: 1,
-    minHeight: 148,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.cardLight,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    paddingBottom: spacing.sm,
-  },
-  selectedAvatarChoice: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryDark,
-  },
   avatarPreview: {
-    width: 240,
+    width: 280,
     maxWidth: "100%",
-  },
-  avatarChoiceText: {
-    color: colors.mutedText,
-    fontWeight: "700",
-    marginTop: spacing.xs,
-  },
-  selectedAvatarChoiceText: {
-    color: colors.text,
+    alignSelf: "center",
   },
   errorText: {
     color: colors.danger,

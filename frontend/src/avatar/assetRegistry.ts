@@ -18,6 +18,7 @@ export type CharacterSpriteDefinition = {
   hairPart?: "ponytail";
   tuckPonytail?: boolean;
   fullOutfit?: boolean;
+  coversShoulderCaps?: boolean;
   tint?: "skin" | "hair" | "eyes";
 };
 
@@ -40,6 +41,7 @@ export type ResolvedCharacterSprite = {
   hairPart?: "ponytail";
   tuckPonytail?: boolean;
   fullOutfit?: boolean;
+  coversShoulderCaps?: boolean;
   tint?: "skin" | "hair" | "eyes";
 };
 
@@ -66,6 +68,11 @@ const HAIR_EAR_OPENINGS = [
   "M533 160L526 164L524 168L523 172L522 176V184L523 188L524 192L526 196L529 200L532 204L537 208L542 212L548 216L557 219L565 220L550 180L543 166Z",
   "M721 160L728 164L730 168L731 172L732 176V184L731 188L730 192L728 196L725 200L722 204L717 208L712 212L706 216L697 219L689 220L704 180L711 166Z",
 ].join(" ");
+
+// Keep authored brows and lower-face linework while hiding the baked scalp
+// outline that otherwise sits above rear hair and reads as a pasted hairline.
+const HEAD_DETAIL_CLIP = "M548 115H706V160H1254V1254H0V160H548Z";
+const CROWN_DETAIL_CLIP = "M548 115H706V160H548Z";
 
 function layeredHair(source: ImageSourcePropType, frame?: SpriteFrame, drape = false): CharacterSpriteSet {
   return [
@@ -153,7 +160,7 @@ const VERDANT_WISPS_AURA = require("../../assets/avatar/v2/auras/verdant-wisps.p
 const ARCANE_CONSTELLATION_AURA = require("../../assets/avatar/v2/auras/arcane-constellation.png");
 
 const GUILD_TUNIC_SPRITES = [
-  sprite("vest", "upperBody", GUILD_TUNIC),
+  { ...sprite("vest", "upperBody", GUILD_TUNIC), coversShoulderCaps: true },
   sprite("belt", "belt", GUILD_BELT),
 ] satisfies CharacterSpriteSet;
 
@@ -213,7 +220,7 @@ function dressAsset(
       { id: "bodice", from: shoulderY, to: waistY, y: 295, height: 275 },
       { id: "skirt", from: waistY, to: bottom + 4, y: 570, height: 610 },
     ].map(({ id, from, to, y, height }) => ({
-      id, layer: "upperBody", source, fullOutfit: true,
+      id, layer: "upperBody", source, fullOutfit: true, coversShoulderCaps: true,
       frame: sourceFrame([1086, 1448], [0, from, 1086, to], [274.05, y, 705.9, height]),
     })),
   };
@@ -757,10 +764,11 @@ function skinPair(
   layer: CharacterLayer,
   frame?: SpriteFrame,
   detailLayer: CharacterLayer = layer,
+  detailClipPath?: string,
 ): BaseBodySpriteDefinition[] {
   return [
     { id: `${id}-0-skin`, source: sources[0], region, layer, frame, tint: "skin" },
-    { id: `${id}-3-details`, source: sources[1], region, layer: detailLayer, frame },
+    { id: `${id}-3-details`, source: sources[1], region, layer: detailLayer, frame, clipPath: detailClipPath },
   ];
 }
 
@@ -778,7 +786,7 @@ const ADVENTURER_BODY_SPRITES = [
   ...skinPair("left-arm", BOY_SKIN["left-arm"], "upperArmLeft", "bodyBack"),
   ...skinPair("right-arm", BOY_SKIN["right-arm"], "upperArmRight", "bodyBack"),
   ...skinPair("neck", BOY_SKIN.neck, "neck", "baseBody"),
-  ...skinPair("head", BOY_SKIN.head, "head", "bodyFront", undefined, "face"),
+  ...skinPair("head", BOY_SKIN.head, "head", "bodyFront", undefined, "face", HEAD_DETAIL_CLIP),
   ...eyePair("head", BOY_EYES),
 ] satisfies readonly BaseBodySpriteDefinition[];
 
@@ -813,7 +821,7 @@ const GIRL_BODY_SPRITES = [
   ...skinPair("neck", GIRL_SKIN.head, "neck", "bodyBack", GIRL_NECK_FRAME),
   ...skinPair("head", GIRL_SKIN.head, "head", "bodyFront", GIRL_HEAD_FRAME, "face"),
   ...eyePair("head", GIRL_EYES, GIRL_HEAD_FRAME),
-  ...skinPair("crown", GIRL_SKIN.head, "head", "bodyFront", GIRL_CROWN_FRAME, "face"),
+  ...skinPair("crown", GIRL_SKIN.head, "head", "bodyFront", GIRL_CROWN_FRAME, "face", CROWN_DETAIL_CLIP),
 ] satisfies readonly BaseBodySpriteDefinition[];
 
 export const BASE_BODY_SPRITES: Record<
@@ -864,7 +872,11 @@ export function getEquippedCharacterSprites(
   const cosmetic = cosmetics?.find(
     (candidate) => candidate.id === cosmeticId && candidate.type === type,
   );
-  const assetKey = cosmetic?.imageUrl;
+  const directBuiltInHair = type === "HAIR" && typeof cosmeticId === "string"
+    && COSMETIC_ASSETS[cosmeticId]?.slot === "hair"
+    ? cosmeticId
+    : undefined;
+  const assetKey = cosmetic?.imageUrl ?? directBuiltInHair;
   const definition = assetKey ? COSMETIC_ASSETS[assetKey] : undefined;
 
   if (assetKey && definition?.sprites) {
@@ -925,6 +937,7 @@ export function resolveSpriteSet(
     hairPart: definition.hairPart,
     tuckPonytail: definition.tuckPonytail,
     fullOutfit: definition.fullOutfit,
+    coversShoulderCaps: definition.coversShoulderCaps,
     tint: definition.tint,
     region: "region" in definition ? definition.region : undefined,
     covers,

@@ -73,6 +73,7 @@ export default function AvatarRenderer({
     ...resolveSpriteSet(`base-body:${bodyType}`, BASE_BODY_SPRITES[bodyType]),
     ...(cosmetics === undefined
       ? resolveSpriteSet("registration-default", DEFAULT_CHARACTER_SPRITES)
+          .filter(({ layer }) => !hairId || !layer.startsWith("hair"))
       : []),
     ...getEquippedCharacterSprites(cosmetics, bottomId, "BOTTOM"),
     ...getEquippedCharacterSprites(cosmetics, bootsId, "BOOTS"),
