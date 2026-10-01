@@ -81,6 +81,10 @@ test("color matrix preserves grayscale luminance and alpha instead of flattening
   ]);
   const skinMatrix = avatarTintMatrix("skin", "#804020");
   assert.deepEqual(skinMatrix, skinTintMatrix("#804020"));
+  assert.ok(skinMatrix.every((value) => value >= 0), "skin tint must not clamp negative channels into red fringes");
+  assert.equal(skinMatrix[3], 0);
+  assert.equal(skinMatrix[8], 0);
+  assert.equal(skinMatrix[13], 0);
   assert.equal(skinMatrix[4], 0);
   assert.equal(skinMatrix[9], 0);
   assert.equal(skinMatrix[14], 0);
@@ -100,8 +104,38 @@ test("color matrix preserves grayscale luminance and alpha instead of flattening
   assert.deepEqual(avatarTintMatrix("hair", "#804020"), grayscaleTintMatrix("#804020"));
   assert.deepEqual(avatarTintMatrix("eyes", "#804020"), grayscaleTintMatrix("#804020"));
   const layers = read("../src/components/CharacterSpriteLayers.tsx");
-  assert.match(layers, /values=\{avatarTintMatrix\(channel as "skin" \| "hair" \| "eyes", color\)\}/);
+  assert.match(layers, /values=\{avatarTintMatrix\(channel as "skin" \| "hair" \| "eyes", color, FILTER_COLOR_SPACE\)\}/);
   assert.match(layers, /filter=\{tint \? `url\(#\$\{id\}-tint-\$\{tint\}\)`/);
+});
+
+test("skin swatches survive native linear-RGB filtering without washing out or changing hair/eyes", () => {
+  const linear = (value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  const srgb = (value) => value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
+  for (const { color } of SKIN_COLORS) {
+    const target = [1, 3, 5].map(offset => Number.parseInt(color.slice(offset, offset + 2), 16) / 255);
+    for (const space of ["sRGB", "linearRGB"]) {
+      const matrix = avatarTintMatrix("skin", color, space);
+      const render = (gray) => [0, 5, 10].map(offset => {
+        const input = space === "linearRGB" ? linear(gray) : gray;
+        const output = input * (matrix[offset] + matrix[offset + 1] + matrix[offset + 2]);
+        return Math.min(1, space === "linearRGB" ? srgb(output) : output);
+      });
+      render(0.78).forEach((value, index) => assert.ok(Math.abs(value - target[index]) < 1e-12));
+      const shadow = render(0.6), midtone = render(0.78), highlight = render(0.9);
+      for (const tone of [shadow, midtone, highlight]) assert.ok(tone[0] > tone[1] && tone[1] > tone[2]);
+      for (let index = 0; index < 3; index++) {
+        assert.ok(shadow[index] < midtone[index] && midtone[index] <= highlight[index]);
+      }
+      // No alpha or bias terms to contaminate translucent skin edges.
+      for (const offset of [3, 4, 8, 9, 13, 14, 15, 16, 17, 19]) assert.equal(matrix[offset], 0);
+      assert.equal(matrix[18], 1);
+      assert.deepEqual(render(0), [0, 0, 0]);
+      for (const channel of ["hair", "eyes"]) {
+        assert.deepEqual(avatarTintMatrix(channel, color, space), grayscaleTintMatrix(color));
+      }
+    }
+  }
+  assert.match(read("../src/components/CharacterSpriteLayers.tsx"), /Platform\.OS === "android" \? "sRGB" : "linearRGB"/);
 });
 
 test("all skin presets produce warm shadow, midtone, and highlight ramps", () => {
@@ -115,7 +149,10 @@ test("all skin presets produce warm shadow, midtone, and highlight ramps", () =>
       assert.ok(tone[0] > tone[1] && tone[1] > tone[2], `${color} ${name} should stay warm`);
       assert.ok(tone.every((channel) => channel >= 0 && channel <= 1), `${color} ${name} should be display-safe`);
     }
-    assert.ok(ramp.shadow[0] / ramp.shadow[1] > ramp.midtone[0] / ramp.midtone[1]);
+    for (let channel = 0; channel < 3; channel += 1) {
+      assert.ok(ramp.shadow[channel] < ramp.midtone[channel]);
+      assert.ok(ramp.midtone[channel] <= ramp.highlight[channel]);
+    }
   }
 });
 
@@ -127,10 +164,14 @@ test("neutral skin, iris, and detail layers are independently registered", () =>
   assert.match(registry, /appearance\/eyes\/girl\/eye-details\.png/);
   assert.match(registry, /tint: "skin"/);
   assert.match(registry, /tint: "eyes"/);
+  assert.match(registry, /neutralDetails: true/);
   assert.match(registry, /HEAD_DETAIL_CLIP/);
   assert.match(registry, /CROWN_DETAIL_CLIP/);
   assert.match(registry, /skinPair\("head", BOY_SKIN\.head[\s\S]*?HEAD_DETAIL_CLIP\)/);
   assert.match(registry, /skinPair\("crown", GIRL_SKIN\.head[\s\S]*?CROWN_DETAIL_CLIP\)/);
+  const layers = read("../src/components/CharacterSpriteLayers.tsx");
+  assert.match(layers, /FeColorMatrix type="saturate" values=\{\[0\]\}/);
+  assert.match(layers, /neutralDetails \? `url\(#\$\{id\}-neutral-details\)`/);
 });
 
 test("all hairstyles use neutral tint sources and Twin Braids bows remain untinted", () => {
@@ -156,24 +197,25 @@ test("existing hat clips, ponytail tuck, dress coverage, and paid ownership gate
   assert.match(inventorySource, /unlocked: Boolean\(owned\)/);
 });
 
-test("starter tunic retains shoulder coverage while corrected dresses expose their armholes", () => {
+test("base body and starter tunic never opt into outfit clipping", () => {
   const registry = read("../src/avatar/assetRegistry.ts");
   const layers = read("../src/components/CharacterSpriteLayers.tsx");
-  assert.equal((registry.match(/coversShoulderCaps: true/g) ?? []).length, 1);
-  assert.match(registry, /sprite\("vest", "upperBody", GUILD_TUNIC\), coversShoulderCaps: true/);
-  assert.match(registry, /layer: "upperBody", source, fullOutfit: true,/);
-  assert.doesNotMatch(registry, /layer: "upperBody", source, fullOutfit: true, coversShoulderCaps: true/);
-  assert.match(layers, /covered-shoulders/);
-  assert.match(layers, /region === "torso" \|\| region === "upperArmLeft" \|\| region === "upperArmRight"/);
-  assert.match(layers, /fullOutfit && \(region === "torso" \|\| region === "neck"\)/);
-  assert.ok(
-    layers.indexOf('fullOutfit && (region === "torso" || region === "neck")')
-      < layers.indexOf('coveredShoulder ? `${id}-covered-shoulders`'),
-    "dress torso clipping must take precedence over shoulder-cap clipping",
-  );
+  assert.match(registry, /sprite\("vest", "upperBody", GUILD_TUNIC\)/);
+  assert.doesNotMatch(registry, /coversShoulderCaps|armholeOcclusion|dressClipPath/);
+  assert.doesNotMatch(layers, /covered-shoulders|coversShoulderCaps/);
+  assert.equal((registry.match(/fullOutfit: true/g) ?? []).length, 1);
 });
 
-test("dress correction contract keeps one shared sprite and no unused split-layer rig", () => {
+test("dress body clipping is scoped to equipped full-outfit sprites", () => {
+  const registry = read("../src/avatar/assetRegistry.ts");
+  const layers = read("../src/components/CharacterSpriteLayers.tsx");
+  assert.match(registry, /id, layer: "upperBody", source, fullOutfit: true/);
+  assert.match(layers, /const fullOutfit = sprites\.some\(sprite => sprite\.fullOutfit\)/);
+  assert.match(layers, /fullOutfit && \(region === "torso" \|\| region === "neck"\)/);
+  assert.match(layers, /fullOutfit && isLeg/);
+});
+
+test("dress replacements keep one shared sprite and require no renderer-specific rig", () => {
   const registry = read("../src/avatar/assetRegistry.ts");
   const renderer = read("../src/components/AvatarRenderer.tsx");
   const catalog = read("../src/avatar/cosmeticCatalog.ts");
@@ -182,16 +224,23 @@ test("dress correction contract keeps one shared sprite and no unused split-laye
   assert.doesNotMatch(registry, /definition\.bodyType/);
   assert.match(renderer, /getEquippedCharacterSprites\(cosmetics, topId, "TOP"\)/);
   assert.doesNotMatch(catalog, /clothingBack/);
-  assert.match(contract, /Keep one flattened sprite per dress/);
-  assert.match(contract, /artwork-candidates\/avatar\/v2\/dresses\/forest-ranger-armhole-candidate\.png/);
-  assert.match(contract, /GO for applying the same[\s\S]*remaining nine dresses/);
+  assert.doesNotMatch(registry, /DressArmholeOcclusion|dressClipPath|armholeOcclusion/);
+  assert.match(contract, /corrected artwork at the existing\s+production paths/);
+  assert.match(contract, /No runtime armhole mask/);
   assert.doesNotMatch(contract, /aligned\/boy|aligned\/girl|-front\.png|-back\.png/);
-  for (const id of [
-    "starlight", "forest-ranger", "frostbound", "teal-wayfarer", "crimson-guard",
-    "royal-vanguard", "royal-bard", "harbor-scout", "verdant-warden", "celestial-acolyte",
-  ]) {
-    assert.match(contract, new RegExp(`artwork-candidates/avatar/v2/dresses/${id}-armhole-candidate\\.png`));
-  }
+});
+
+test("all ten dresses share the narrower centered fit without moving vertical anchors", () => {
+  const registry = read("../src/avatar/assetRegistry.ts");
+  assert.equal((registry.match(/"avatar-v2\/dresses\/[^"]+": dressAsset\(/g) ?? []).length, 10);
+  const destination = registry.match(/\[([\d.]+), y, ([\d.]+), height\]/);
+  assert.ok(destination);
+  const [, x, width] = destination.map(Number);
+  assert.equal(x + width / 2, 627);
+  assert.ok(Math.abs(width / 1086 - 0.575) < 1e-12);
+  assert.match(registry, /from: top - 4, to: shoulderY, y: 250, height: 45/);
+  assert.match(registry, /from: shoulderY, to: waistY, y: 295, height: 275/);
+  assert.match(registry, /from: waistY, to: bottom \+ 4, y: 570, height: 610/);
 });
 
 test("Avatar screen previews drafts and saves all five fields with one PATCH", () => {

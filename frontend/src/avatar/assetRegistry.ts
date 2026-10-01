@@ -220,7 +220,8 @@ function dressAsset(
       { id: "skirt", from: waistY, to: bottom + 4, y: 570, height: 610 },
     ].map(({ id, from, to, y, height }) => ({
       id, layer: "upperBody", source, fullOutfit: true,
-      frame: sourceFrame([1086, 1448], [0, from, 1086, to], [274.05, y, 705.9, height]),
+      // Fit the shoulders/neck at 0.575x width; share it across bands to avoid seams.
+      frame: sourceFrame([1086, 1448], [0, from, 1086, to], [314.775, y, 624.45, height]),
     })),
   };
 }
