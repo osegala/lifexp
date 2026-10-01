@@ -18,7 +18,7 @@ export type CharacterSpriteDefinition = {
   hairPart?: "ponytail";
   tuckPonytail?: boolean;
   fullOutfit?: boolean;
-  coversShoulderCaps?: boolean;
+  neutralDetails?: boolean;
   tint?: "skin" | "hair" | "eyes";
 };
 
@@ -41,7 +41,7 @@ export type ResolvedCharacterSprite = {
   hairPart?: "ponytail";
   tuckPonytail?: boolean;
   fullOutfit?: boolean;
-  coversShoulderCaps?: boolean;
+  neutralDetails?: boolean;
   tint?: "skin" | "hair" | "eyes";
 };
 
@@ -160,7 +160,7 @@ const VERDANT_WISPS_AURA = require("../../assets/avatar/v2/auras/verdant-wisps.p
 const ARCANE_CONSTELLATION_AURA = require("../../assets/avatar/v2/auras/arcane-constellation.png");
 
 const GUILD_TUNIC_SPRITES = [
-  { ...sprite("vest", "upperBody", GUILD_TUNIC), coversShoulderCaps: true },
+  sprite("vest", "upperBody", GUILD_TUNIC),
   sprite("belt", "belt", GUILD_BELT),
 ] satisfies CharacterSpriteSet;
 
@@ -176,7 +176,6 @@ const GUILD_BOOTS_SPRITES = [
 ] satisfies CharacterSpriteSet;
 
 type ArtworkBounds = readonly [number, number, number, number];
-
 function artworkCrop(bounds: ArtworkBounds): ImageCrop {
   const [left, top, right, bottom] = bounds;
   return {
@@ -601,25 +600,25 @@ const COSMETIC_ASSETS: Record<string, CosmeticAssetDefinition> = {
     sprites: GUILD_TUNIC_SPRITES,
   },
   "avatar-v2/dresses/starlight": dressAsset(
-    require("../../assets/avatar/v2/dresses/starlight.png"), [96, 114, 990, 1291], 218, 614),
+    require("../../assets/avatar/v2/dresses/starlight.png"), [96, 114, 1016, 1291], 218, 614),
   "avatar-v2/dresses/forest-ranger": dressAsset(
     require("../../assets/avatar/v2/dresses/forest-ranger.png"), [57, 100, 1027, 1348], 209, 646),
   "avatar-v2/dresses/frostbound": dressAsset(
-    require("../../assets/avatar/v2/dresses/frostbound.png"), [49, 101, 1039, 1348], 219, 605),
+    require("../../assets/avatar/v2/dresses/frostbound.png"), [49, 101, 1059, 1348], 219, 605),
   "avatar-v2/dresses/teal-wayfarer": dressAsset(
-    require("../../assets/avatar/v2/dresses/teal-wayfarer.png"), [76, 83, 1010, 1302], 193, 562),
+    require("../../assets/avatar/v2/dresses/teal-wayfarer.png"), [76, 83, 1031, 1302], 193, 562),
   "avatar-v2/dresses/crimson-guard": dressAsset(
     require("../../assets/avatar/v2/dresses/crimson-guard.png"), [42, 68, 1044, 1385], 177, 617),
   "avatar-v2/dresses/royal-vanguard": dressAsset(
-    require("../../assets/avatar/v2/dresses/royal-vanguard.png"), [70, 80, 1016, 1312], 203, 601),
+    require("../../assets/avatar/v2/dresses/royal-vanguard.png"), [70, 80, 1038, 1343], 203, 601),
   "avatar-v2/dresses/royal-bard": dressAsset(
     require("../../assets/avatar/v2/dresses/royal-bard.png"), [46, 100, 1042, 1292], 207, 612),
   "avatar-v2/dresses/harbor-scout": dressAsset(
     require("../../assets/avatar/v2/dresses/harbor-scout.png"), [39, 96, 1048, 1328], 205, 597),
   "avatar-v2/dresses/verdant-warden": dressAsset(
-    require("../../assets/avatar/v2/dresses/verdant-warden.png"), [65, 111, 1022, 1340], 220, 589),
+    require("../../assets/avatar/v2/dresses/verdant-warden.png"), [65, 111, 1022, 1345], 220, 589),
   "avatar-v2/dresses/celestial-acolyte": dressAsset(
-    require("../../assets/avatar/v2/dresses/celestial-acolyte.png"), [81, 93, 1005, 1321], 202, 560),
+    require("../../assets/avatar/v2/dresses/celestial-acolyte.png"), [81, 93, 1019, 1321], 202, 560),
   "avatar-v2/tops/midnight-vanguard": {
     slot: "upperBody",
     previewSource: require("../../assets/avatar/v2/tops/midnight-vanguard.png"),
@@ -768,7 +767,8 @@ function skinPair(
 ): BaseBodySpriteDefinition[] {
   return [
     { id: `${id}-0-skin`, source: sources[0], region, layer, frame, tint: "skin" },
-    { id: `${id}-3-details`, source: sources[1], region, layer: detailLayer, frame, clipPath: detailClipPath },
+    { id: `${id}-3-details`, source: sources[1], region, layer: detailLayer,
+      frame, clipPath: detailClipPath, neutralDetails: true },
   ];
 }
 
@@ -937,7 +937,7 @@ export function resolveSpriteSet(
     hairPart: definition.hairPart,
     tuckPonytail: definition.tuckPonytail,
     fullOutfit: definition.fullOutfit,
-    coversShoulderCaps: definition.coversShoulderCaps,
+    neutralDetails: definition.neutralDetails,
     tint: definition.tint,
     region: "region" in definition ? definition.region : undefined,
     covers,
