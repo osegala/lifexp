@@ -1,9 +1,12 @@
 import { useId } from "react";
+import { Platform } from "react-native";
 import Svg, { ClipPath, Defs, FeColorMatrix, Filter, G, Image, Path, Rect, Use } from "react-native-svg";
 
 import type { ResolvedCharacterSprite } from "../avatar/assetRegistry";
 import { sourceFrameTransform, spriteImageRect, spriteTransform, trouserTuckPath, trouserTuckSlices } from "../avatar/spriteLayout";
 import { avatarTintMatrix } from "../avatar/colorize";
+
+const FILTER_COLOR_SPACE = Platform.OS === "android" ? "sRGB" : "linearRGB";
 
 /** One shared coordinate space keeps clipping identical at every avatar size. */
 export default function CharacterSpriteLayers({ sprites, tintColors }: {
@@ -16,7 +19,7 @@ export default function CharacterSpriteLayers({ sprites, tintColors }: {
   const headClip = sprites.find(sprite => sprite.headClip)?.headClip;
   const tuckPonytail = sprites.some(sprite => sprite.tuckPonytail);
   const fullOutfit = sprites.some(sprite => sprite.fullOutfit);
-  const coversShoulderCaps = sprites.some(sprite => sprite.coversShoulderCaps);
+  const hasNeutralDetails = sprites.some(sprite => sprite.neutralDetails);
   const cuffs = sprites.flatMap(sprite => sprite.bootCuff ? [sprite.bootCuff] : []);
   const tuckPath = trouserTuckPath(cuffs);
   const coveredLegs = !fullOutfit && cuffs.length > 0 && sprites.some(sprite => sprite.layer === "bottoms");
@@ -29,10 +32,15 @@ export default function CharacterSpriteLayers({ sprites, tintColors }: {
           <Filter key={channel} id={`${id}-tint-${channel}`} x="-10%" y="-10%" width="120%" height="120%">
             <FeColorMatrix
               type="matrix"
-              values={avatarTintMatrix(channel as "skin" | "hair" | "eyes", color)}
+              values={avatarTintMatrix(channel as "skin" | "hair" | "eyes", color, FILTER_COLOR_SPACE)}
             />
           </Filter>
         ))}
+        {hasNeutralDetails && (
+          <Filter id={`${id}-neutral-details`} x="-10%" y="-10%" width="120%" height="120%">
+            <FeColorMatrix type="saturate" values={[0]} />
+          </Filter>
+        )}
         {hairClip && <ClipPath id={`${id}-hair`}><Path d={hairClip} /></ClipPath>}
         {headClip && <ClipPath id={`${id}-head`}><Path d={headClip} /></ClipPath>}
         {tuckPath && <ClipPath id={tuckId}><Path d={tuckPath} /></ClipPath>}
@@ -41,9 +49,7 @@ export default function CharacterSpriteLayers({ sprites, tintColors }: {
         {/* Keep skin inside the neckline, without the starter shirt or hip edges. */}
         <ClipPath id={`${id}-dress-underlay`}><Rect x={584} y={0} width={86} height={390} /></ClipPath>
         <ClipPath id={`${id}-dress-legs`}><Rect x={0} y={900} width={1254} height={354} /></ClipPath>
-        {/* Opt-in fitted tops retain the open neckline but hide skin above their shoulder seam. */}
-        <ClipPath id={`${id}-covered-shoulders`}><Path d="M548 0H706V318H1254V1254H0V318H548Z" /></ClipPath>
-        {sprites.map(({ frame, source, clipPath, tint }, index) => (
+        {sprites.map(({ frame, source, clipPath, tint, neutralDetails }, index) => (
           <G key={index}>
             {frame && <ClipPath id={`${id}-frame-${index}`}><Rect {...frame.destination} /></ClipPath>}
             {frame?.sourceClipPath && <ClipPath id={`${id}-source-${index}`}>
@@ -53,7 +59,8 @@ export default function CharacterSpriteLayers({ sprites, tintColors }: {
             <G
               id={`${id}-image-${index}`}
               clipPath={frame ? `url(#${id}-frame-${index})` : undefined}
-              filter={tint ? `url(#${id}-tint-${tint})` : undefined}
+              filter={tint ? `url(#${id}-tint-${tint})`
+                : neutralDetails ? `url(#${id}-neutral-details)` : undefined}
             >
               <G clipPath={clipPath ? `url(#${id}-shape-${index})` : undefined}>
                 <G clipPath={frame?.sourceClipPath ? `url(#${id}-source-${index})` : undefined}>
@@ -82,15 +89,13 @@ export default function CharacterSpriteLayers({ sprites, tintColors }: {
         const plan = plans[index];
         const href = `#${id}-image-${index}`;
         const lowerPonytail = tuckPonytail && hairPart === "ponytail";
-        const coveredShoulder = coversShoulderCaps
-          && (region === "torso" || region === "upperArmLeft" || region === "upperArmRight");
         const clipId = tuck ? tuckId
           : headClip && region === "head" ? `${id}-head`
           : hairClip && !lowerPonytail && (layer === "hairFront" || layer === "hairBack" || layer === "hairDrape") ? `${id}-hair`
           : undefined;
         const bodyClip = fullOutfit && (region === "torso" || region === "neck") ? `${id}-dress-underlay`
           : fullOutfit && isLeg ? `${id}-dress-legs`
-            : coveredShoulder ? `${id}-covered-shoulders` : undefined;
+            : undefined;
         return (
           <G key={key} clipPath={bodyClip ? `url(#${bodyClip})` : undefined}>
           <G clipPath={clipId ? `url(#${clipId})` : undefined}>

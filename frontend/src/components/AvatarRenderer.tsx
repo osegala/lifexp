@@ -1,8 +1,8 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 
 import {
-  BASE_BODY_SPRITES,
   DEFAULT_CHARACTER_SPRITES,
+  getBaseBodySprites,
   getEquippedCharacterSprites,
   getEquippedSceneSource,
   resolveSpriteSet,
@@ -66,11 +66,7 @@ export default function AvatarRenderer({
   );
   const auraImage = getEquippedSceneSource(cosmetics, auraId, "AURA");
   const petImage = getEquippedSceneSource(cosmetics, petId, "PET");
-
-  const equippedSprites = [
-    ...getEquippedCharacterSprites(cosmetics, hairId, "HAIR"),
-    ...getEquippedCharacterSprites(cosmetics, hatId, "HAT"),
-    ...resolveSpriteSet(`base-body:${bodyType}`, BASE_BODY_SPRITES[bodyType]),
+  const clothingSprites = [
     ...(cosmetics === undefined
       ? resolveSpriteSet("registration-default", DEFAULT_CHARACTER_SPRITES)
           .filter(({ layer }) => !hairId || !layer.startsWith("hair"))
@@ -78,6 +74,12 @@ export default function AvatarRenderer({
     ...getEquippedCharacterSprites(cosmetics, bottomId, "BOTTOM"),
     ...getEquippedCharacterSprites(cosmetics, bootsId, "BOOTS"),
     ...getEquippedCharacterSprites(cosmetics, topId, "TOP"),
+  ];
+  const equippedSprites = [
+    ...getEquippedCharacterSprites(cosmetics, hairId, "HAIR"),
+    ...getEquippedCharacterSprites(cosmetics, hatId, "HAT"),
+    ...resolveSpriteSet(`base-body:${bodyType}`, getBaseBodySprites(bodyType, clothingSprites)),
+    ...clothingSprites,
   ];
   const coveredBodyRegions = new Set(
     equippedSprites.flatMap(({ covers }) => covers ?? []),

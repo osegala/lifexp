@@ -36,27 +36,35 @@ export function skinToneRamp(hexColor: string): SkinToneRamp {
   const midtone: Rgb = [channel(0), channel(2), channel(4)];
   if (midtone.some(Number.isNaN)) throw new Error(`Invalid palette color: ${hexColor}`);
 
-  const shadow: Rgb = [midtone[0] * 0.86, midtone[1] * 0.65, midtone[2] * 0.55];
-  const midtonePosition = (SKIN_SOURCE_MIDTONE - SKIN_SOURCE_SHADOW)
-    / (SKIN_SOURCE_HIGHLIGHT - SKIN_SOURCE_SHADOW);
-  const highlightAt = (index: number) => (
-    midtone[index] - (1 - midtonePosition) * shadow[index]
-  ) / midtonePosition;
-  const highlight: Rgb = [highlightAt(0), highlightAt(1), highlightAt(2)];
+  const at = (sourceLuminance: number): Rgb => {
+    const scale = sourceLuminance / SKIN_SOURCE_MIDTONE;
+    return [
+      Math.min(1, midtone[0] * scale),
+      Math.min(1, midtone[1] * scale),
+      Math.min(1, midtone[2] * scale),
+    ];
+  };
+  const shadow = at(SKIN_SOURCE_SHADOW);
+  const highlight = at(SKIN_SOURCE_HIGHLIGHT);
   return { shadow, midtone, highlight };
 }
 
-/** Maps the authored skin luminance band onto its warm three-tone ramp. */
-export function skinTintMatrix(hexColor: string) {
-  const { shadow, highlight } = skinToneRamp(hexColor);
-  const sourceSpan = SKIN_SOURCE_HIGHLIGHT - SKIN_SOURCE_SHADOW;
-  return shadow.flatMap((value, index) => {
-    const slope = (highlight[index] - value) / sourceSpan;
-    const alphaOffset = value - slope * SKIN_SOURCE_SHADOW;
-    return [...LUMINANCE.map((weight) => slope * weight), alphaOffset, 0];
-  }).concat([0, 0, 0, 1, 0]);
+/** Keeps every neutral skin shade on the selected warm hue, including alpha edges. */
+export function skinTintMatrix(hexColor: string, colorSpace: "sRGB" | "linearRGB" = "sRGB") {
+  const { midtone } = skinToneRamp(hexColor);
+  // iOS Core Image and web SVG filters work in linear RGB; Android uses sRGB.
+  // Calibrate both the selected swatch and the source gray in that working space.
+  const workingValue = (value: number) => colorSpace === "sRGB" ? value
+    : value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  return midtone.flatMap((value) => [
+    ...LUMINANCE.map((weight) => weight * workingValue(value) / workingValue(SKIN_SOURCE_MIDTONE)), 0, 0,
+  ]).concat([0, 0, 0, 1, 0]);
 }
 
-export function avatarTintMatrix(channel: "skin" | "hair" | "eyes", hexColor: string) {
-  return channel === "skin" ? skinTintMatrix(hexColor) : grayscaleTintMatrix(hexColor);
+export function avatarTintMatrix(
+  channel: "skin" | "hair" | "eyes",
+  hexColor: string,
+  colorSpace: "sRGB" | "linearRGB" = "sRGB",
+) {
+  return channel === "skin" ? skinTintMatrix(hexColor, colorSpace) : grayscaleTintMatrix(hexColor);
 }

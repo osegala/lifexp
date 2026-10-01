@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import ts from "typescript";
 
 import {
   DEFAULT_APPEARANCE,
@@ -15,6 +16,12 @@ import { avatarTintMatrix, grayscaleTintMatrix, skinTintMatrix, skinToneRamp } f
 import { avatarFromInventory } from "../src/avatar/inventory.ts";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+// Exercise the real registry without loading native UI or decoding PNG imports.
+const registry = {};
+new Function("exports", "require", ts.transpileModule(read("../src/avatar/assetRegistry.ts"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true },
+}).outputText)(registry, (path) => path.endsWith(".json")
+  ? JSON.parse(read(`../src/avatar/${path}`)) : path);
 const equipment = {
   tunic: "tunic-1", pants: "pants-1", boots: "boots-1", hat: "hat-1",
   hair: null, pet: "pet-1", aura: "aura-1", background: "background-1",
@@ -241,6 +248,125 @@ test("all ten dresses share the narrower centered fit without moving vertical an
   assert.match(registry, /from: top - 4, to: shoulderY, y: 250, height: 45/);
   assert.match(registry, /from: shoulderY, to: waistY, y: 295, height: 275/);
   assert.match(registry, /from: waistY, to: bottom \+ 4, y: 570, height: 610/);
+});
+
+test("GIRL body selection follows rendered clothing without changing BOY", () => {
+  const { BASE_BODY_SPRITES, getBaseBodySprites } = registry;
+  for (const clothing of [[], [{ layer: "upperBody" }], [{ layer: "bottoms" }], [{ fullOutfit: true }]]) {
+    assert.equal(getBaseBodySprites("BOY", clothing), BASE_BODY_SPRITES.BOY);
+  }
+  assert.equal(getBaseBodySprites("GIRL", [{ fullOutfit: true }]), BASE_BODY_SPRITES.GIRL);
+  const bare = getBaseBodySprites("GIRL", []);
+  assert.notEqual(bare, BASE_BODY_SPRITES.GIRL);
+  for (const part of bare) {
+    assert.equal(part.fullOutfit, undefined);
+    if (!["torso", "upperArmLeft", "upperArmRight", "upperLegLeft", "upperLegRight"].includes(part.region)) {
+      assert.equal(part, BASE_BODY_SPRITES.GIRL.find(({ id }) => id === part.id));
+    }
+  }
+  const renderer = read("../src/components/AvatarRenderer.tsx");
+  assert.match(renderer, /getBaseBodySprites\(bodyType, clothingSprites\)/);
+  assert.match(renderer, /const clothingSprites =[\s\S]*registration-default[\s\S]*getEquippedCharacterSprites\(cosmetics, bottomId/);
+});
+
+test("GIRL skin and details share corrected limb frames without changing crops or ground height", () => {
+  const { BASE_BODY_SPRITES, getBaseBodySprites } = registry;
+  const bare = getBaseBodySprites("GIRL", []);
+  for (const side of ["left", "right"]) {
+    const skin = bare.find(({ id }) => id === `${side}-arm-0-skin`);
+    const detail = bare.find(({ id }) => id === `${side}-arm-3-details`);
+    const original = BASE_BODY_SPRITES.GIRL.find(({ id }) => id === skin.id);
+    assert.deepEqual(skin.frame, detail.frame);
+    assert.equal(skin.frame.crop, original.frame.crop);
+    assert.equal(skin.frame.sourceClipPath, original.frame.sourceClipPath);
+    assert.equal(skin.frame.destination.y, original.frame.destination.y - 15);
+    assert.equal(skin.frame.destination.height, original.frame.destination.height + 15);
+    assert.equal(skin.frame.destination.y + skin.frame.destination.height,
+      original.frame.destination.y + original.frame.destination.height);
+    assert.equal(skin.frame.destination.x, original.frame.destination.x - (side === "left" ? 5 : 0));
+    assert.equal(skin.clipPath, undefined, "do not cut actual shoulder skin");
+    assert.equal(detail.clipPath, "M0 305H1254V1254H0Z");
+    const leg = bare.find(({ id }) => id === `${side}-leg-0-skin`);
+    const legDetail = bare.find(({ id }) => id === `${side}-leg-3-details`);
+    const oldLeg = BASE_BODY_SPRITES.GIRL.find(({ id }) => id === leg.id);
+    assert.deepEqual(leg.frame, legDetail.frame);
+    assert.equal(leg.frame.crop, oldLeg.frame.crop);
+    assert.equal(leg.frame.sourceClipPath, oldLeg.frame.sourceClipPath);
+    assert.equal(leg.frame.destination.y, oldLeg.frame.destination.y);
+    assert.equal(leg.frame.destination.height, oldLeg.frame.destination.height);
+    assert.equal(leg.frame.destination.width, leg.frame.crop.width * 0.5);
+    assert.equal(leg.frame.destination.x, side === "left" ? 661.3 : 435.7);
+    assert.equal(leg.frame.shearX, side === "left" ? 0.074 : -0.105);
+    assert.equal(leg.clipPath, undefined, "bare legs must not inherit trouser coverage");
+  }
+  const torso = bare.filter(({ region }) => region === "torso");
+  assert.deepEqual(torso[0].frame, torso[1].frame);
+  assert.equal(torso[0].frame.destination, BASE_BODY_SPRITES.GIRL.find(({ region }) => region === "torso").frame.destination);
+  assert.ok(torso[0].frame.sourceClipPath);
+});
+
+test("all dresses retain the original GIRL body and exact finalized dress fit", () => {
+  const { BASE_BODY_SPRITES, getBaseBodySprites, getCosmeticAssetIds, getEquippedCharacterSprites } = registry;
+  const ids = getCosmeticAssetIds("upperBody").filter(id => id.startsWith("avatar-v2/dresses/"));
+  assert.equal(ids.length, 10);
+  for (const imageUrl of ids) {
+    const sprites = getEquippedCharacterSprites([{ id: "top", type: "TOP", imageUrl }], "top", "TOP");
+    assert.equal(getBaseBodySprites("GIRL", sprites), BASE_BODY_SPRITES.GIRL);
+    assert.equal(sprites.length, 3);
+    for (const [index, part] of sprites.entries()) {
+      assert.deepEqual(part.frame.destination, {
+        x: 314.775, y: [250, 295, 570][index], width: 624.45, height: [45, 275, 610][index],
+      });
+    }
+  }
+});
+
+test("every GIRL tunic keeps clean torso joins and the original garment arm anchors", () => {
+  const { BASE_BODY_SPRITES, getBaseBodySprites, getCosmeticAssetIds, getEquippedCharacterSprites } = registry;
+  const bare = getBaseBodySprites("GIRL", []);
+  const tops = getCosmeticAssetIds("upperBody").filter(id => id.startsWith("avatar-v2/tops/"));
+  assert.equal(tops.length, 11);
+  for (const imageUrl of tops) {
+    const sprites = getEquippedCharacterSprites([{ id: "top", type: "TOP", imageUrl }], "top", "TOP");
+    const body = getBaseBodySprites("GIRL", sprites);
+    for (const part of body) {
+      const original = BASE_BODY_SPRITES.GIRL.find(({ id }) => id === part.id);
+      if (["upperArmLeft", "upperArmRight"].includes(part.region)) {
+        assert.equal(part.frame, original.frame, `${imageUrl}: no arm repositioning under tunics`);
+        assert.equal(part.clipPath, part.tint === "skin" ? undefined : "M0 305H1254V1254H0Z");
+      } else {
+        assert.equal(part, bare.find(({ id }) => id === part.id));
+      }
+    }
+    assert.ok(body.find(({ region }) => region === "torso").frame.sourceClipPath);
+  }
+});
+
+test("all GIRL trousers cover legs with or without boots, preserving exposed ankles", () => {
+  const { BASE_BODY_SPRITES, getBaseBodySprites, getCosmeticAssetIds, getEquippedCharacterSprites, resolveSpriteSet, DEFAULT_CHARACTER_SPRITES } = registry;
+  const bottoms = getCosmeticAssetIds("bottoms");
+  const boots = getCosmeticAssetIds("boots");
+  assert.equal(bottoms.length, 11);
+  assert.equal(boots.length, 11);
+  for (const imageUrl of bottoms) {
+    const pants = getEquippedCharacterSprites([{ id: "pants", type: "BOTTOM", imageUrl }], "pants", "BOTTOM");
+    const expectedClip = imageUrl.endsWith("traveler-trousers") ? "M0 993H1254V1254H0Z" : "M0 1096H1254V1254H0Z";
+    for (const boot of [undefined, ...boots]) {
+      const shoes = boot ? getEquippedCharacterSprites([{ id: "boots", type: "BOOTS", imageUrl: boot }], "boots", "BOOTS") : [];
+      const outfit = [...pants, ...shoes];
+      assert.equal(getBaseBodySprites("BOY", outfit), BASE_BODY_SPRITES.BOY);
+      const body = getBaseBodySprites("GIRL", outfit);
+      const legs = body.filter(({ region }) => ["upperLegLeft", "upperLegRight"].includes(region));
+      assert.equal(legs.length, 4);
+      for (const leg of legs) assert.equal(leg.clipPath, expectedClip, `${imageUrl} / ${boot ?? "barefoot"}`);
+      const bare = getBaseBodySprites("GIRL", []);
+      for (const part of body.filter(({ region }) => !region.startsWith("upperLeg"))) {
+        assert.equal(part, bare.find(({ id }) => id === part.id), "pants must not affect shoulders/head");
+      }
+    }
+  }
+  const registration = getBaseBodySprites("GIRL", resolveSpriteSet("defaults", DEFAULT_CHARACTER_SPRITES));
+  assert.equal(registration.find(({ region }) => region === "upperLegLeft").clipPath, "M0 993H1254V1254H0Z");
 });
 
 test("Avatar screen previews drafts and saves all five fields with one PATCH", () => {

@@ -1,0 +1,19 @@
+{
+  "productionSha256": "a7ae50a9bf311a0fa05f18901f9aafcd59652d2294115db341b0cfa14ee39b36",
+  "productionSha256After": "a7ae50a9bf311a0fa05f18901f9aafcd59652d2294115db341b0cfa14ee39b36",
+  "dimensions": [
+    1086,
+    1448
+  ],
+  "colorType": "RGBA",
+  "scenarios": [
+    "base",
+    "starter",
+    "dress"
+  ],
+  "bodyTypes": [
+    "BOY",
+    "GIRL"
+  ],
+  "sourcePngModified": false
+}

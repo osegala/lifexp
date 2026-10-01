@@ -833,6 +833,61 @@ export const BASE_BODY_SPRITES: Record<
   GIRL: GIRL_BODY_SPRITES,
 };
 
+// The tank/shorts source includes assembly sockets, not continuous shoulders or
+// thighs. Keep its clothing/chest, letting the separate limbs finish those joins.
+// Source coordinates; shared by the neutral and detail layers. No PNG is changed.
+const GIRL_BASE_TORSO_CLIP = "M336 0H750V416L790 507H1086V1150H866L866 1163Q752 1243 626 1238Q594 1238 569 1228L559 1147H529L518 1229Q385 1260 222 1167H0V507H295L336 416Z";
+const GIRL_UNCOVERED_BODY_SPRITES = GIRL_BODY_SPRITES.map((part) => {
+  if (part.region === "upperLegLeft" || part.region === "upperLegRight") {
+    const frame = part.frame!;
+    const left = part.region === "upperLegLeft";
+    return { ...part, frame: {
+      ...frame,
+      // Restore near-native leg proportions and align the stance with the shoes.
+      destination: { ...frame.destination, x: left ? 661.3 : 435.7, width: frame.crop.width * 0.5 },
+      shearX: left ? 0.074 : -0.105,
+    } };
+  }
+  if (part.region === "torso") return {
+    ...part, frame: { ...GIRL_TORSO_FRAME, sourceClipPath: GIRL_BASE_TORSO_CLIP },
+  };
+  if (part.region !== "upperArmLeft" && part.region !== "upperArmRight") return part;
+  const frame = part.frame!;
+  return {
+    ...part,
+    frame: { ...frame, destination: {
+      ...frame.destination,
+      // Meet the tank straps; retain hand height, source crops and silhouettes.
+      x: frame.destination.x - (part.region === "upperArmLeft" ? 5 : 0),
+      y: frame.destination.y - 15,
+      height: frame.destination.height + 15,
+    } },
+    // The arm's top cut-line is an assembly edge, not an anatomical crease.
+    clipPath: part.tint === "skin" ? undefined : "M0 305H1254V1254H0Z",
+  };
+});
+
+// Tunics cover the raised tank straps, but must not bring back the torso sockets.
+const GIRL_TUNIC_BODY_SPRITES = GIRL_UNCOVERED_BODY_SPRITES.map((part) =>
+  part.region === "upperArmLeft" ? { ...part, frame: GIRL_LEFT_ARM_FRAME }
+    : part.region === "upperArmRight" ? { ...part, frame: GIRL_RIGHT_ARM_FRAME } : part,
+);
+
+/** Keep finalized dresses/BOY unchanged; fit GIRL joints to the clothing actually rendered. */
+export function getBaseBodySprites(bodyType: "BOY" | "GIRL", clothing: readonly ResolvedCharacterSprite[]) {
+  if (bodyType === "BOY" || clothing.some(({ fullOutfit }) => fullOutfit)) return BASE_BODY_SPRITES[bodyType];
+  const body = clothing.some(({ layer }) => layer === "upperBody")
+    ? GIRL_TUNIC_BODY_SPRITES : GIRL_UNCOVERED_BODY_SPRITES;
+  const trousers = clothing.filter(({ layer }) => layer === "bottoms");
+  if (!trousers.length) return body;
+  // Framed trousers end at their destination bottom; aligned starter cuffs end
+  // at Y1001/1009. Keep 8px of ankle overlap inside the hems, not skin at the calves.
+  const hemY = Math.min(...trousers.map(({ frame }) => frame
+    ? frame.destination.y + frame.destination.height : 1001)) - 8;
+  return body.map((part) => part.region === "upperLegLeft" || part.region === "upperLegRight"
+    ? { ...part, clipPath: `M0 ${hemY}H1254V1254H0Z` } : part);
+}
+
 const FALLBACK_IMAGES: Partial<
   Record<CosmeticType, Record<number, ImageSourcePropType>>
 > = {
