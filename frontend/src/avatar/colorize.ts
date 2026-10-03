@@ -61,6 +61,34 @@ export function skinTintMatrix(hexColor: string, colorSpace: "sRGB" | "linearRGB
   ]).concat([0, 0, 0, 1, 0]);
 }
 
+/** Detail whites become a restrained warm highlight on deep skin, not white paint. */
+export function skinDetailMatrix(hexColor: string, colorSpace: "sRGB" | "linearRGB" = "sRGB") {
+  const { midtone } = skinToneRamp(hexColor);
+  const luminance = midtone.reduce((sum, value, index) => sum + value * LUMINANCE[index], 0);
+  // Keep light/medium presets on the existing detail path; fade in for deep tones.
+  const depth = Math.max(0, Math.min(1, (0.45 - luminance) / 0.17));
+  if (depth === 0) return null;
+  const workingValue = (value: number) => colorSpace === "sRGB" ? value
+    : value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  return midtone.flatMap((value) => {
+    const gain = 1 - depth + depth * workingValue(Math.min(1, value * 1.25));
+    return [...LUMINANCE.map(weight => weight * gain), 0, 0];
+  }).concat([0, 0, 0, 1, 0]);
+}
+
+// Authored skin details are neutral RGB; the white starter clothes sharing some
+// detail PNGs retain chroma. Select neutral pixels BEFORE desaturation so those
+// clothes keep their existing appearance. Both signs also protect cool pixels.
+// 4096 resolves a one-byte channel difference even in linear RGB.
+// ponytail: relies on the current art's neutral-detail/chromatic-cloth encoding;
+// separate cloth/detail sources if future artwork no longer preserves it.
+export const SKIN_DETAIL_NEUTRAL_MASKS = [-4096, 4096].map(scale => [
+  1, 0, 0, 0, 0,
+  0, 1, 0, 0, 0,
+  0, 0, 1, 0, 0,
+  scale, 0, -scale, 0, 1,
+]);
+
 export function avatarTintMatrix(
   channel: "skin" | "hair" | "eyes",
   hexColor: string,

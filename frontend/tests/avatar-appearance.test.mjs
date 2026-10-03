@@ -177,7 +177,7 @@ test("neutral skin, iris, and detail layers are independently registered", () =>
   assert.match(registry, /skinPair\("head", BOY_SKIN\.head[\s\S]*?HEAD_DETAIL_CLIP\)/);
   assert.match(registry, /skinPair\("crown", GIRL_SKIN\.head[\s\S]*?CROWN_DETAIL_CLIP\)/);
   const layers = read("../src/components/CharacterSpriteLayers.tsx");
-  assert.match(layers, /FeColorMatrix type="saturate" values=\{\[0\]\}/);
+  assert.match(layers, /FeColorMatrix in="SourceGraphic" type="saturate" values=\{\[0\]\}/);
   assert.match(layers, /neutralDetails \? `url\(#\$\{id\}-neutral-details\)`/);
 });
 
@@ -297,12 +297,34 @@ test("GIRL skin and details share corrected limb frames without changing crops o
     assert.equal(leg.frame.destination.width, leg.frame.crop.width * 0.5);
     assert.equal(leg.frame.destination.x, side === "left" ? 661.3 : 435.7);
     assert.equal(leg.frame.shearX, side === "left" ? 0.074 : -0.105);
-    assert.equal(leg.clipPath, undefined, "bare legs must not inherit trouser coverage");
+    assert.equal(leg.clipPath, side === "left" ? "M676 0H1254V1254H0V671H678L676 638Z" : undefined);
+    assert.equal(legDetail.clipPath, leg.clipPath, "the shorts seam clips skin and linework together");
   }
   const torso = bare.filter(({ region }) => region === "torso");
   assert.deepEqual(torso[0].frame, torso[1].frame);
   assert.equal(torso[0].frame.destination, BASE_BODY_SPRITES.GIRL.find(({ region }) => region === "torso").frame.destination);
   assert.ok(torso[0].frame.sourceClipPath);
+});
+
+test("GIRL upper-eye layers use the crown crop as well as the face crop", () => {
+  const { BASE_BODY_SPRITES } = registry;
+  for (const section of ["head", "crown"]) {
+    const skin = BASE_BODY_SPRITES.GIRL.find(({ id }) => id === `${section}-0-skin`);
+    const iris = BASE_BODY_SPRITES.GIRL.find(({ id }) => id === `${section}-1-iris`);
+    const eyes = BASE_BODY_SPRITES.GIRL.find(({ id }) => id === `${section}-2-eye-details`);
+    assert.equal(iris.frame, skin.frame);
+    assert.equal(eyes.frame, skin.frame);
+    assert.equal(iris.tint, "eyes");
+    assert.equal(eyes.tint, undefined);
+    assert.equal(iris.layer, "face");
+    assert.equal(eyes.layer, "face");
+  }
+  const crown = BASE_BODY_SPRITES.GIRL.find(({ id }) => id === "crown-1-iris").frame;
+  const head = BASE_BODY_SPRITES.GIRL.find(({ id }) => id === "head-1-iris").frame;
+  // Authored eye details start at source Y566, above the face's Y615 boundary.
+  assert.ok(crown.crop.y <= 566);
+  assert.ok(crown.crop.y + crown.crop.height >= head.crop.y);
+  assert.equal(BASE_BODY_SPRITES.BOY.filter(({ tint }) => tint === "eyes").length, 1);
 });
 
 test("all dresses retain the original GIRL body and exact finalized dress fit", () => {

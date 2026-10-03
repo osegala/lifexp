@@ -1,10 +1,10 @@
 import { useId } from "react";
 import { Platform } from "react-native";
-import Svg, { ClipPath, Defs, FeColorMatrix, Filter, G, Image, Path, Rect, Use } from "react-native-svg";
+import Svg, { ClipPath, Defs, FeColorMatrix, FeComposite, Filter, G, Image, Path, Rect, Use } from "react-native-svg";
 
 import type { ResolvedCharacterSprite } from "../avatar/assetRegistry";
 import { sourceFrameTransform, spriteImageRect, spriteTransform, trouserTuckPath, trouserTuckSlices } from "../avatar/spriteLayout";
-import { avatarTintMatrix } from "../avatar/colorize";
+import { avatarTintMatrix, skinDetailMatrix, SKIN_DETAIL_NEUTRAL_MASKS } from "../avatar/colorize";
 
 const FILTER_COLOR_SPACE = Platform.OS === "android" ? "sRGB" : "linearRGB";
 
@@ -20,6 +20,7 @@ export default function CharacterSpriteLayers({ sprites, tintColors }: {
   const tuckPonytail = sprites.some(sprite => sprite.tuckPonytail);
   const fullOutfit = sprites.some(sprite => sprite.fullOutfit);
   const hasNeutralDetails = sprites.some(sprite => sprite.neutralDetails);
+  const detailMatrix = skinDetailMatrix(tintColors.skin, FILTER_COLOR_SPACE);
   const cuffs = sprites.flatMap(sprite => sprite.bootCuff ? [sprite.bootCuff] : []);
   const tuckPath = trouserTuckPath(cuffs);
   const coveredLegs = !fullOutfit && cuffs.length > 0 && sprites.some(sprite => sprite.layer === "bottoms");
@@ -38,7 +39,16 @@ export default function CharacterSpriteLayers({ sprites, tintColors }: {
         ))}
         {hasNeutralDetails && (
           <Filter id={`${id}-neutral-details`} x="-10%" y="-10%" width="120%" height="120%">
-            <FeColorMatrix type="saturate" values={[0]} />
+            <FeColorMatrix in="SourceGraphic" type="saturate" values={[0]} result="neutral" />
+            {detailMatrix && <>
+              {SKIN_DETAIL_NEUTRAL_MASKS.map((values, index) => (
+                <FeColorMatrix key={index} in="SourceGraphic" type="matrix" values={values} result={`neutral-mask-${index}`} />
+              ))}
+              <FeComposite in="neutral-mask-0" in2="neutral-mask-1" operator="in" result="skin-details" />
+              <FeColorMatrix in="skin-details" type="matrix" values={detailMatrix} result="adapted" />
+              {/* atop restores the exact original alpha, including antialiased contours. */}
+              <FeComposite in="adapted" in2="neutral" operator="atop" />
+            </>}
           </Filter>
         )}
         {hairClip && <ClipPath id={`${id}-hair`}><Path d={hairClip} /></ClipPath>}
