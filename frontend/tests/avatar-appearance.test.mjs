@@ -28,8 +28,8 @@ const equipment = {
 };
 const inventory = { equipped: equipment, items: [] };
 
-test("curated appearance palettes expose 10 styles, 16 skin tones, 20 hair colors, and 12 eye colors", () => {
-  assert.equal(HAIR_STYLE_IDS.length, 10);
+test("curated appearance palettes expose 20 styles, 16 skin tones, 20 hair colors, and 12 eye colors", () => {
+  assert.equal(HAIR_STYLE_IDS.length, 20);
   assert.equal(SKIN_COLORS.length, 16);
   assert.equal(HAIR_COLORS.length, 20);
   assert.equal(EYE_COLORS.length, 12);
@@ -108,7 +108,7 @@ test("color matrix preserves grayscale luminance and alpha instead of flattening
     });
   }
   assert.deepEqual(applySkinMatrix(0, 0), [0, 0, 0], "transparent pixels must remain colorless");
-  assert.deepEqual(avatarTintMatrix("hair", "#804020"), grayscaleTintMatrix("#804020"));
+  assert.deepEqual(avatarTintMatrix("hair", "#804020").slice(15), [0, 0, 0, 1, 0]);
   assert.deepEqual(avatarTintMatrix("eyes", "#804020"), grayscaleTintMatrix("#804020"));
   const layers = read("../src/components/CharacterSpriteLayers.tsx");
   assert.match(layers, /values=\{avatarTintMatrix\(channel as "skin" \| "hair" \| "eyes", color, FILTER_COLOR_SPACE\)\}/);
@@ -137,9 +137,7 @@ test("skin swatches survive native linear-RGB filtering without washing out or c
       for (const offset of [3, 4, 8, 9, 13, 14, 15, 16, 17, 19]) assert.equal(matrix[offset], 0);
       assert.equal(matrix[18], 1);
       assert.deepEqual(render(0), [0, 0, 0]);
-      for (const channel of ["hair", "eyes"]) {
-        assert.deepEqual(avatarTintMatrix(channel, color, space), grayscaleTintMatrix(color));
-      }
+      assert.deepEqual(avatarTintMatrix("eyes", color, space), grayscaleTintMatrix(color));
     }
   }
   assert.match(read("../src/components/CharacterSpriteLayers.tsx"), /Platform\.OS === "android" \? "sRGB" : "linearRGB"/);
@@ -181,7 +179,7 @@ test("neutral skin, iris, and detail layers are independently registered", () =>
   assert.match(layers, /neutralDetails \? `url\(#\$\{id\}-neutral-details\)`/);
 });
 
-test("all hairstyles use neutral tint sources and Twin Braids bows remain untinted", () => {
+test("original hairstyles retain their neutral sources and Twin Braids bows remain untinted", () => {
   const registry = read("../src/avatar/assetRegistry.ts");
   for (const filename of [
     "windblown-layers-neutral", "side-swept-layers-neutral", "spring-curls-neutral",

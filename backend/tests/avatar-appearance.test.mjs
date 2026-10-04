@@ -17,7 +17,7 @@ import { ProfilePatchError, validateProfilePatch } from "../functions/update-me/
 
 test("appearance contract exposes the canonical body, hair, skin, hair-color, and eye allowlists", () => {
     assert.deepEqual(BODY_TYPES, ["BOY", "GIRL"]);
-    assert.equal(HAIR_IDS.length, 10);
+    assert.equal(HAIR_IDS.length, 20);
     assert.equal(SKIN_COLOR_IDS.length, 16);
     assert.equal(HAIR_COLOR_IDS.length, 20);
     assert.equal(EYE_COLOR_IDS.length, 12);
@@ -40,6 +40,17 @@ test("legacy and malformed profiles normalize to safe appearance defaults", () =
         ...DEFAULT_APPEARANCE,
         bodyType: "GIRL"
     });
+});
+
+test("all 20 built-in hairstyles survive partial PATCH validation and stored-profile normalization", () => {
+    const frontend = readFileSync(new URL("../../frontend/src/avatar/appearance.ts", import.meta.url), "utf8");
+    const frontendIds = [...frontend.matchAll(/"(avatar-v2\/hair\/[^\"]+)"/g)].map(([, id]) => id);
+    assert.deepEqual(frontendIds, HAIR_IDS, "client and server must accept the same hair IDs");
+    assert.equal(new Set(HAIR_IDS).size, 20);
+    for (const hairId of HAIR_IDS) {
+        assert.deepEqual(validateProfilePatch({ hairId }, APPEARANCE_VALUES), { hairId });
+        assert.equal(normalizeAppearance({ hairId: { S: hairId } }).hairId, hairId);
+    }
 });
 
 test("new profiles explicitly store every appearance default", () => {

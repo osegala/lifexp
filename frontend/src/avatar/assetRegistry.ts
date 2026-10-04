@@ -558,7 +558,7 @@ const COSMETIC_ASSETS: Record<string, CosmeticAssetDefinition> = {
   },
   "avatar-v2/hair/high-ponytail": framedHair(
     require("../../assets/avatar/v2/hair/high-ponytail.png"), HIGH_PONYTAIL_HAIR, [198, 46, 1143, 1209],
-    [577, 680], [0.33, 0.285], [627, 187], true),
+    [577, 680], [0.33, 0.285], [627, 179], true),
   "avatar-v2/hair/twin-braids": framedHair(
     require("../../assets/avatar/v2/hair/twin-braids.png"), TWIN_BRAIDS_HAIR, [269, 54, 990, 1196],
     [630, 548], [0.354, 0.34], [627, 188], false, TWIN_BRAIDS_DETAILS),
@@ -569,7 +569,54 @@ const COSMETIC_ASSETS: Record<string, CosmeticAssetDefinition> = {
   },
   "avatar-v2/hair/long-shag": framedHair(
     require("../../assets/avatar/v2/hair/long-shag.png"), LONG_SHAG_HAIR, [179, 65, 1072, 1168],
-    [630, 700], [0.30, 0.255], [627, 188]),
+    [630, 700], [0.30, 0.255], [627, 180]),
+  // Supplied full-canvas hair: align the opening, never resize the source PNG.
+  "avatar-v2/hair/close-waves": framedHair(
+    require("../../assets/avatar/v2/hair/close-waves.png"),
+    require("../../assets/avatar/v2/hair/close-waves.png"), [4, 4, 1250, 1250],
+    [628, 674], [0.196, 0.15], [627, 110]),
+  "avatar-v2/hair/tapered-coils": framedHair(
+    require("../../assets/avatar/v2/hair/tapered-coils.png"),
+    require("../../assets/avatar/v2/hair/tapered-coils.png"), [4, 4, 1250, 1250],
+    [628, 725], [0.18816, 0.15936], [627, 110]),
+  "avatar-v2/hair/cornrows": framedHair(
+    require("../../assets/avatar/v2/hair/cornrows.png"),
+    require("../../assets/avatar/v2/hair/cornrows.png"), [4, 4, 1250, 1250],
+    [628, 529], [0.2352, 0.17472], [627, 110]),
+  "avatar-v2/hair/loc-updo": framedHair(
+    require("../../assets/avatar/v2/hair/loc-updo.png"),
+    require("../../assets/avatar/v2/hair/loc-updo.png"), [4, 4, 1250, 1250],
+    [628, 615], [0.38, 0.26], [627, 110]),
+  "avatar-v2/hair/two-strand-twists": framedHair(
+    require("../../assets/avatar/v2/hair/two-strand-twists.png"),
+    require("../../assets/avatar/v2/hair/two-strand-twists.png"), [4, 4, 1250, 1250],
+    [628, 350], [0.39, 0.245], [627, 110]),
+  "avatar-v2/hair/rounded-curls": framedHair(
+    require("../../assets/avatar/v2/hair/rounded-curls.png"),
+    require("../../assets/avatar/v2/hair/rounded-curls.png"), [4, 4, 1250, 1250],
+    [628, 526], [0.34, 0.29], [627, 110]),
+  "avatar-v2/hair/box-braids": {
+    slot: "hair", previewSource: require("../../assets/avatar/v2/hair/box-braids.png"),
+    // The authored opening and loose strands must stay intact. Like Curtain
+    // Bob, use one complete front sprite, with no generic crown/fringe cut.
+    sprites: [{ id: "front", layer: "hairFront", tint: "hair",
+      source: require("../../assets/avatar/v2/hair/box-braids.png"),
+      // Uniform 0.4x scale preserves the original width/length relationship.
+      frame: sourceFrame([1254, 1254], [0, 0, 1254, 1254], [375.8, -2.4, 501.6, 501.6]),
+    }],
+  },
+  "avatar-v2/hair/twin-puffs": framedHair(
+    require("../../assets/avatar/v2/hair/twin-puffs.png"),
+    require("../../assets/avatar/v2/hair/twin-puffs.png"), [4, 4, 1250, 1250],
+    [628, 560], [0.4, 0.31], [627, 94]),
+  "avatar-v2/hair/bantu-knots": framedHair(
+    require("../../assets/avatar/v2/hair/bantu-knots.png"),
+    require("../../assets/avatar/v2/hair/bantu-knots.png"), [4, 4, 1250, 1250],
+    [628, 518], [0.3, 0.243], [627, 110]),
+  "avatar-v2/hair/half-up-twists": framedHair(
+    require("../../assets/avatar/v2/hair/half-up-twists.png"),
+    require("../../assets/avatar/v2/hair/half-up-twists.png"), [4, 4, 1250, 1250],
+    [628, 475], [0.39, 0.3], [627, 110]),
   "avatar-v2/hats/azure-feather-cap": {
     slot: "head",
     previewSource: require("../../assets/avatar/v2/hats/azure-feather-cap.png"),
@@ -823,6 +870,8 @@ const GIRL_BODY_SPRITES = [
   ...skinPair("head", GIRL_SKIN.head, "head", "bodyFront", GIRL_HEAD_FRAME, "face"),
   ...eyePair("head", GIRL_EYES, GIRL_HEAD_FRAME),
   ...skinPair("crown", GIRL_SKIN.head, "head", "bodyFront", GIRL_CROWN_FRAME, "face", CROWN_DETAIL_CLIP),
+  // The Y615 split crosses the upper lashes/irises; both crops need eye layers.
+  ...eyePair("crown", GIRL_EYES, GIRL_CROWN_FRAME),
 ] satisfies readonly BaseBodySpriteDefinition[];
 
 export const BASE_BODY_SPRITES: Record<
@@ -837,11 +886,14 @@ export const BASE_BODY_SPRITES: Record<
 // thighs. Keep its clothing/chest, letting the separate limbs finish those joins.
 // Source coordinates; shared by the neutral and detail layers. No PNG is changed.
 const GIRL_BASE_TORSO_CLIP = "M336 0H750V416L790 507H1086V1150H866L866 1163Q752 1243 626 1238Q594 1238 569 1228L559 1147H529L518 1229Q385 1260 222 1167H0V507H295L336 416Z";
+// Pre-shear destination coordinates: follow the shorts' inner seam down to
+// Y671, then reveal the whole thigh. Only the screen-right leg needs this cut.
+const GIRL_LEFT_THIGH_CLIP = "M676 0H1254V1254H0V671H678L676 638Z";
 const GIRL_UNCOVERED_BODY_SPRITES = GIRL_BODY_SPRITES.map((part) => {
   if (part.region === "upperLegLeft" || part.region === "upperLegRight") {
     const frame = part.frame!;
     const left = part.region === "upperLegLeft";
-    return { ...part, frame: {
+    return { ...part, clipPath: left ? GIRL_LEFT_THIGH_CLIP : undefined, frame: {
       ...frame,
       // Restore near-native leg proportions and align the stance with the shoes.
       destination: { ...frame.destination, x: left ? 661.3 : 435.7, width: frame.crop.width * 0.5 },

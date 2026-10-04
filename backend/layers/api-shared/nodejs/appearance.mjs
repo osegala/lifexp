@@ -10,7 +10,17 @@ export const HAIR_IDS = Object.freeze([
     "avatar-v2/hair/high-ponytail",
     "avatar-v2/hair/twin-braids",
     "avatar-v2/hair/feathered-sweep",
-    "avatar-v2/hair/long-shag"
+    "avatar-v2/hair/long-shag",
+    "avatar-v2/hair/close-waves",
+    "avatar-v2/hair/tapered-coils",
+    "avatar-v2/hair/cornrows",
+    "avatar-v2/hair/loc-updo",
+    "avatar-v2/hair/two-strand-twists",
+    "avatar-v2/hair/rounded-curls",
+    "avatar-v2/hair/box-braids",
+    "avatar-v2/hair/twin-puffs",
+    "avatar-v2/hair/bantu-knots",
+    "avatar-v2/hair/half-up-twists",
 ]);
 
 export const SKIN_COLOR_IDS = Object.freeze(

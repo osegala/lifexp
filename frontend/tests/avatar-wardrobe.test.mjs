@@ -7,7 +7,7 @@ import {
   catalogCosmeticReference,
   wardrobeCosmetics,
 } from "../src/avatar/inventory.ts";
-import { DEFAULT_APPEARANCE, loadOptionalAppearance } from "../src/avatar/appearance.ts";
+import { DEFAULT_APPEARANCE, HAIR_STYLE_IDS, loadOptionalAppearance } from "../src/avatar/appearance.ts";
 
 const hairIds = [
   "avatar-v2/hair/windblown-layers",
@@ -67,12 +67,13 @@ const metadata = (assetKey) => {
   return slot ? { slot, fullOutfit: group === "dresses" } : null;
 };
 
-test("central registry discovery supplies all ten built-in hairstyles", () => {
+test("central registry discovery supplies all twenty styles and preserves the original ten IDs", () => {
   const registry = readFileSync(new URL("../src/avatar/assetRegistry.ts", import.meta.url), "utf8");
   const avatarScreen = readFileSync(new URL("../app/(tabs)/avatar.tsx", import.meta.url), "utf8");
   const registeredHairIds = [...registry.matchAll(/^  "(avatar-v2\/hair\/[^"]+)":/gm)]
     .map((match) => match[1]);
-  assert.deepEqual(registeredHairIds, hairIds);
+  assert.deepEqual(registeredHairIds, [...HAIR_STYLE_IDS]);
+  assert.deepEqual(registeredHairIds.slice(0, 10), hairIds);
   assert.match(registry, /export function getCosmeticAssetIds[\s\S]*definition\.slot === slot/);
   assert.match(avatarScreen, /getCosmeticAssetIds\("hair"\)/);
 });

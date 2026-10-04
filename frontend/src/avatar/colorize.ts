@@ -94,5 +94,12 @@ export function avatarTintMatrix(
   hexColor: string,
   colorSpace: "sRGB" | "linearRGB" = "sRGB",
 ) {
-  return channel === "skin" ? skinTintMatrix(hexColor, colorSpace) : grayscaleTintMatrix(hexColor);
+  if (channel === "skin") return skinTintMatrix(hexColor, colorSpace);
+  const tint = grayscaleTintMatrix(hexColor);
+  if (channel === "eyes") return tint;
+  // Neutralize authored hair RGB before tinting; existing grayscale hair is
+  // mathematically unchanged. Keep source alpha and every strand highlight.
+  return [0, 6, 12].flatMap(index => [
+    ...LUMINANCE.map(weight => weight * tint[index]), 0, 0,
+  ]).concat([0, 0, 0, 1, 0]);
 }
