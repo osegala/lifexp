@@ -14,6 +14,7 @@ type Props = {
   appearance: AvatarAppearance;
   dirty: boolean;
   saving: boolean;
+  saveError?: string;
   onChange: (patch: Partial<AvatarAppearance>) => void;
   onSave: () => void;
   showSaveButton?: boolean;
@@ -23,6 +24,7 @@ export default function AppearanceEditor({
   appearance,
   dirty,
   saving,
+  saveError,
   onChange,
   onSave,
   showSaveButton = true,
@@ -50,14 +52,19 @@ export default function AppearanceEditor({
       </View>
 
       <Text style={styles.label}>Hair style</Text>
-      <View accessibilityRole="radiogroup" style={styles.hairStyles}>
+      <Text accessibilityLiveRegion="polite" aria-live="polite" style={styles.selectedColor}>
+        {hairStyleName(appearance.hairId)}
+      </Text>
+      <View accessibilityRole="radiogroup" accessibilityLabel="Hair style" style={styles.hairStyles}>
         {HAIR_STYLE_IDS.map((hairId) => {
           const selected = appearance.hairId === hairId;
           return (
             <Pressable
               key={hairId}
               accessibilityRole="radio"
+              accessibilityLabel={`Hair style: ${hairStyleName(hairId)}`}
               accessibilityState={{ checked: selected }}
+              aria-checked={selected}
               onPress={() => onChange({ hairId })}
               style={({ pressed }) => [
                 styles.hairStyle,
@@ -74,13 +81,19 @@ export default function AppearanceEditor({
       </View>
 
       <Text style={styles.label}>Skin tone</Text>
-      <Swatches options={SKIN_COLORS} selectedId={appearance.skinColorId} onSelect={(skinColorId) => onChange({ skinColorId })} />
+      <Swatches label="Skin tone" options={SKIN_COLORS} selectedId={appearance.skinColorId} onSelect={(skinColorId) => onChange({ skinColorId })} />
 
       <Text style={styles.label}>Hair color</Text>
-      <Swatches options={HAIR_COLORS} selectedId={appearance.hairColorId} onSelect={(hairColorId) => onChange({ hairColorId })} />
+      <Swatches label="Hair color" options={HAIR_COLORS} selectedId={appearance.hairColorId} onSelect={(hairColorId) => onChange({ hairColorId })} />
 
       <Text style={styles.label}>Eye color</Text>
-      <Swatches options={EYE_COLORS} selectedId={appearance.eyeColorId} onSelect={(eyeColorId) => onChange({ eyeColorId })} />
+      <Swatches label="Eye color" options={EYE_COLORS} selectedId={appearance.eyeColorId} onSelect={(eyeColorId) => onChange({ eyeColorId })} />
+
+      {!!saveError && (
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.saveError}>
+          Appearance not saved. {saveError}
+        </Text>
+      )}
 
       {showSaveButton && (
         <Pressable
@@ -119,6 +132,7 @@ function BodyChoice({ bodyType, selected, onPress }: {
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
+      aria-checked={selected}
       onPress={onPress}
       style={({ pressed }) => [styles.bodyChoice, selected && styles.bodyChoiceSelected, pressed && styles.pressed]}
     >
@@ -129,33 +143,40 @@ function BodyChoice({ bodyType, selected, onPress }: {
   );
 }
 
-function Swatches({ options, selectedId, onSelect }: {
+function Swatches({ label, options, selectedId, onSelect }: {
+  label: string;
   options: readonly AppearanceColor[];
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
   return (
-    <View accessibilityRole="radiogroup" style={styles.swatches}>
-      {options.map((option) => {
-        const selected = option.id === selectedId;
-        return (
-          <Pressable
-            key={option.id}
-            accessibilityRole="radio"
-            accessibilityLabel={option.name}
-            accessibilityState={{ checked: selected }}
-            hitSlop={4}
-            onPress={() => onSelect(option.id)}
-            style={({ pressed }) => [
-              styles.swatchShell,
-              selected && styles.swatchSelected,
-              pressed && styles.pressed,
-            ]}
-          >
-            <View style={[styles.swatch, { backgroundColor: option.color }]} />
-          </Pressable>
-        );
-      })}
+    <View>
+      <Text accessibilityLiveRegion="polite" aria-live="polite" style={styles.selectedColor}>
+        {options.find(({ id }) => id === selectedId)?.name}
+      </Text>
+      <View accessibilityRole="radiogroup" accessibilityLabel={label} style={styles.swatches}>
+        {options.map((option) => {
+          const selected = option.id === selectedId;
+          return (
+            <Pressable
+              key={option.id}
+              accessibilityRole="radio"
+              accessibilityLabel={`${label}: ${option.name}`}
+              accessibilityState={{ checked: selected }}
+              aria-checked={selected}
+              onPress={() => onSelect(option.id)}
+              style={({ pressed }) => [
+                styles.swatchShell,
+                selected && styles.swatchSelected,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={[styles.swatch, { backgroundColor: option.color }]} />
+              {selected && <Text style={styles.swatchCheck}>✓</Text>}
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -175,15 +196,18 @@ const styles = StyleSheet.create({
   bodyChoiceText: { color: colors.mutedText, fontSize: 14, fontWeight: "800" },
   bodyChoiceTextSelected: { color: colors.accent },
   hairStyles: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
-  hairStyle: { minHeight: 36, justifyContent: "center", borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardLight, paddingHorizontal: spacing.sm },
+  hairStyle: { minHeight: 44, justifyContent: "center", borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardLight, paddingHorizontal: spacing.sm },
   hairStyleSelected: { borderColor: colors.accent, backgroundColor: "#173329" },
   hairStyleText: { color: colors.mutedText, fontSize: 11, fontWeight: "700" },
   hairStyleTextSelected: { color: colors.accent },
   swatches: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  swatchShell: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "transparent" },
+  selectedColor: { color: colors.mutedText, fontSize: 12, marginBottom: spacing.sm },
+  swatchShell: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "transparent" },
   swatchSelected: { borderColor: colors.accent, backgroundColor: colors.cardLight },
   swatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
+  swatchCheck: { position: "absolute", color: colors.text, backgroundColor: colors.background, borderRadius: 8, width: 16, height: 16, textAlign: "center", fontSize: 12, lineHeight: 16, right: 0, bottom: 0 },
   saveButton: { minHeight: 46, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.accent },
+  saveError: { color: colors.danger, fontSize: 13, lineHeight: 19 },
   saveButtonDisabled: { backgroundColor: colors.cardLight },
   saveText: { color: colors.background, fontSize: 13, fontWeight: "900" },
   saveTextDisabled: { color: colors.mutedText },

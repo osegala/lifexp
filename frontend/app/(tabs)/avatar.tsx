@@ -85,8 +85,10 @@ export default function AvatarScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingId, setLoadingId] = useState<CosmeticId | null>(null);
   const [savingAppearance, setSavingAppearance] = useState(false);
+  const [appearanceSaveError, setAppearanceSaveError] = useState("");
   const [savedAppearance, setSavedAppearance] = useState<AvatarAppearance | null>(null);
   const [editingAppearance, setEditingAppearance] = useState(false);
+  const [confirmDiscardAppearance, setConfirmDiscardAppearance] = useState(false);
   const [previewAllCosmetics, setPreviewAllCosmetics] = useState(false);
   const [selectedType, setSelectedType] = useState<CosmeticType>("HAIR");
 
@@ -171,6 +173,7 @@ export default function AvatarScreen() {
   }
 
   function updateAppearance(patch: Partial<AvatarAppearance>) {
+    setAppearanceSaveError("");
     setAvatar((current) => current ? {
       ...current,
       ...(patch.bodyType ? { bodyType: patch.bodyType } : {}),
@@ -190,6 +193,7 @@ export default function AvatarScreen() {
     if (!user || !draftAppearance || !appearanceDirty || savingAppearance) return;
     try {
       setSavingAppearance(true);
+      setAppearanceSaveError("");
       const response = await api.patch<AvatarAppearance>(apiRoutes.me, draftAppearance);
       const persisted = normalizeAppearance(response.data);
       setSavedAppearance(persisted);
@@ -205,32 +209,30 @@ export default function AvatarScreen() {
       setEditingAppearance(false);
       Alert.alert("Appearance", "Your appearance is saved.");
     } catch (error) {
-      Alert.alert("Appearance not saved", apiError(error, "Could not save your appearance.").message);
+      const failure = apiError(error, "Could not save your appearance. Please try again.");
+      setAppearanceSaveError(failure.code === "INVALID_HAIR_ID"
+        ? "The server does not support this hairstyle yet. Choose another hairstyle to save, or keep this draft until the server is updated."
+        : failure.message);
     } finally {
       setSavingAppearance(false);
     }
   }
 
   function closeAppearanceEditor() {
+    if (savingAppearance) return;
     if (!appearanceDirty) {
+      setConfirmDiscardAppearance(false);
       setEditingAppearance(false);
       return;
     }
-    Alert.alert(
-      "Discard appearance changes?",
-      "Your unsaved appearance choices will be reset.",
-      [
-        { text: "Keep Editing", style: "cancel" },
-        {
-          text: "Discard",
-          style: "destructive",
-          onPress: () => {
-            if (savedAppearance) updateAppearance(savedAppearance);
-            setEditingAppearance(false);
-          },
-        },
-      ],
-    );
+    // Alert.alert is a no-op on web. Keep the confirmation inside this sheet.
+    setConfirmDiscardAppearance(true);
+  }
+
+  function discardAppearance() {
+    if (savedAppearance) updateAppearance(savedAppearance);
+    setConfirmDiscardAppearance(false);
+    setEditingAppearance(false);
   }
 
   const activeSection =
@@ -457,6 +459,8 @@ export default function AvatarScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Close appearance editor"
+                accessibilityState={{ disabled: savingAppearance }}
+                disabled={savingAppearance}
                 hitSlop={8}
                 onPress={closeAppearanceEditor}
                 style={({ pressed }) => [styles.closeButton, pressed && styles.pressedButton]}
@@ -469,32 +473,48 @@ export default function AvatarScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              <View style={styles.modalPreview}>
-                <AvatarRenderer
-                  showBackground={false}
-                  hairId={avatar?.equippedHairId}
-                  hatId={avatar?.equippedHatId}
-                  topId={avatar?.equippedTopId}
-                  bottomId={avatar?.equippedBottomId}
-                  bootsId={avatar?.equippedBootsId}
-                  backgroundId={avatar?.equippedBackgroundId}
-                  petId={avatar?.equippedPetId}
-                  auraId={avatar?.equippedAuraId}
-                  bodyType={avatar?.bodyType}
-                  skinColorId={avatar?.skinColorId}
-                  hairColorId={avatar?.hairColorId}
-                  eyeColorId={avatar?.eyeColorId}
-                  cosmetics={cosmetics}
-                />
-              </View>
-              {draftAppearance && (
-                <AppearanceEditor
-                  appearance={draftAppearance}
-                  dirty={appearanceDirty}
-                  saving={savingAppearance}
-                  onChange={updateAppearance}
-                  onSave={() => void saveAppearance()}
-                />
+              {confirmDiscardAppearance ? (
+                <LifeCard style={styles.discardPrompt}>
+                  <Text accessibilityRole="alert" style={styles.discardTitle}>Discard appearance changes?</Text>
+                  <Text style={styles.discardCopy}>Your unsaved appearance choices will be reset.</Text>
+                  <Pressable accessibilityRole="button" onPress={() => setConfirmDiscardAppearance(false)} style={styles.discardAction}>
+                    <Text style={styles.discardActionText}>Keep Editing</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={discardAppearance} style={styles.discardAction}>
+                    <Text style={styles.discardActionText}>Discard Changes</Text>
+                  </Pressable>
+                </LifeCard>
+              ) : (
+                <>
+                  <View style={styles.modalPreview}>
+                    <AvatarRenderer
+                      showBackground={false}
+                      hairId={avatar?.equippedHairId}
+                      hatId={avatar?.equippedHatId}
+                      topId={avatar?.equippedTopId}
+                      bottomId={avatar?.equippedBottomId}
+                      bootsId={avatar?.equippedBootsId}
+                      backgroundId={avatar?.equippedBackgroundId}
+                      petId={avatar?.equippedPetId}
+                      auraId={avatar?.equippedAuraId}
+                      bodyType={avatar?.bodyType}
+                      skinColorId={avatar?.skinColorId}
+                      hairColorId={avatar?.hairColorId}
+                      eyeColorId={avatar?.eyeColorId}
+                      cosmetics={cosmetics}
+                    />
+                  </View>
+                  {draftAppearance && (
+                    <AppearanceEditor
+                      appearance={draftAppearance}
+                      dirty={appearanceDirty}
+                      saving={savingAppearance}
+                      saveError={appearanceSaveError}
+                      onChange={updateAppearance}
+                      onSave={() => void saveAppearance()}
+                    />
+                  )}
+                </>
               )}
             </ScrollView>
           </View>
@@ -974,6 +994,7 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     minHeight: 70,
+    flexShrink: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -994,13 +1015,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeButton: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
     backgroundColor: colors.cardLight,
   },
+  discardPrompt: { gap: spacing.md },
+  discardTitle: { color: colors.text, fontSize: 18, fontWeight: "800" },
+  discardCopy: { color: colors.mutedText, fontSize: 14 },
+  discardAction: { minHeight: 44, justifyContent: "center", alignItems: "center", backgroundColor: colors.cardLight, borderRadius: radius.md },
+  discardActionText: { color: colors.text, fontWeight: "700" },
   modalContent: {
     width: "100%",
     maxWidth: 760,

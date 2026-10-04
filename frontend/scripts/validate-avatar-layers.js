@@ -12,7 +12,7 @@ const framedClothingSources = [...fs.readFileSync(registryPath, "utf8")
   .map(([, source]) => path.resolve(path.dirname(registryPath), source));
 
 const sharedCanvasSprites = [
-  ...["body", "aligned"].flatMap((directory) => findPngFiles(path.join(avatarRoot, directory))),
+  ...["body", "aligned", "hair"].flatMap((directory) => findPngFiles(path.join(avatarRoot, directory))),
   ...framedClothingSources,
 ]
   .map((absolutePath) => path.relative(avatarRoot, absolutePath))
