@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 import ts from "typescript";
 import * as feedback from "../src/feedback/completion.ts";
+import * as buildings from "../src/base/buildingProgress.ts";
 import * as theme from "../src/theme/theme.ts";
 import { apiError } from "../src/api/errors.ts";
 import { levelInfo } from "../../backend/layers/api-shared/nodejs/leveling.mjs";
@@ -133,8 +134,8 @@ const native = { ...Object.fromEntries(["ActivityIndicator", "Pressable", "Scrol
   StyleSheet: { create: value => value }, Alert: { alert() {} } };
 const tick = () => new Promise(setImmediate);
 
-async function tasksScreen(post, { refreshUser = async () => {} } = {}) {
-  const h = hooks(), events = [], calls = [];
+async function tasksScreen(post, { refreshUser = async () => {}, readWorld = async () => world(1) } = {}) {
+  const h = hooks(), events = [], calls = [], buildingEvents = [];
   let focus, refreshes = 0;
   const tasks = [task("one"), task("two")];
   const Screen = load("../app/(tabs)/tasks.tsx", {
@@ -142,7 +143,7 @@ async function tasksScreen(post, { refreshUser = async () => {} } = {}) {
     "@expo/vector-icons/MaterialCommunityIcons": "Icon",
     "expo-router": { useFocusEffect: fn => { focus = fn; } },
     "../../src/api/client": { apiError, api: {
-      get: async () => ({ data: { tasks: [...tasks], time: {}, summary: {} } }),
+      get: async route => ({ data: route === "world" ? await readWorld() : { tasks: [...tasks], time: {}, summary: {} } }),
       post: async (route, body) => {
         calls.push({ route, body });
         const data = await post(route);
@@ -150,16 +151,19 @@ async function tasksScreen(post, { refreshUser = async () => {} } = {}) {
         return { data };
       },
     } },
-    "../../src/api/routes": { apiRoutes: { tasks: "tasks", completeTask: id => `tasks/${id}/complete` } },
+    "../../src/api/routes": { apiRoutes: { tasks: "tasks", world: "world", completeTask: id => `tasks/${id}/complete` } },
+    "../../src/base/buildingProgress": buildings,
+    "../../src/feedback/completion": feedback,
     "../../src/components/LifeButton": "LifeButton", "../../src/components/LifeCard": "LifeCard", "../../src/components/LifeInput": "LifeInput",
     "../../src/context/AuthContext": { useAuth: () => ({ refreshUser, triggerDashboardRefresh: () => refreshes++ }) },
-    "../../src/context/CompletionFeedbackContext": { useCompletionFeedback: () => event => events.push(event) },
+    "../../src/context/CompletionFeedbackContext": { useCompletionFeedback: () => event => events.push(event),
+      useBuildingFeedback: () => ({ enqueue: batch => buildingEvents.push(batch) }) },
     "../../src/theme/theme": theme,
   });
   const render = () => h.render(Screen);
   render(); focus(); await tick();
   const button = id => nodes(render()).find(n => n.props.accessibilityLabel === `Complete Task ${id}`);
-  return { render, button, events, calls, refreshes: () => refreshes };
+  return { render, button, events, buildingEvents, calls, refreshes: () => refreshes };
 }
 
 test("task action waits for server success, guards same-tick taps, and survives refresh failure", async () => {
@@ -169,6 +173,7 @@ test("task action waits for server success, guards same-tick taps, and survives 
   });
   const press = ui.button("one").props.onPress;
   press(); press();
+  await tick(); // The authoritative before-world read precedes POST.
   assert.deepEqual(ui.calls, [{ route: "tasks/one/complete", body: {} }]);
   assert.equal(ui.events.length, 0);
   assert.equal(ui.button("one").props.children.props.name, "check");
@@ -184,6 +189,7 @@ test("failed and already-completed requests never emit success or optimistic rew
     const ui = await tasksScreen(async () => { throw error; });
     ui.button("one").props.onPress(); await tick();
     assert.equal(ui.events.length, 0);
+    assert.equal(ui.buildingEvents.length, 0);
     assert.equal(ui.button("one").props.children.props.name, "check");
     assert.equal(ui.button("one").props.disabled, false);
     assert.ok(nodes(ui.render()).some(n => n.props.accessibilityRole === "alert"));
@@ -278,10 +284,13 @@ test("provider keeps the web live region mounted and coordinates FIFO display/di
   const announce = tree => nodes(tree).find(n => n.props.role === "status");
   const current = tree => nodes(tree).find(n => n.type === "Feedback")?.props;
   const first = render();
+  const buildingContext = tree => nodes(tree).find(n => n.props.value?.enqueue)?.props.value;
   assert.equal(text(announce(first)), "");
   assert.equal(announce(first).props["aria-live"], "polite");
   assert.equal(announce(first).props["aria-atomic"], true);
   first.props.value(response("one")); first.props.value(response("two"));
+  buildingContext(first).enqueue({ id: "upgrade", upgrades: buildings.buildingUpgrades(world(1), world(2)) });
+  assert.equal(buildingContext(render()).pending, undefined, "building feedback waits for completion feedback");
   assert.equal(current(render()).event.response.task.taskId, "one");
   assert.match(text(announce(render())), /Task one completed/);
   current(render()).onDone(current(render()).event.id);
@@ -289,4 +298,127 @@ test("provider keeps the web live region mounted and coordinates FIFO display/di
   current(render()).onDone(current(render()).event.id);
   assert.equal(current(render()), undefined);
   assert.equal(text(announce(render())), "");
+  assert.equal(buildingContext(render()).pending.id, "upgrade", "unconsumed event survives until World focuses");
+  buildingContext(render()).finish("upgrade");
+  assert.equal(buildingContext(render()).pending, undefined);
+});
+
+function world(workshopLevel, gardenLevel = 1) {
+  return { worldPoints: 500, buildings: [["workshop", "Workshop", workshopLevel], ["garden", "Garden", gardenLevel]].map(([buildingId, name, currentLevel]) => ({
+    buildingId, name, currentLevel, level: currentLevel, maxLevel: 5, upgradeCost: 100, canUpgrade: true,
+  })) };
+}
+
+test("world diff uses stored building levels, ignores unchanged/decreased/missing tiers and keeps every increase", () => {
+  assert.deepEqual(buildings.buildingUpgrades(world(1), world(1)), []);
+  assert.deepEqual(buildings.buildingUpgrades(world(3), world(2)), []);
+  assert.deepEqual(buildings.buildingUpgrades(null, world(2)), []);
+  assert.deepEqual(buildings.buildingUpgrades(world(1), null), []);
+  assert.deepEqual(buildings.buildingUpgrades({ buildings: [] }, world(2)), []);
+  for (const [from, to] of [[1, 2], [2, 3], [4, 5]]) {
+    const changes = buildings.buildingUpgrades(world(from), world(to));
+    assert.deepEqual(changes, [{ buildingId: "workshop", buildingName: "Workshop", previousTier: from, newTier: to }]);
+    assert.equal(buildings.worldToBaseProgress(world(to)).buildings[0].visualTier, to);
+  }
+  assert.equal(buildings.buildingUpgrades(world(1, 2), world(2, 3)).length, 2);
+  assert.deepEqual(buildings.buildingUpgrades(world(5), world(6)), [], "visual tier remains capped at the existing five images");
+  assert.deepEqual(buildings.confirmedBuildingUpgrade({ upgraded: true,
+    building: { buildingId: "workshop", name: "Workshop", oldLevel: 2, newLevel: 3 } }), buildings.buildingUpgrades(world(2), world(3)));
+});
+
+test("building batches share session dedupe, preserve rapid upgrades, and never replay after consumption or refresh", () => {
+  const first = { id: "task-one", upgrades: buildings.buildingUpgrades(world(1, 1), world(2, 2)) };
+  let state = completionQueue(EMPTY_COMPLETION_QUEUE, { type: "buildings", batch: first });
+  assert.equal(state.buildings[0].upgrades.length, 2);
+  assert.equal(completionQueue(state, { type: "buildings", batch: first }), state);
+  state = completionQueue(state, { type: "buildings", batch: { ...first, id: "manual-same-upgrade" } });
+  assert.equal(state.buildings.length, 1, "same server transition from a different source is not replayed");
+  state = completionQueue(state, { type: "buildings", batch: { id: "task-two", upgrades: buildings.buildingUpgrades(world(2), world(3)) } });
+  state = completionQueue(state, { type: "finishBuildings", id: first.id });
+  assert.equal(state.buildings[0].id, "task-two");
+  assert.equal(completionQueue(state, { type: "finishBuildings", id: first.id }), state, "stale timer cannot consume another batch");
+  state = completionQueue(state, { type: "finishBuildings", id: "task-two" });
+  state = completionQueue(state, { type: "buildings", batch: { ...first, id: "late-response" } });
+  assert.deepEqual(state.buildings, []);
+  assert.deepEqual(EMPTY_COMPLETION_QUEUE.buildings, [], "refresh/account change starts without any persisted celebration");
+});
+
+test("task success compares ordered authoritative snapshots, including multiple upgrades and unavailable world", async () => {
+  const order = [];
+  let reads = 0;
+  const ui = await tasksScreen(async () => { order.push("post"); return response(); }, {
+    readWorld: async () => { order.push("world"); return reads++ ? world(2, 3) : world(1, 2); },
+  });
+  ui.button("one").props.onPress(); await tick();
+  assert.deepEqual(order, ["world", "post", "world"]);
+  assert.deepEqual(ui.buildingEvents[0], { id: completionEvent(response()).id, upgrades: buildings.buildingUpgrades(world(1, 2), world(2, 3)) });
+  for (const failedRead of [0, 1]) {
+    let attempts = 0;
+    const offline = await tasksScreen(async () => response(), { readWorld: async () => {
+      if (attempts++ === failedRead) throw new Error("offline world");
+      return world(3);
+    } });
+    offline.button("one").props.onPress(); await tick();
+    assert.equal(offline.events.length, 1, "world read failure cannot undo earned task rewards");
+    assert.deepEqual(offline.buildingEvents[0].upgrades, []);
+  }
+  const noChange = await tasksScreen(async () => response("one", 90, 1000));
+  noChange.button("one").props.onPress(); await tick();
+  assert.deepEqual(noChange.buildingEvents[0].upgrades, [], "even a multiple-level player increase cannot invent a building upgrade");
+});
+
+function buildingUI(h, { reduced = false, announced = [], animations = [], values = [] } = {}, exportName = "default") {
+  return load("../src/components/BuildingUpgradeFeedback.tsx", {
+    react: h.react,
+    "react-native": { ...native, Image: "Image", Platform: { OS: "ios" }, Easing: { inOut: v => v, quad: 0 },
+      AccessibilityInfo: { isReduceMotionEnabled: async () => reduced, addEventListener: () => ({ remove() {} }), announceForAccessibility: value => announced.push(value) },
+      Animated: { View: "AnimatedView", Image: "AnimatedImage", Value: class {
+        setValue(value) { values.push(value); }
+        interpolate(config) { return config; }
+      }, timing: (_, config) => ({ start() { animations.push(config); }, stop() {} }) },
+    },
+    "../base/buildingAssetRegistry": { getBuildingImageSource: (name, tier) => `${name}/tier-${tier}.png` },
+    "../base/buildingProgress": buildings, "../theme/theme": theme,
+  }, exportName);
+}
+
+test("building reveal uses actual old/new tiers; reduced motion and final render have no animated transforms", () => {
+  const h = hooks();
+  const Art = buildingUI(h, {}, "BuildingTierArtwork");
+  const upgrade = buildings.buildingUpgrades(world(4), world(5))[0];
+  const motion = { reducedMotion: false, progress: { interpolate: config => config } };
+  const render = (change, reducedMotion = false) => Art({ type: "Workshop", tier: 5, upgrade: change, motion: { ...motion, reducedMotion } });
+  const images = nodes(render(upgrade)).filter(n => n.type === "AnimatedImage");
+  assert.deepEqual(images.map(n => n.props.source), ["Workshop/tier-4.png", "Workshop/tier-5.png"]);
+  assert.equal(images[0].props.style.at(-1).opacity.outputRange.at(-1), 0);
+  assert.equal(images[1].props.style.at(-1).opacity.outputRange.at(-1), 1);
+  for (const tree of [render(undefined), render(upgrade, true)]) {
+    assert.equal(tree.type, "Image");
+    assert.equal(tree.props.source, "Workshop/tier-5.png");
+    assert.equal(tree.props.resizeMode, "contain");
+    assert.deepEqual(tree.props.style, { width: "100%", height: "100%" });
+  }
+});
+
+test("world presentation announces all upgrades, lasts 2.8s, and cancels timers when World blurs", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const batch = { id: "batch", upgrades: buildings.buildingUpgrades(world(1, 2), world(2, 3)) };
+  for (const reduced of [true, false]) {
+    const h = hooks(), announced = [], animations = [], done = [], values = [];
+    const usePresentation = buildingUI(h, { reduced, announced, animations, values }, "useBuildingUpgradePresentation");
+    const onDone = id => done.push(id);
+    const render = active => h.render(() => usePresentation(active, onDone));
+    render(undefined); const cleanupA11y = h.effects[0](); await tick();
+    render(undefined); assert.equal(h.effects[1](), undefined, "off-world queue cannot animate/consume");
+    render(batch); const cleanup = h.effects[1]();
+    assert.equal(animations.length, reduced ? 0 : 1);
+    assert.deepEqual(announced, ["Workshop reached Tier 2. Garden reached Tier 3"]);
+    assert.equal(values.at(-1), reduced ? 1 : 0);
+    t.mock.timers.tick(2799); assert.deepEqual(done, []);
+    t.mock.timers.tick(1); assert.deepEqual(done, [batch.id]);
+    cleanup();
+    render(batch); const blur = h.effects[1](); blur();
+    t.mock.timers.tick(3000); assert.deepEqual(done, [batch.id], "blur must not consume a queued batch");
+    cleanupA11y();
+  }
 });

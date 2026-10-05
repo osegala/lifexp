@@ -29,6 +29,10 @@ import {
   getPathTileSource,
 } from "../../src/base/mapAssetRegistry";
 import { buildPathNetwork } from "../../src/base/pathNetwork";
+import { buildingUpgradeAnnouncement, confirmedBuildingUpgrade, worldToBaseProgress } from "../../src/base/buildingProgress";
+import type { BuildingUpgrade } from "../../src/base/buildingProgress";
+import BuildingUpgradeFeedback, { BuildingTierArtwork, useBuildingUpgradePresentation } from "../../src/components/BuildingUpgradeFeedback";
+import { useBuildingFeedback } from "../../src/context/CompletionFeedbackContext";
 import { BASE_LAYOUT_STORAGE_KEY } from "../../src/storage/localAccountData";
 import { colors, radius, spacing } from "../../src/theme/theme";
 import {
@@ -137,14 +141,6 @@ const ACTION_BUTTONS: {
   { key: "enter", label: "Enter", icon: "door-open" },
   { key: "description", label: "Info", icon: "information-outline" },
 ];
-const CONFETTI_PIECES = Array.from({ length: 38 }, (_, index) => ({
-  id: index,
-  left: `${(index * 23) % 100}%`,
-  delay: (index % 10) * 70,
-  drift: ((index % 7) - 3) * 18,
-  rotate: `${(index * 29) % 180}deg`,
-  color: ["#E9BA66", "#8FCB9B", "#C77A70", "#6CA6A0", "#F2E8C9"][index % 5],
-}));
 
 const BUILDING_META: Record<
   BuildingType,
@@ -826,7 +822,9 @@ export default function BaseScreen() {
   const [selectedBuilding, setSelectedBuilding] =
     useState<BuildingProgress | null>(null);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
-  const [celebration, setCelebration] = useState<BuildingProgress | null>(null);
+  const [focused, setFocused] = useState(false);
+  const { pending, enqueue: enqueueBuildings, finish: finishBuildings } = useBuildingFeedback();
+  const upgrading = useRef(false);
   const [buildingLayouts, setBuildingLayouts] = useState(() =>
     getSizedBuildingLayouts(BUILDING_MAP_POSITIONS),
   );
@@ -834,6 +832,11 @@ export default function BaseScreen() {
   const [mapCamera, setMapCamera] = useState<MapCamera>(DEFAULT_MAP_CAMERA);
   const [mapSize, setMapSize] = useState({ width: 1, height: MAP_HEIGHT });
   const [loading, setLoading] = useState(true);
+  // Never consume off-screen, before XP feedback finishes, or against stale map artwork.
+  const celebration = focused && !loading && pending?.upgrades.every(upgrade =>
+    base?.buildings.some(building => building.buildingId === upgrade.buildingId && building.visualTier >= upgrade.newTier))
+    ? pending : undefined;
+  const upgradeMotion = useBuildingUpgradePresentation(celebration, finishBuildings);
   const mapCameraRef = useRef(mapCamera);
   const mapPanStart = useRef(DEFAULT_MAP_CAMERA);
   const webPanStart = useRef<{
@@ -1007,15 +1010,6 @@ export default function BaseScreen() {
     setMapCamera((current) => clampMapCamera(current, mapSize));
   }, [mapSize]);
 
-  useEffect(() => {
-    if (!celebration) {
-      return;
-    }
-
-    const timeout = setTimeout(() => setCelebration(null), 3200);
-    return () => clearTimeout(timeout);
-  }, [celebration]);
-
   const loadBase = useCallback(async () => {
     try {
       setLoading(true);
@@ -1046,9 +1040,14 @@ export default function BaseScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadBase();
-    }, [loadBase]),
+      setFocused(true);
+      return () => setFocused(false);
+    }, []),
   );
+  useEffect(() => {
+    // Refresh on focus and when newly confirmed upgrades arrive while already focused.
+    if (focused) void loadBase();
+  }, [focused, pending?.id, loadBase]);
 
   const sortedBuildings = useMemo(
     () =>
@@ -1213,6 +1212,7 @@ export default function BaseScreen() {
     }
 
     if (action === "upgrade") {
+      if (upgrading.current) return;
       if (!selectedBuilding.upgradeAvailable) {
         Alert.alert(
           `${selectedBuilding.type} upgrade`,
@@ -1224,20 +1224,24 @@ export default function BaseScreen() {
       }
 
       try {
-        await api.post<UpgradeBuildingResponse>(
+        upgrading.current = true;
+        const response = await api.post<UpgradeBuildingResponse>(
           apiRoutes.upgradeBuilding(selectedBuilding.buildingId),
           {},
         );
+        const upgrades = confirmedBuildingUpgrade(response.data);
+        enqueueBuildings({ id: JSON.stringify(["upgrade", response.data.building.buildingId, response.data.building.newLevel]), upgrades });
         const nextBase = await loadBase();
         const upgradedBuilding = nextBase?.buildings.find(
           (building) => building.buildingId === selectedBuilding.buildingId,
         );
         if (upgradedBuilding) {
           setSelectedBuilding(upgradedBuilding);
-          setCelebration(upgradedBuilding);
         }
       } catch (error) {
         Alert.alert("Upgrade unavailable", apiError(error, "This building cannot be upgraded yet.").message);
+      } finally {
+        upgrading.current = false;
       }
       return;
     }
@@ -1332,6 +1336,8 @@ export default function BaseScreen() {
             <BuildingNode
               key={building.type}
               building={building}
+              upgrade={celebration?.upgrades.find(upgrade => upgrade.buildingId === building.buildingId && upgrade.newTier === building.visualTier)}
+              upgradeMotion={upgradeMotion}
               layout={buildingLayouts[building.type]}
               layouts={buildingLayouts}
               mapScale={getMapBaseScale(mapSize) * mapCamera.zoom}
@@ -1378,13 +1384,18 @@ export default function BaseScreen() {
         <Text style={styles.worldPointsText}>{base?.worldPoints ?? 0} World Points</Text>
       </View>
 
-      {celebration && <UpgradeCelebration building={celebration} />}
+      {Platform.OS === "web" && <Text role="status" aria-live="polite" aria-atomic style={styles.announcement}>
+        {celebration ? buildingUpgradeAnnouncement(celebration) : ""}
+      </Text>}
+      {celebration && <BuildingUpgradeFeedback batch={celebration} motion={upgradeMotion} onDone={finishBuildings} />}
     </View>
   );
 }
 
 function BuildingNode({
   building,
+  upgrade,
+  upgradeMotion,
   layout,
   layouts,
   mapScale,
@@ -1395,6 +1406,8 @@ function BuildingNode({
   onDragEnd,
 }: {
   building: BuildingProgress;
+  upgrade?: BuildingUpgrade;
+  upgradeMotion: ReturnType<typeof useBuildingUpgradePresentation>;
   layout: BuildingMapLayout;
   layouts: Record<BuildingType, BuildingMapLayout>;
   mapScale: number;
@@ -1495,11 +1508,7 @@ function BuildingNode({
         ]}
       >
         {imageSource ? (
-          <Image
-            source={imageSource}
-            style={styles.buildingImage}
-            resizeMode="contain"
-          />
+          <BuildingTierArtwork type={building.type} tier={building.visualTier} upgrade={upgrade} motion={upgradeMotion} />
         ) : (
           <MaterialCommunityIcons
             name={meta.icon}
@@ -1624,102 +1633,6 @@ function BuildingActionTray({
   );
 }
 
-function UpgradeCelebration({ building }: { building: BuildingProgress }) {
-  const meta = BUILDING_META[building.type];
-  const confettiProgress = useRef(
-    CONFETTI_PIECES.map(() => new Animated.Value(0)),
-  ).current;
-
-  useEffect(() => {
-    confettiProgress.forEach((progress) => progress.setValue(0));
-
-    Animated.stagger(
-      28,
-      confettiProgress.map((progress, index) =>
-        Animated.timing(progress, {
-          toValue: 1,
-          duration: 1900,
-          delay: CONFETTI_PIECES[index].delay,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ),
-    ).start();
-  }, [confettiProgress]);
-
-  return (
-    <View pointerEvents="none" style={styles.celebrationOverlay}>
-      {CONFETTI_PIECES.map((piece, index) => {
-        const progress = confettiProgress[index];
-        const translateY = progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-120, 760],
-        });
-        const translateX = progress.interpolate({
-          inputRange: [0, 0.55, 1],
-          outputRange: [0, piece.drift, piece.drift * -0.35],
-        });
-        const opacity = progress.interpolate({
-          inputRange: [0, 0.75, 1],
-          outputRange: [1, 1, 0],
-        });
-
-        return (
-          <Animated.View
-            key={piece.id}
-            style={[
-              styles.confettiPiece,
-              {
-                left: piece.left as `${number}%`,
-                backgroundColor: piece.color,
-                opacity,
-                transform: [
-                  { translateX },
-                  { translateY },
-                  { rotate: piece.rotate },
-                ],
-              },
-            ]}
-          />
-        );
-      })}
-
-      <View style={styles.celebrationCard}>
-        <MaterialCommunityIcons
-          name={meta.icon}
-          size={34}
-          color={colors.accent}
-        />
-        <Text style={styles.celebrationTitle}>Upgrade complete</Text>
-        <Text style={styles.celebrationText}>
-          Congrats on bettering your {meta.category.toLowerCase()}.{" "}
-          {building.type} is now tier {building.visualTier}.
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function worldToBaseProgress(world: WorldResponse): BaseProgress {
-  const buildings = world.buildings
-    .filter((building) => Object.hasOwn(BUILDING_META, building.name))
-    .map((building): BuildingProgress => ({
-      buildingId: building.buildingId,
-      type: building.name as BuildingType,
-      level: building.currentLevel,
-      maxLevel: building.maxLevel,
-      upgradeCost: building.upgradeCost,
-      visualTier: Math.max(1, Math.min(5, building.currentLevel)),
-      upgradeAvailable: building.canUpgrade,
-    }));
-
-  return {
-    baseLevel: Math.max(1, ...buildings.map((building) => building.level)),
-    worldPoints: world.worldPoints,
-    buildings,
-  };
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   worldPointsBadge: {
@@ -1835,10 +1748,6 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
     backgroundColor: "transparent",
   },
-  buildingImage: {
-    width: "100%",
-    height: "100%",
-  },
   actionOverlay: {
     position: "absolute",
     gap: spacing.sm,
@@ -1942,43 +1851,5 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: spacing.sm,
   },
-  celebrationOverlay: {
-    position: "absolute",
-    inset: 0,
-    zIndex: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(12, 18, 14, 0.18)",
-  },
-  confettiPiece: {
-    position: "absolute",
-    top: 0,
-    width: 9,
-    height: 18,
-    borderRadius: 3,
-  },
-  celebrationCard: {
-    width: "86%",
-    maxWidth: 360,
-    borderRadius: radius.lg,
-    backgroundColor: `${colors.background}F2`,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    padding: spacing.lg,
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  celebrationTitle: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  celebrationText: {
-    color: colors.mutedText,
-    fontSize: 15,
-    fontWeight: "600",
-    lineHeight: 21,
-    textAlign: "center",
-  },
+  announcement: { position: "absolute", width: 1, height: 1, overflow: "hidden", opacity: 0 },
 });

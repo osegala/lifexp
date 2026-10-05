@@ -9,9 +9,12 @@ import LifeButton from "../../src/components/LifeButton";
 import LifeCard from "../../src/components/LifeCard";
 import LifeInput from "../../src/components/LifeInput";
 import { useAuth } from "../../src/context/AuthContext";
-import { useCompletionFeedback } from "../../src/context/CompletionFeedbackContext";
+import { useBuildingFeedback, useCompletionFeedback } from "../../src/context/CompletionFeedbackContext";
+import { buildingUpgrades } from "../../src/base/buildingProgress";
+import { completionEvent } from "../../src/feedback/completion";
 import { colors, radius, spacing } from "../../src/theme/theme";
 import type { CompletionResponse, Task, TaskSize, TasksResponse } from "../../src/types";
+import type { WorldResponse } from "../../src/types/progression";
 
 type RepeatType = Task["repeatType"];
 
@@ -27,6 +30,7 @@ const TASK_SIZE_OPTIONS: { value: TaskSize; label: string; xp: number }[] = [
 export default function TasksScreen() {
   const { user, refreshUser, triggerDashboardRefresh } = useAuth();
   const celebrate = useCompletionFeedback();
+  const { enqueue: enqueueBuildings } = useBuildingFeedback();
   const completing = useRef(false);
   const [data, setData] = useState<TasksResponse | null>(null);
   const [title, setTitle] = useState("");
@@ -91,12 +95,18 @@ export default function TasksScreen() {
     try {
       setBusy(task.taskId);
       setCompletionError("");
+      // Presentation-only reads: an unavailable world must never block earning rewards.
+      const readWorld = () => api.get<WorldResponse>(apiRoutes.world, { timeout: 3000 })
+        .then(response => response.data).catch(() => null);
+      const previousWorld = await readWorld();
       const response = await api.post<CompletionResponse>(apiRoutes.completeTask(task.taskId), {});
       setData(current => current ? { ...current, tasks: current.tasks.map(item => item.taskId === task.taskId
         ? { ...item, ...response.data.task } : item) } : current);
       celebrate(response.data, user);
       // A refresh failure cannot undo a confirmed completion or its feedback.
-      await Promise.allSettled([loadTasks(), refreshUser()]);
+      await Promise.allSettled([loadTasks(), refreshUser(), readWorld().then(world => {
+        enqueueBuildings({ id: completionEvent(response.data).id, upgrades: buildingUpgrades(previousWorld, world) });
+      })]);
       triggerDashboardRefresh();
     } catch (error) {
       const failure = apiError(error, "Could not complete the task.");

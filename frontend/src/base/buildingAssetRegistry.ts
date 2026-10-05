@@ -5,8 +5,9 @@ import { BuildingType} from "../types/progression";
  * Building artwork registry
  * ---------------------------------------------------------------
  * Mirrors `src/avatar/assetRegistry.ts`. Each building has up to 5
- * visual tiers (see `visualTierForLevel` in BuildingService.java on
- * the backend, which sends `visualTier` as part of BuildingProgress).
+ * visual tiers. The active GET /world pipeline maps stored building
+ * currentLevel 1–5 to visualTier 1–5 in base/buildingProgress.ts.
+ * Player XP alone does not upgrade a building.
  *
  * TO ADD ART:
  * 1. Drop a transparent PNG into:

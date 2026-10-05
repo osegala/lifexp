@@ -1,4 +1,5 @@
 import type { CompletionResponse, LevelProgress, User } from "../types";
+import type { BuildingUpgradeBatch } from "../base/buildingProgress";
 
 export type CompletionEvent = {
   id: string;
@@ -24,17 +25,43 @@ export function completionEvent(response: CompletionResponse, user?: User | null
   };
 }
 
-export type CompletionQueue = { pending: CompletionEvent[]; seen: string[] };
-export const EMPTY_COMPLETION_QUEUE: CompletionQueue = { pending: [], seen: [] };
+export type CompletionQueue = {
+  pending: CompletionEvent[];
+  seen: string[];
+  buildings: BuildingUpgradeBatch[];
+  seenBuildingSources: string[];
+  buildingTiers: Record<string, number>;
+};
+export const EMPTY_COMPLETION_QUEUE: CompletionQueue = {
+  pending: [], seen: [], buildings: [], seenBuildingSources: [], buildingTiers: {},
+};
 
 export function completionQueue(state: CompletionQueue, action:
   | { type: "enqueue"; event: CompletionEvent }
-  | { type: "finish"; id: string }): CompletionQueue {
+  | { type: "finish"; id: string }
+  | { type: "buildings"; batch: BuildingUpgradeBatch }
+  | { type: "finishBuildings"; id: string }): CompletionQueue {
+  if (action.type === "finishBuildings") return state.buildings[0]?.id === action.id
+    ? { ...state, buildings: state.buildings.slice(1) } : state;
+  if (action.type === "buildings") {
+    if (state.seenBuildingSources.includes(action.batch.id)) return state;
+    const buildingTiers = { ...state.buildingTiers };
+    const upgrades = action.batch.upgrades.filter(upgrade => {
+      if (upgrade.newTier <= Math.max(upgrade.previousTier, buildingTiers[upgrade.buildingId] ?? 0)) return false;
+      buildingTiers[upgrade.buildingId] = upgrade.newTier;
+      return true;
+    });
+    return {
+      ...state, buildingTiers,
+      seenBuildingSources: [...state.seenBuildingSources, action.batch.id],
+      buildings: upgrades.length ? [...state.buildings, { ...action.batch, upgrades }] : state.buildings,
+    };
+  }
   if (action.type === "finish") return state.pending[0]?.id === action.id
     ? { ...state, pending: state.pending.slice(1) } : state;
   if (state.seen.includes(action.event.id)) return state;
   // Session-only; the provider is remounted on account change/logout.
-  return { pending: [...state.pending, action.event], seen: [...state.seen, action.event.id] };
+  return { ...state, pending: [...state.pending, action.event], seen: [...state.seen, action.event.id] };
 }
 
 export function completionFrame(event: CompletionEvent, fraction: number) {
