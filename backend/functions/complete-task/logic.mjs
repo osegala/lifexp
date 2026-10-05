@@ -125,7 +125,8 @@ export function planCompletion({
         defaults.weeklyWorldPoints + Math.max(0, rewardBonuses.weeklyWorldPoints ?? 0)
     );
     const worldPoints = daily.worldPoints + weekly.worldPoints;
-    const previousLevel = progressionForXp(profile.xp).level;
+    const previousProgression = progressionForXp(profile.xp);
+    const previousLevel = previousProgression.level;
     const progression = progressionForXp(profile.xp + xp);
     const tasksCompleted = profile.tasksCompleted + 1;
     const playerCoins = profile.coins + coins;
@@ -172,6 +173,7 @@ export function planCompletion({
         },
         progression: {
             previousLevel,
+            previous: { ...previousProgression, totalXp: profile.xp },
             ...progression,
             totalXp: profile.xp + xp,
             leveledUp: progression.level > previousLevel

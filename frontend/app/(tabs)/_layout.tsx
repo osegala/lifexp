@@ -3,9 +3,10 @@ import { Redirect, Tabs } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { colors } from "../../src/theme/theme";
 import { useAuth } from "../../src/context/AuthContext";
+import { CompletionFeedbackProvider } from "../../src/context/CompletionFeedbackContext";
 
 export default function TabLayout() {
-  const { token, loading } = useAuth();
+  const { token, user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -27,6 +28,7 @@ export default function TabLayout() {
   }
 
   return (
+    <CompletionFeedbackProvider key={String(user?.id ?? "loading")}>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -98,5 +100,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </CompletionFeedbackProvider>
   );
 }

@@ -48,6 +48,36 @@ export type TasksResponse = {
   tasks: Task[];
 };
 
+export type LevelProgress = {
+  level: number;
+  totalXp: number;
+  xpIntoLevel: number;
+  xpForNextLevel: number;
+  xpToNextLevel: number;
+};
+
+/** Confirmed POST /tasks/{taskId}/complete response (extra server fields are unused). */
+export type CompletionResponse = {
+  task: Omit<Task, "archived">;
+  rewards: { xp: number; coins: number; worldPoints: number };
+  progression: LevelProgress & {
+    previousLevel: number;
+    leveledUp: boolean;
+    previous?: LevelProgress; // Older deployments omit this snapshot.
+  };
+  player: { xp: number; coins: number; worldPoints: number; tasksCompleted: number; level: number };
+  time: { date: string; completedAt: string };
+  newAchievements: {
+    achievementId: string;
+    name: string;
+    description: string;
+    type: string;
+    requiredValue: number;
+    progressValue: number;
+    earnedAt: string;
+  }[];
+};
+
 export type GoalProgress = {
   current: number;
   target: number;

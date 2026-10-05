@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { api, apiError } from "../../src/api/client";
@@ -9,13 +9,11 @@ import LifeButton from "../../src/components/LifeButton";
 import LifeCard from "../../src/components/LifeCard";
 import LifeInput from "../../src/components/LifeInput";
 import { useAuth } from "../../src/context/AuthContext";
+import { useCompletionFeedback } from "../../src/context/CompletionFeedbackContext";
 import { colors, radius, spacing } from "../../src/theme/theme";
-import type { Task, TaskSize, TasksResponse } from "../../src/types";
+import type { CompletionResponse, Task, TaskSize, TasksResponse } from "../../src/types";
 
 type RepeatType = Task["repeatType"];
-type CompletionResponse = {
-  rewards: { xp: number; coins: number; worldPoints: number };
-};
 
 const WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const TASK_SIZE_OPTIONS: { value: TaskSize; label: string; xp: number }[] = [
@@ -27,7 +25,9 @@ const TASK_SIZE_OPTIONS: { value: TaskSize; label: string; xp: number }[] = [
 ];
 
 export default function TasksScreen() {
-  const { refreshUser, triggerDashboardRefresh } = useAuth();
+  const { user, refreshUser, triggerDashboardRefresh } = useAuth();
+  const celebrate = useCompletionFeedback();
+  const completing = useRef(false);
   const [data, setData] = useState<TasksResponse | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -36,6 +36,7 @@ export default function TasksScreen() {
   const [repeatDays, setRepeatDays] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [completionError, setCompletionError] = useState("");
 
   const loadTasks = useCallback(async () => {
     try {
@@ -85,16 +86,25 @@ export default function TasksScreen() {
   }
 
   async function completeTask(task: Task) {
+    if (completing.current || busy !== null || !task.isDueToday) return;
+    completing.current = true;
     try {
       setBusy(task.taskId);
+      setCompletionError("");
       const response = await api.post<CompletionResponse>(apiRoutes.completeTask(task.taskId), {});
-      const { xp, coins, worldPoints } = response.data.rewards;
-      Alert.alert("Task complete", `+${xp} XP · +${coins} coins · +${worldPoints} World Points`);
-      await Promise.all([loadTasks(), refreshUser()]);
+      setData(current => current ? { ...current, tasks: current.tasks.map(item => item.taskId === task.taskId
+        ? { ...item, ...response.data.task } : item) } : current);
+      celebrate(response.data, user);
+      // A refresh failure cannot undo a confirmed completion or its feedback.
+      await Promise.allSettled([loadTasks(), refreshUser()]);
       triggerDashboardRefresh();
     } catch (error) {
-      Alert.alert("Tasks", apiError(error, "Could not complete the task.").message);
+      const failure = apiError(error, "Could not complete the task.");
+      setCompletionError(failure.message);
+      Alert.alert("Tasks", failure.message);
+      if (failure.code === "TASK_ALREADY_COMPLETED") await loadTasks();
     } finally {
+      completing.current = false;
       setBusy(null);
     }
   }
@@ -120,6 +130,7 @@ export default function TasksScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>Tasks</Text>
+      {!!completionError && <Text accessibilityRole="alert" style={styles.error}>{completionError}</Text>}
 
       <LifeCard compact>
         <Text style={styles.cardTitle}>Add a task</Text>
@@ -172,7 +183,7 @@ export default function TasksScreen() {
 
       {loading && !data ? <ActivityIndicator color={colors.primary} /> : null}
       {(data?.tasks ?? []).map((task) => (
-        <LifeCard compact key={task.taskId} style={!task.active && styles.inactiveCard}>
+        <LifeCard compact key={task.taskId} style={[!task.active && styles.inactiveCard, task.completedToday && styles.completedCard]}>
           <View style={styles.taskRow}>
             <View style={styles.taskCopy}>
               <Text style={styles.taskTitle}>{task.title}</Text>
@@ -191,6 +202,7 @@ export default function TasksScreen() {
             <View style={styles.actions}>
               <Pressable
                 accessibilityLabel={`Complete ${task.title}`}
+                accessibilityRole="button"
                 onPress={() => void completeTask(task)}
                 disabled={!task.isDueToday || busy !== null}
                 style={[styles.iconButton, (!task.isDueToday || busy !== null) && styles.disabled]}
@@ -234,5 +246,7 @@ const styles = StyleSheet.create({
   iconButton: { minWidth: 44, minHeight: 44, borderRadius: radius.md, backgroundColor: colors.cardLight, alignItems: "center", justifyContent: "center" },
   disabled: { opacity: 0.35 },
   inactiveCard: { opacity: 0.55 },
+  completedCard: { borderColor: colors.accent },
+  error: { color: colors.danger },
   empty: { color: colors.mutedText, textAlign: "center", marginTop: spacing.xl },
 });

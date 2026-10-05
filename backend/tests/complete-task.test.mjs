@@ -142,6 +142,7 @@ test("completion preserves lifetime XP while resetting the per-level bar with ov
     assert.equal(result.progression.xpForNextLevel, 255);
     assert.equal(result.progression.xpToNextLevel, 245);
     assert.equal(result.progression.leveledUp, true);
+    assert.deepEqual(result.progression.previous, { ...levelInfo(90), totalXp: 90 });
 });
 
 test("earned catalog achievements are skipped and real catalog IDs are returned", () => {
