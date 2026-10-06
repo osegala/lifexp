@@ -13,7 +13,8 @@ import {
     planCompletion,
     weekday,
     weekBounds
-} from "./logic.mjs";
+} from "/opt/nodejs/task-completion.mjs";
+import { isRecurring, nextScheduledDate } from "/opt/nodejs/task-schedule.mjs";
 import {
     achievementCatalogFromItem,
     achievementPut,
@@ -43,6 +44,7 @@ import {
 } from "/opt/nodejs/http.mjs";
 import { levelInfo } from "/opt/nodejs/leveling.mjs";
 import { resolveTaskReward } from "/opt/nodejs/task-rewards.mjs";
+import { activityStreak } from "/opt/nodejs/activity-streak.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -78,6 +80,8 @@ function taskFrom(item, taskId) {
         taskSize: reward.taskSize,
         repeatType: item.repeatType?.S ?? "NONE",
         repeatDays: repeatDays(item),
+        startDate: item.startDate?.S ?? null,
+        dueTime: item.dueTime?.S ?? null,
         active: item.active?.BOOL !== false,
         archived: item.archived?.BOOL === true,
         completed: item.completed?.BOOL === true,
@@ -184,6 +188,7 @@ function taskUpdate(taskKey, plan, today, now) {
             },
             ExpressionAttributeValues: {
                 ":true": { BOOL: true },
+                ":false": { BOOL: false },
                 ":today": { S: today },
                 ":now": { S: now },
                 ":currentStreak": { N: String(plan.currentStreak) },
@@ -203,6 +208,10 @@ function profileUpdate(profileKey, profileItem, plan, now) {
         ":now": { S: now }
     };
     const conditions = ["attribute_exists(PK)"];
+    if (profileItem.timeZone?.S) {
+        conditions.push("#timeZone = :expectedTimeZone");
+        values[":expectedTimeZone"] = profileItem.timeZone;
+    } else conditions.push("attribute_not_exists(#timeZone)");
     for (const field of ["xp", "coins", "worldPoints", "tasksCompleted"]) {
         const name = `#${field}`;
         const expected = `:expected${field[0].toUpperCase()}${field.slice(1)}`;
@@ -222,6 +231,7 @@ function profileUpdate(profileKey, profileItem, plan, now) {
             ConditionExpression: conditions.join(" AND "),
             ExpressionAttributeNames: {
                 "#xp": "xp",
+                "#timeZone": "timeZone",
                 "#coins": "coins",
                 "#tasksCompleted": "tasksCompleted",
                 "#worldPoints": "worldPoints",
@@ -270,10 +280,13 @@ function statsUpdate(userPk, period, date, state, goal, xp, coins, now) {
     if (goal.awarded) {
         names["#goalRewarded"] = "goalRewarded";
         names["#goalRewardedAt"] = "goalRewardedAt";
+        names["#goalWorldPoints"] = "goalWorldPoints";
         values[":false"] = { BOOL: false };
         values[":true"] = { BOOL: true };
         values[":goalRewardedAt"] = { S: now };
+        values[":goalWorldPoints"] = { N: String(goal.worldPoints) };
         sets.push("#goalRewarded = :true", "#goalRewardedAt = :goalRewardedAt");
+        sets.push("#goalWorldPoints = :goalWorldPoints");
         conditions.push("(attribute_not_exists(#goalRewarded) OR #goalRewarded = :false)");
     }
 
@@ -331,6 +344,9 @@ function completionResponse(task, profile, plan, timeZone, today, now, weekStart
             taskSize: task.taskSize,
             repeatType: task.repeatType,
             repeatDays: task.repeatDays,
+            startDate: task.startDate,
+            dueTime: task.dueTime,
+            nextScheduledDate: plan.recurring ? nextScheduledDate(task, today, true) : null,
             active: task.active,
             completed: plan.recurring ? task.completed : true,
             completedAt: plan.recurring ? task.completedAt : now,
@@ -373,6 +389,7 @@ function completionResponse(task, profile, plan, timeZone, today, now, weekStart
             }
         },
         streak: plan.responseStreak,
+        activityStreak: plan.activityStreak,
         progression: plan.progression,
         player: {
             ...plan.player,
@@ -424,7 +441,7 @@ async function complete(userPk, taskId) {
         const now = clock.toISOString();
         const { start: weekStart, end: weekEnd } = weekBounds(today);
         const weekId = isoWeekId(today);
-        const recurring = task.repeatType === "DAILY" || task.repeatType === "WEEKLY";
+        const recurring = isRecurring(task);
         const completionKey = recurring
             ? { PK: { S: userPk }, SK: { S: `COMPLETION#${taskId}#${today}` } }
             : null;
@@ -491,6 +508,12 @@ async function complete(userPk, taskId) {
             throw error;
         }
 
+        const previousActivity = activityStreak(dailyStatsItems, today);
+        plan.activityStreak = {
+            ...activityStreak(dailyStatsItems, today, true),
+            increased: !previousActivity.completedToday
+        };
+
         plan.newAchievements = evaluateAchievementAwards({
             catalog: catalogItems.map(achievementCatalogFromItem),
             earnedAchievementIds,
@@ -544,8 +567,13 @@ async function complete(userPk, taskId) {
         });
         transaction.push(completionHistoryPut(userPk, history));
 
+        const taskWrite = taskUpdate(taskKey, plan, today, now);
+        // Retry against fresh schedule/rewards if an edit races with completion.
+        taskWrite.Update.ConditionExpression += taskItem.updatedAt?.S
+            ? " AND #updatedAt = :expectedUpdatedAt" : " AND attribute_not_exists(#updatedAt)";
+        if (taskItem.updatedAt?.S) taskWrite.Update.ExpressionAttributeValues[":expectedUpdatedAt"] = taskItem.updatedAt;
         transaction.push(
-            taskUpdate(taskKey, plan, today, now),
+            taskWrite,
             profileUpdate(profileKey, profileItem, plan, now),
             statsUpdate(userPk, "DAY", today, dailyStats, plan.daily, plan.xp, plan.coins, now),
             statsUpdate(userPk, "WEEK", weekId, weeklyStats, plan.weekly, plan.xp, plan.coins, now),

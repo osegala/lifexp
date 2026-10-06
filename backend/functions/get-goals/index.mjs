@@ -1,21 +1,24 @@
 import {
     DynamoDBClient,
-    GetItemCommand
+    GetItemCommand,
+    QueryCommand
 } from "@aws-sdk/client-dynamodb";
 import {
     buildGoal,
     isoWeekId,
-    localDate
+    localDate,
+    millisecondsUntilNextDay
 } from "./logic.mjs";
 import {
     authSubject,
     handleApiError,
     internalServerError,
     jsonResponse as response,
-    notFound,
     requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
+import { activityStreak } from "/opt/nodejs/activity-streak.mjs";
+import { buildingCatalogFromItem, playerBuildingsFromItems, resolveBuildingEffects } from "/opt/nodejs/building-effects.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -37,6 +40,23 @@ function number(item, field) {
     return Number(item[field]?.N ?? 0);
 }
 
+async function queryPrefix(pk, prefix) {
+    const items = [];
+    let ExclusiveStartKey;
+    do {
+        const result = await client.send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+            ExpressionAttributeValues: { ":pk": { S: pk }, ":prefix": { S: prefix } },
+            ConsistentRead: true,
+            ExclusiveStartKey
+        }));
+        items.push(...(result.Items ?? []));
+        ExclusiveStartKey = result.LastEvaluatedKey;
+    } while (ExclusiveStartKey);
+    return items;
+}
+
 export const handler = async (event) => {
     const userId = authSubject(event);
     if (!userId) {
@@ -51,13 +71,20 @@ export const handler = async (event) => {
 
     try {
         const userPk = `USER#${userId}`;
-        const timeZone = profile.timeZone?.S ?? "America/New_York";
-        const date = localDate(new Date(), timeZone);
+        const timeZone = profile.timeZone?.S ?? "UTC";
+        const now = new Date();
+        const date = localDate(now, timeZone);
         const week = isoWeekId(date);
-        const [daily, weekly] = await Promise.all([
-            getItem({ PK: { S: userPk }, SK: { S: `STATS#DAY#${date}` } }),
-            getItem({ PK: { S: userPk }, SK: { S: `STATS#WEEK#${week}` } })
+        const [dailyItems, weekly, buildingCatalog, playerBuildings] = await Promise.all([
+            queryPrefix(userPk, "STATS#DAY#"),
+            getItem({ PK: { S: userPk }, SK: { S: `STATS#WEEK#${week}` } }),
+            queryPrefix("CATALOG#BUILDINGS", "BUILDING#"),
+            queryPrefix(userPk, "BUILDING#")
         ]);
+        const daily = dailyItems.find((item) => item.SK?.S === `STATS#DAY#${date}`) ?? {};
+        const { effects } = resolveBuildingEffects(
+            buildingCatalog.map(buildingCatalogFromItem), playerBuildingsFromItems(playerBuildings)
+        );
         const dailyTasksCompleted = number(daily, "tasksCompleted");
         const weeklyTasksCompleted = number(weekly, "tasksCompleted");
 
@@ -65,6 +92,8 @@ export const handler = async (event) => {
             timeZone,
             date,
             week,
+            refreshAfterMs: Math.max(0, millisecondsUntilNextDay(now, timeZone) - (new Date() - now)),
+            streak: activityStreak(dailyItems, date),
             player: {
                 worldPoints: number(profile, "worldPoints")
             },
@@ -72,9 +101,10 @@ export const handler = async (event) => {
                 tasks: buildGoal(
                     dailyTasksCompleted,
                     DAILY_TASK_TARGET,
-                    DAILY_WORLD_POINTS_REWARD,
+                    DAILY_WORLD_POINTS_REWARD + effects.dailyWorldPointsBonus,
                     daily.goalRewarded?.BOOL ?? false,
-                    daily.goalRewardedAt?.S ?? null
+                    daily.goalRewardedAt?.S ?? null,
+                    daily.goalWorldPoints?.N == null ? undefined : number(daily, "goalWorldPoints")
                 ),
                 stats: {
                     tasksCompleted: dailyTasksCompleted,
@@ -86,9 +116,10 @@ export const handler = async (event) => {
                 tasks: buildGoal(
                     weeklyTasksCompleted,
                     WEEKLY_TASK_TARGET,
-                    WEEKLY_WORLD_POINTS_REWARD,
+                    WEEKLY_WORLD_POINTS_REWARD + effects.weeklyWorldPointsBonus,
                     weekly.goalRewarded?.BOOL ?? false,
-                    weekly.goalRewardedAt?.S ?? null
+                    weekly.goalRewardedAt?.S ?? null,
+                    weekly.goalWorldPoints?.N == null ? undefined : number(weekly, "goalWorldPoints")
                 ),
                 stats: {
                     tasksCompleted: weeklyTasksCompleted,

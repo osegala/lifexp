@@ -18,7 +18,20 @@ export function isoWeekId(date) {
     return `${year}-W${String(week).padStart(2, "0")}`;
 }
 
-export function buildGoal(current, target, rewardAmount, goalRewarded, goalRewardedAt) {
+// Server-computed delay avoids trusting the device's clock/timezone. Search using
+// the existing localDate utility, so short/long DST days are not assumed to be 24h.
+export function millisecondsUntilNextDay(now, timeZone) {
+    const date = localDate(now, timeZone);
+    let low = 0, high = 48 * 60 * 60 * 1000;
+    while (high - low > 1) {
+        const middle = Math.floor((low + high) / 2);
+        if (localDate(new Date(now.getTime() + middle), timeZone) === date) low = middle;
+        else high = middle;
+    }
+    return high;
+}
+
+export function buildGoal(current, target, rewardAmount, goalRewarded, goalRewardedAt, earnedWorldPoints) {
     return {
         current,
         target,
@@ -30,7 +43,8 @@ export function buildGoal(current, target, rewardAmount, goalRewarded, goalRewar
         reward: {
             worldPoints: rewardAmount,
             granted: goalRewarded,
-            grantedAt: goalRewardedAt
+            grantedAt: goalRewardedAt,
+            ...(earnedWorldPoints == null ? {} : { earnedWorldPoints })
         }
     };
 }

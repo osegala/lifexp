@@ -1261,6 +1261,7 @@ Resources:
 
       Layers:
         - Ref: ApiSharedLayer
+        - Ref: ProgressionSharedLayer
 
       Environment:
         Variables:
@@ -1275,6 +1276,7 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:GetItem
+                - dynamodb:Query
               Resource:
                 Fn::GetAtt:
                   - EvrenthiaDevTable

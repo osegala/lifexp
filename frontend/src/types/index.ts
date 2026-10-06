@@ -22,8 +22,11 @@ export type Task = {
   title: string;
   description: string | null;
   taskSize: TaskSize;
-  repeatType: "NONE" | "DAILY" | "WEEKLY";
+  repeatType: "NONE" | "DAILY" | "WEEKLY" | "MONTHLY";
   repeatDays: string[];
+  startDate?: string | null;
+  dueTime?: string | null;
+  nextScheduledDate?: string | null;
   active: boolean;
   archived: boolean;
   completed: boolean;
@@ -60,6 +63,11 @@ export type LevelProgress = {
 export type CompletionResponse = {
   task: Omit<Task, "archived">;
   rewards: { xp: number; coins: number; worldPoints: number };
+  goalRewards?: {
+    daily: { awarded: boolean; worldPoints: number };
+    weekly: { awarded: boolean; worldPoints: number };
+  };
+  activityStreak?: ActivityStreak & { increased: boolean };
   progression: LevelProgress & {
     previousLevel: number;
     leveledUp: boolean;
@@ -84,13 +92,17 @@ export type GoalProgress = {
   remaining: number;
   progressPercent: number;
   completed: boolean;
-  reward: { worldPoints: number; granted: boolean; grantedAt: string | null };
+  reward: { worldPoints: number; granted: boolean; grantedAt: string | null; earnedWorldPoints?: number };
 };
+
+export type ActivityStreak = { currentDays: number; longestDays: number; completedToday: boolean };
 
 export type GoalsResponse = {
   timeZone: string;
   date: string;
   week: string;
+  refreshAfterMs?: number;
+  streak?: ActivityStreak; // Absent on older servers; do not fabricate a streak.
   player: { worldPoints: number };
   daily: { tasks: GoalProgress };
   weekly: { tasks: GoalProgress };

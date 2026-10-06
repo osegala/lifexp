@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { api } from "../api/client";
 import { apiRoutes } from "../api/routes";
-import { completionAnnouncement, completionFrame } from "../feedback/completion";
+import { completionAnnouncement, completionFrame, questCompletionMessages } from "../feedback/completion";
 import type { CompletionEvent } from "../feedback/completion";
 import type { AchievementsResponse } from "../types";
 import { colors, radius, spacing } from "../theme/theme";
@@ -19,6 +19,7 @@ export default function CompletionFeedback({ event, onDone }: {
   const progress = useRef(new Animated.Value(0)).current;
   const announcement = completionAnnouncement(event);
   const { task, rewards, progression, newAchievements } = event.response;
+  const questMessages = questCompletionMessages(event.response);
 
   useEffect(() => {
     let active = true;
@@ -36,9 +37,9 @@ export default function CompletionFeedback({ event, onDone }: {
     const listener = progress.addListener(({ value }) => setFrame(completionFrame(event, value)));
     const animation = Animated.timing(progress, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.quad), useNativeDriver: false });
     if (!reducedMotion) animation.start();
-    const timer = setTimeout(() => onDone(event.id), 2800);
+    const timer = setTimeout(() => onDone(event.id), questMessages.length ? 5500 : 2800);
     return () => { clearTimeout(timer); animation.stop(); progress.removeListener(listener); progress.setValue(0); };
-  }, [event, onDone, progress, reducedMotion]);
+  }, [event, onDone, progress, reducedMotion, questMessages.length]);
 
   useEffect(() => {
     if (!newAchievements.length) return;
@@ -70,6 +71,10 @@ export default function CompletionFeedback({ event, onDone }: {
             <Text style={styles.caption}>{frame.coins} coins total{rewards.worldPoints ? ` · +${rewards.worldPoints} World Points` : ""}</Text>
           </View>
         </View>
+        {questMessages.map(message => <Text key={message} style={styles.achievementName}>{message}</Text>)}
+        {typeof event.response.player.worldPoints === "number" && <Text style={styles.caption}>
+          {event.response.player.worldPoints} World Points total
+        </Text>}
         {!!newAchievements.length && <ScrollView style={styles.achievements}>
           {newAchievements.map(achievement => <View key={achievement.achievementId} style={styles.achievement}>
             <Text style={styles.achievementName}>✦ {achievement.name}</Text>

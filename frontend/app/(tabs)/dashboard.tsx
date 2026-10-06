@@ -1,12 +1,13 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
 import LifeCard from "../../src/components/LifeCard";
 import XPBar from "../../src/components/XPBar";
+import QuestProgress from "../../src/components/QuestProgress";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, spacing } from "../../src/theme/theme";
 import type { AchievementsResponse, GoalsResponse } from "../../src/types";
@@ -16,19 +17,46 @@ export default function DashboardScreen() {
   const [goals, setGoals] = useState<GoalsResponse | null>(null);
   const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [questError, setQuestError] = useState(false);
 
   useFocusEffect(useCallback(() => {
     let active = true;
+    let refreshing = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function refreshGoals() {
+      if (!active || refreshing) return;
+      refreshing = true;
+      clearTimeout(timer);
+      let delay = 60_000;
+      try {
+        const result = await api.get<GoalsResponse>(apiRoutes.goals);
+        if (active) {
+          setGoals(result.data);
+          setQuestError(false);
+          // The server schedules local midnight, including DST. A bounded refresh
+          // also picks up timezone/building changes without using the device date.
+          delay = Math.max(1000, Math.min(delay, result.data.refreshAfterMs ?? delay));
+        }
+      } catch {
+        if (active) setQuestError(true); // Keep the last confirmed snapshot.
+      } finally {
+        refreshing = false;
+        if (active) {
+          setLoading(false);
+          if (AppState.currentState !== "background" && AppState.currentState !== "inactive") {
+            timer = setTimeout(() => { void refreshGoals(); }, delay);
+          }
+        }
+      }
+    }
     async function loadDashboard() {
       try {
         setLoading(true);
         if (!await refreshUser()) return;
-        const [goalsResponse, achievementsResponse] = await Promise.all([
-          api.get<GoalsResponse>(apiRoutes.goals),
-          api.get<AchievementsResponse>(apiRoutes.achievements),
+        const [, achievementsResponse] = await Promise.all([
+          refreshGoals(), api.get<AchievementsResponse>(apiRoutes.achievements),
         ]);
         if (active) {
-          setGoals(goalsResponse.data);
           setAchievementData(achievementsResponse.data);
         }
       } catch (error) {
@@ -38,7 +66,11 @@ export default function DashboardScreen() {
       }
     }
     void loadDashboard();
-    return () => { active = false; };
+    const subscription = AppState.addEventListener("change", state => {
+      if (state === "active") void refreshGoals();
+      else clearTimeout(timer);
+    });
+    return () => { active = false; clearTimeout(timer); subscription.remove(); };
   }, [refreshUser]));
 
   return (
@@ -61,17 +93,18 @@ export default function DashboardScreen() {
 
       {loading && !goals ? <ActivityIndicator color={colors.primary} /> : null}
 
-      <View style={styles.grid}>
-        <GoalCard title="Today" goal={goals?.daily.tasks} />
-        <GoalCard title="This week" goal={goals?.weekly.tasks} />
-      </View>
+      {questError && <Text accessibilityRole="alert" style={styles.muted}>
+        {goals ? "Could not refresh quests. Showing last confirmed progress; retrying shortly." : "Could not load quests. Retrying shortly."}
+      </Text>}
+      {goals ? <QuestProgress goals={goals} /> : !loading && !questError
+        ? <Text style={styles.muted}>Quest status is unavailable.</Text> : null}
 
       <LifeCard compact>
         <View style={styles.row}>
           <Text style={styles.cardTitle}>World Points</Text>
-          <Text style={styles.value}>{goals?.player.worldPoints ?? 0}</Text>
+          <Text style={styles.value}>{goals?.player.worldPoints ?? "—"}</Text>
         </View>
-        <Text style={styles.muted}>Goal rewards are granted automatically when tasks are completed.</Text>
+        <Text style={styles.muted}>Quest rewards are granted automatically when tasks are completed.</Text>
       </LifeCard>
 
       <LifeCard compact>
@@ -100,21 +133,6 @@ export default function DashboardScreen() {
   );
 }
 
-function GoalCard({ title, goal }: { title: string; goal?: GoalsResponse["daily"]["tasks"] }) {
-  return (
-    <LifeCard compact style={styles.goalCard}>
-      <Text style={styles.cardTitle}>{title}</Text>
-      <Text style={styles.value}>{goal?.current ?? 0}/{goal?.target ?? 0}</Text>
-      <XPBar progress={(goal?.progressPercent ?? 0) / 100} />
-      <Text style={styles.muted}>
-        {goal?.reward.granted
-          ? `${goal.reward.worldPoints} World Points earned`
-          : `${goal?.reward.worldPoints ?? 0} World Points at goal`}
-      </Text>
-    </LifeCard>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.lg },
@@ -125,8 +143,6 @@ const styles = StyleSheet.create({
   heroTitle: { color: colors.text, fontSize: 25, fontWeight: "800" },
   heroMeta: { color: colors.accent, fontSize: 16, marginTop: spacing.xs },
   progress: { marginTop: spacing.md },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
-  goalCard: { flexGrow: 1, flexBasis: 240 },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md },
   cardTitle: { color: colors.text, fontSize: 18, fontWeight: "700", marginBottom: spacing.sm },
   value: { color: colors.accent, fontSize: 20, fontWeight: "800" },

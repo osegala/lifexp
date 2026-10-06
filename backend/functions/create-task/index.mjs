@@ -15,6 +15,7 @@ import {
 } from "/opt/nodejs/http.mjs";
 import { validateTaskCreate } from "/opt/nodejs/task-input.mjs";
 import { rewardForTaskSize } from "/opt/nodejs/task-rewards.mjs";
+import { localDate } from "/opt/nodejs/dates.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -23,8 +24,9 @@ export const handler = async (event) => {
     if (!userId) {
         return unauthorized();
     }
+    let profile;
     try {
-        await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand);
+        ({ profile } = await requireActivePlayer(event, client, TABLE_NAME, GetItemCommand));
     } catch (error) {
         return handleApiError(error, "Create task active player check failed");
     }
@@ -39,6 +41,8 @@ export const handler = async (event) => {
     const taskId = randomUUID();
     const now = new Date().toISOString();
     const { repeatType, repeatDays } = input;
+    const startDate = input.startDate ?? (repeatType !== "NONE"
+        ? localDate(new Date(now), profile.timeZone?.S ?? "UTC") : null);
     const reward = rewardForTaskSize(input.taskSize);
     const userPk = `USER#${userId}`;
     const item = {
@@ -63,6 +67,8 @@ export const handler = async (event) => {
     if (input.description != null) {
         item.description = { S: input.description };
     }
+    if (startDate) item.startDate = { S: startDate };
+    if (input.dueTime) item.dueTime = { S: input.dueTime };
 
     try {
         await client.send(new PutItemCommand({
@@ -78,6 +84,8 @@ export const handler = async (event) => {
             taskSize: input.taskSize,
             repeatType,
             repeatDays,
+            startDate,
+            dueTime: input.dueTime ?? null,
             active: item.active.BOOL,
             completed: false,
             currentStreak: 0,

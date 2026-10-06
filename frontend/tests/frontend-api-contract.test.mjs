@@ -68,7 +68,7 @@ test("task screen uses the SAM task methods and server-owned completion contract
 });
 
 test("task creation renders every task size, defaults to NORMAL, and submits no custom rewards", () => {
-  const tasks = read("app/(tabs)/tasks.tsx");
+  const tasks = read("src/tasks/scheduling.ts") + read("src/components/TaskEditor.tsx");
   for (const [value, label, xp] of [
     ["QUICK", "Quick", 10],
     ["SMALL", "Small", 20],
@@ -78,7 +78,7 @@ test("task creation renders every task size, defaults to NORMAL, and submits no 
   ]) {
     assert.match(tasks, new RegExp(`value: "${value}", label: "${label}", xp: ${xp}`));
   }
-  assert.match(tasks, /useState<TaskSize>\("NORMAL"\)/);
+  assert.match(tasks, /useState<TaskSize>\(task\?\.taskSize \?\? "NORMAL"\)/);
   assert.match(tasks, /description: description\.trim\(\) \|\| null,\s*taskSize,/);
   assert.doesNotMatch(tasks, /<LifeInput[^>]*placeholder=["'][^"']*(?:XP|coin)|xpReward\s*:|coinReward\s*:/i);
 });

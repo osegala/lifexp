@@ -42,6 +42,8 @@ function taskResponse(item) {
         taskSize: reward.taskSize,
         repeatType: item.repeatType?.S ?? "NONE",
         repeatDays,
+        startDate: item.startDate?.S ?? null,
+        dueTime: item.dueTime?.S ?? null,
         active: item.active?.BOOL !== false,
         completed: item.completed?.BOOL === true,
         completedAt: item.completedAt?.S ?? null,
@@ -105,7 +107,8 @@ export const handler = async (event) => {
         try {
             patch = validateTaskPatch(body, {
                 repeatType: existing.repeatType?.S ?? "NONE",
-                repeatDays: storedRepeatDays(existing)
+                repeatDays: storedRepeatDays(existing),
+                startDate: existing.startDate?.S ?? null
             });
         } catch (error) {
             return handleApiError(error, "Update task validation failed");
@@ -115,6 +118,19 @@ export const handler = async (event) => {
         const values = { ":updatedAt": { S: new Date().toISOString() }, ":false": { BOOL: false } };
         const setExpressions = ["#updatedAt = :updatedAt"];
         const removeExpressions = [];
+        const versionCondition = existing.updatedAt?.S
+            ? "#updatedAt = :expectedUpdatedAt" : "attribute_not_exists(#updatedAt)";
+        if (existing.updatedAt?.S) values[":expectedUpdatedAt"] = existing.updatedAt;
+
+        for (const field of ["startDate", "dueTime"]) {
+            if (!(field in patch)) continue;
+            names[`#${field}`] = field;
+            if (patch[field] == null) removeExpressions.push(`#${field}`);
+            else {
+                values[`:${field}`] = { S: patch[field] };
+                setExpressions.push(`#${field} = :${field}`);
+            }
+        }
 
         if ("title" in patch) {
             names["#title"] = "title";
@@ -154,6 +170,15 @@ export const handler = async (event) => {
         }
 
         const repeatType = patch.repeatType ?? existing.repeatType?.S ?? "NONE";
+        const scheduleChanged = repeatType !== (existing.repeatType?.S ?? "NONE")
+            || ("repeatDays" in patch && [...patch.repeatDays].sort().join() !== storedRepeatDays(existing).sort().join())
+            || ("startDate" in patch && patch.startDate !== (existing.startDate?.S ?? null));
+        if (scheduleChanged) {
+            // A new rule starts a new streak, but never erases completion/duplicate guards or best streak.
+            names["#currentStreak"] = "currentStreak";
+            values[":zero"] = { N: "0" };
+            setExpressions.push("#currentStreak = :zero");
+        }
         if ("repeatType" in patch) {
             names["#repeatType"] = "repeatType";
             values[":repeatType"] = { S: repeatType };
@@ -180,14 +205,14 @@ export const handler = async (event) => {
             UpdateExpression: updateExpression,
             ExpressionAttributeNames: names,
             ExpressionAttributeValues: values,
-            ConditionExpression: "attribute_exists(PK) AND attribute_exists(SK) AND (attribute_not_exists(#archived) OR #archived = :false)",
+            ConditionExpression: `attribute_exists(PK) AND attribute_exists(SK) AND (attribute_not_exists(#archived) OR #archived = :false) AND ${versionCondition}`,
             ReturnValues: "ALL_NEW"
         }));
 
         return response(200, taskResponse(result.Attributes));
     } catch (error) {
         if (error.name === "ConditionalCheckFailedException") {
-            return conflict("TASK_ARCHIVED", "Archived tasks cannot be edited.");
+            return conflict("TASK_CHANGED", "Task changed while saving. Refresh and try again.");
         }
         return internalServerError("Update task failed", error);
     }

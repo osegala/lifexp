@@ -1,12 +1,12 @@
 import { ApiError } from "./http.mjs";
 import { isTaskSize } from "./task-rewards.mjs";
 
-const EDITABLE_FIELDS = new Set(["title", "description", "repeatType", "repeatDays", "active", "taskSize"]);
+const EDITABLE_FIELDS = new Set(["title", "description", "repeatType", "repeatDays", "active", "taskSize", "startDate", "dueTime"]);
 export const PROTECTED_TASK_FIELDS = new Set([
     "completed", "completedAt", "currentStreak", "bestStreak", "lastCompletedDate",
     "lastCompletedAt", "xpReward", "coinReward", "timeZone", "archived", "archivedAt"
 ]);
-const REPEAT_TYPES = new Set(["NONE", "DAILY", "WEEKLY"]);
+const REPEAT_TYPES = new Set(["NONE", "DAILY", "WEEKLY", "MONTHLY"]);
 const WEEKDAYS = new Set(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]);
 
 function invalid(code, message, field, fieldCode = "INVALID") {
@@ -56,7 +56,7 @@ function normalizeDescription(value) {
 function normalizeRepeatType(value) {
     const repeatType = typeof value === "string" ? value.toUpperCase() : "";
     if (!REPEAT_TYPES.has(repeatType)) {
-        invalid("INVALID_REPEAT_TYPE", "repeatType must be NONE, DAILY, or WEEKLY.", "repeatType");
+        invalid("INVALID_REPEAT_TYPE", "repeatType must be NONE, DAILY, WEEKLY, or MONTHLY.", "repeatType");
     }
     return repeatType;
 }
@@ -85,7 +85,29 @@ function normalizeTaskSize(value) {
     return taskSize;
 }
 
-function validateSchedule(repeatType, repeatDays) {
+function dateValue(value) {
+    if (value == null) return null;
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)
+        || value < "1900-01-01" || value > "9998-12-31"
+        || !Number.isFinite(Date.parse(`${value}T00:00:00Z`))
+        || new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value) {
+        invalid("INVALID_START_DATE", "Use a valid calendar date in YYYY-MM-DD format.", "startDate");
+    }
+    return value;
+}
+
+function timeValue(value) {
+    if (value == null) return null;
+    if (typeof value !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+        invalid("INVALID_DUE_TIME", "Use a 24-hour time in HH:mm format.", "dueTime");
+    }
+    return value;
+}
+
+function validateSchedule(repeatType, repeatDays, startDate) {
+    if (repeatType === "MONTHLY" && !startDate) {
+        invalid("INVALID_START_DATE", "Monthly tasks need a start date.", "startDate", "REQUIRED");
+    }
     if (repeatType === "WEEKLY" && repeatDays.length === 0) {
         invalid("INVALID_REPEAT_DAYS", "repeatDays is required for WEEKLY tasks.", "repeatDays", "REQUIRED");
     }
@@ -98,7 +120,9 @@ export function validateTaskCreate(body) {
     validateObject(body);
     const repeatType = normalizeRepeatType(body.repeatType ?? "NONE");
     const repeatDays = normalizeRepeatDays(body.repeatDays ?? []);
-    validateSchedule(repeatType, repeatDays);
+    const startDate = dateValue(body.startDate);
+    const dueTime = timeValue(body.dueTime);
+    validateSchedule(repeatType, repeatDays, startDate);
     if (body.active !== undefined && typeof body.active !== "boolean") {
         invalid("VALIDATION_ERROR", "active must be a boolean.", "active");
     }
@@ -108,6 +132,8 @@ export function validateTaskCreate(body) {
         taskSize: normalizeTaskSize(body.taskSize ?? "NORMAL"),
         repeatType,
         repeatDays,
+        ...(body.startDate === undefined ? {} : { startDate }),
+        ...(body.dueTime === undefined ? {} : { dueTime }),
         active: body.active ?? true
     };
 }
@@ -126,6 +152,8 @@ export function validateTaskPatch(body, existing) {
     }
     if (Object.hasOwn(body, "repeatType")) patch.repeatType = normalizeRepeatType(body.repeatType);
     if (Object.hasOwn(body, "repeatDays")) patch.repeatDays = normalizeRepeatDays(body.repeatDays);
+    if (Object.hasOwn(body, "startDate")) patch.startDate = dateValue(body.startDate);
+    if (Object.hasOwn(body, "dueTime")) patch.dueTime = timeValue(body.dueTime);
 
     const repeatType = patch.repeatType ?? existing.repeatType ?? "NONE";
     const repeatDays = Object.hasOwn(patch, "repeatDays")
@@ -133,7 +161,7 @@ export function validateTaskPatch(body, existing) {
         : Object.hasOwn(patch, "repeatType") && repeatType !== "WEEKLY"
             ? []
             : existing.repeatDays ?? [];
-    validateSchedule(repeatType, repeatDays);
+    validateSchedule(repeatType, repeatDays, Object.hasOwn(patch, "startDate") ? patch.startDate : existing.startDate);
     if (Object.hasOwn(patch, "repeatType") && repeatType !== "WEEKLY") patch.repeatDays = [];
     return patch;
 }

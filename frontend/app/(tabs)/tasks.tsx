@@ -1,31 +1,20 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
-import LifeButton from "../../src/components/LifeButton";
 import LifeCard from "../../src/components/LifeCard";
-import LifeInput from "../../src/components/LifeInput";
+import TaskEditor from "../../src/components/TaskEditor";
 import { useAuth } from "../../src/context/AuthContext";
 import { useBuildingFeedback, useCompletionFeedback } from "../../src/context/CompletionFeedbackContext";
 import { buildingUpgrades } from "../../src/base/buildingProgress";
 import { completionEvent } from "../../src/feedback/completion";
 import { colors, radius, spacing } from "../../src/theme/theme";
-import type { CompletionResponse, Task, TaskSize, TasksResponse } from "../../src/types";
+import type { CompletionResponse, Task, TasksResponse } from "../../src/types";
 import type { WorldResponse } from "../../src/types/progression";
-
-type RepeatType = Task["repeatType"];
-
-const WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-const TASK_SIZE_OPTIONS: { value: TaskSize; label: string; xp: number }[] = [
-  { value: "QUICK", label: "Quick", xp: 10 },
-  { value: "SMALL", label: "Small", xp: 20 },
-  { value: "NORMAL", label: "Normal", xp: 35 },
-  { value: "CHALLENGING", label: "Challenging", xp: 50 },
-  { value: "BIG", label: "Big", xp: 75 },
-];
+import { recurrenceLabel, TASK_SIZE_OPTIONS, tasksForView, type TaskInput, type TaskView } from "../../src/tasks/scheduling";
 
 export default function TasksScreen() {
   const { user, refreshUser, triggerDashboardRefresh } = useAuth();
@@ -33,60 +22,52 @@ export default function TasksScreen() {
   const { enqueue: enqueueBuildings } = useBuildingFeedback();
   const completing = useRef(false);
   const [data, setData] = useState<TasksResponse | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [taskSize, setTaskSize] = useState<TaskSize>("NORMAL");
-  const [repeatType, setRepeatType] = useState<RepeatType>("NONE");
-  const [repeatDays, setRepeatDays] = useState<string[]>([]);
+  const [view, setView] = useState<TaskView>("Today");
+  const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [completionError, setCompletionError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const loadVersion = useRef(0);
 
   const loadTasks = useCallback(async () => {
+    const version = ++loadVersion.current;
     try {
       setLoading(true);
       const response = await api.get<TasksResponse>(apiRoutes.tasks);
-      setData(response.data);
+      if (version === loadVersion.current) { setData(response.data); setLoadError(""); }
     } catch (error) {
-      Alert.alert("Tasks", apiError(error, "Could not load tasks.").message);
+      if (version === loadVersion.current) setLoadError(apiError(error, "Could not refresh tasks. Showing the last saved schedule.").message);
     } finally {
-      setLoading(false);
+      if (version === loadVersion.current) setLoading(false);
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { void loadTasks(); }, [loadTasks]));
+  useFocusEffect(useCallback(() => {
+    void loadTasks();
+    // Server dates remain authoritative across midnight, timezone changes and app resume.
+    const timer = setInterval(() => { if (AppState.currentState === "active") void loadTasks(); }, 60_000);
+    const subscription = AppState.addEventListener("change", state => { if (state === "active") void loadTasks(); });
+    return () => { clearInterval(timer); subscription.remove(); loadVersion.current++; };
+  }, [loadTasks]));
 
-  async function createTask() {
-    if (!title.trim()) {
-      Alert.alert("Tasks", "Enter a task title.");
-      return;
-    }
-    if (repeatType === "WEEKLY" && repeatDays.length === 0) {
-      Alert.alert("Tasks", "Choose at least one weekday for a weekly task.");
-      return;
-    }
-
+  async function createTask(input: TaskInput) {
     try {
       setBusy("create");
-      await api.post(apiRoutes.tasks, {
-        title: title.trim(),
-        description: description.trim() || null,
-        taskSize,
-        repeatType,
-        repeatDays: repeatType === "WEEKLY" ? repeatDays : [],
-        active: true,
-      });
-      setTitle("");
-      setDescription("");
-      setTaskSize("NORMAL");
-      setRepeatType("NONE");
-      setRepeatDays([]);
+      await api.post(apiRoutes.tasks, { ...input, active: true });
       await loadTasks();
-    } catch (error) {
-      Alert.alert("Tasks", apiError(error, "Could not create the task.").message);
     } finally {
       setBusy(null);
     }
+  }
+
+  async function editTask(task: Task, input: TaskInput) {
+    try {
+      setBusy(task.taskId);
+      await api.patch(apiRoutes.task(task.taskId), input);
+      setEditing(null);
+      await loadTasks();
+    } finally { setBusy(null); }
   }
 
   async function completeTask(task: Task) {
@@ -100,6 +81,7 @@ export default function TasksScreen() {
         .then(response => response.data).catch(() => null);
       const previousWorld = await readWorld();
       const response = await api.post<CompletionResponse>(apiRoutes.completeTask(task.taskId), {});
+      loadVersion.current++; // A pre-completion background read must not undo this confirmed result.
       setData(current => current ? { ...current, tasks: current.tasks.map(item => item.taskId === task.taskId
         ? { ...item, ...response.data.task } : item) } : current);
       celebrate(response.data, user);
@@ -131,57 +113,19 @@ export default function TasksScreen() {
     }
   }
 
-  function toggleDay(day: string) {
-    setRepeatDays((current) =>
-      current.includes(day) ? current.filter((value) => value !== day) : [...current, day],
-    );
-  }
+  const tasks = tasksForView(data?.tasks ?? [], view, data?.time.date ?? "");
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text accessibilityRole="header" style={styles.title}>Tasks</Text>
       {!!completionError && <Text accessibilityRole="alert" style={styles.error}>{completionError}</Text>}
+      {!!loadError && <View>
+        <Text accessibilityRole="alert" style={styles.error}>{loadError}</Text>
+        <Pressable accessibilityRole="button" onPress={() => void loadTasks()} style={styles.chip}><Text style={styles.chipText}>Refresh tasks</Text></Pressable>
+      </View>}
 
       <LifeCard compact>
-        <Text style={styles.cardTitle}>Add a task</Text>
-        <LifeInput placeholder="Task title" value={title} onChangeText={setTitle} />
-        <LifeInput placeholder="Description (optional)" value={description} onChangeText={setDescription} />
-        <Text style={styles.optionLabel}>Task size</Text>
-        <View style={styles.sizeOptions}>
-          {TASK_SIZE_OPTIONS.map((option) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: taskSize === option.value }}
-              key={option.value}
-              onPress={() => setTaskSize(option.value)}
-              style={[styles.sizeChip, taskSize === option.value && styles.selectedChip]}
-            >
-              <Text style={[styles.chipText, taskSize === option.value && styles.selectedChipText]}>{option.label}</Text>
-              <Text style={[styles.sizeReward, taskSize === option.value && styles.selectedChipText]}>+{option.xp} XP</Text>
-            </Pressable>
-          ))}
-        </View>
-        <View style={styles.options}>
-          {(["NONE", "DAILY", "WEEKLY"] as RepeatType[]).map((value) => (
-            <Pressable
-              key={value}
-              onPress={() => { setRepeatType(value); if (value !== "WEEKLY") setRepeatDays([]); }}
-              style={[styles.chip, repeatType === value && styles.selectedChip]}
-            >
-              <Text style={[styles.chipText, repeatType === value && styles.selectedChipText]}>{value}</Text>
-            </Pressable>
-          ))}
-        </View>
-        {repeatType === "WEEKLY" ? (
-          <View style={styles.options}>
-            {WEEKDAYS.map((day) => (
-              <Pressable key={day} onPress={() => toggleDay(day)} style={[styles.day, repeatDays.includes(day) && styles.selectedChip]}>
-                <Text style={[styles.chipText, repeatDays.includes(day) && styles.selectedChipText]}>{day.slice(0, 1)}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-        <LifeButton title={busy === "create" ? "Adding…" : "Add task"} onPress={createTask} disabled={busy !== null} />
+        <TaskEditor time={data?.time} disabled={busy !== null || !data} onSave={createTask} />
       </LifeCard>
 
       <LifeCard compact>
@@ -189,11 +133,20 @@ export default function TasksScreen() {
         <Text style={styles.summary}>
           {data?.summary.dueToday ?? 0} due · {data?.summary.completedToday ?? 0} completed
         </Text>
+        <Text style={styles.meta}>{data?.time.timeZone}</Text>
+        <View style={styles.options}>{(["Today", "Upcoming", "All"] as TaskView[]).map(option => <Pressable key={option}
+          accessibilityRole="button" accessibilityLabel={`${option} tasks`} accessibilityState={{ selected: view === option }}
+          onPress={() => { setView(option); setEditing(null); }} style={[styles.chip, view === option && styles.selectedChip]}>
+          <Text style={[styles.chipText, view === option && styles.selectedChipText]}>{option}</Text>
+        </Pressable>)}</View>
+        {view === "Upcoming" && <Text style={styles.summary}>Next available occurrence of each task.</Text>}
       </LifeCard>
 
       {loading && !data ? <ActivityIndicator color={colors.primary} /> : null}
-      {(data?.tasks ?? []).map((task) => (
+      {tasks.map((task) => (
         <LifeCard compact key={task.taskId} style={[!task.active && styles.inactiveCard, task.completedToday && styles.completedCard]}>
+          {editing === task.taskId ? <TaskEditor task={task} time={data?.time} disabled={busy !== null}
+            onSave={input => editTask(task, input)} onCancel={() => setEditing(null)} /> : <>
           <View style={styles.taskRow}>
             <View style={styles.taskCopy}>
               <Text style={styles.taskTitle}>{task.title}</Text>
@@ -203,8 +156,12 @@ export default function TasksScreen() {
                 {` · +${task.xpReward} XP · +${task.coinReward} coin${task.coinReward === 1 ? "" : "s"}`}
               </Text>
               <Text style={styles.meta}>
-                {task.repeatType}{task.repeatDays.length ? ` · ${task.repeatDays.join(", ")}` : ""}
+                {recurrenceLabel(task)}{task.dueTime ? ` · ${task.dueTime}` : ""}
               </Text>
+              {task.repeatType === "NONE" && !!task.startDate && <Text style={styles.meta}>Due: {task.startDate}</Text>}
+              {!!task.nextScheduledDate && <Text style={styles.meta}>Next: {task.nextScheduledDate}</Text>}
+              {!task.active && <Text style={styles.meta}>Inactive</Text>}
+              {task.completed && task.repeatType === "NONE" && <Text style={styles.meta}>Completed</Text>}
               {task.repeatType !== "NONE" ? (
                 <Text style={styles.meta}>Streak {task.currentStreak} · best {task.bestStreak}</Text>
               ) : null}
@@ -214,19 +171,24 @@ export default function TasksScreen() {
                 accessibilityLabel={`Complete ${task.title}`}
                 accessibilityRole="button"
                 onPress={() => void completeTask(task)}
-                disabled={!task.isDueToday || busy !== null}
-                style={[styles.iconButton, (!task.isDueToday || busy !== null) && styles.disabled]}
+                disabled={view === "Upcoming" || !task.isDueToday || busy !== null}
+                accessibilityState={{ disabled: view === "Upcoming" || !task.isDueToday || busy !== null }}
+                style={[styles.iconButton, (view === "Upcoming" || !task.isDueToday || busy !== null) && styles.disabled]}
               >
                 <MaterialCommunityIcons name={task.completedToday ? "check-circle" : "check"} color={colors.text} size={22} />
               </Pressable>
-              <Pressable accessibilityLabel={`Archive ${task.title}`} onPress={() => void archiveTask(task)} disabled={busy !== null} style={styles.iconButton}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${task.title}`} onPress={() => setEditing(task.taskId)} disabled={busy !== null} style={styles.iconButton}>
+                <MaterialCommunityIcons name="pencil-outline" color={colors.mutedText} size={22} />
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Archive ${task.title}`} onPress={() => void archiveTask(task)} disabled={busy !== null} style={styles.iconButton}>
                 <MaterialCommunityIcons name="archive-outline" color={colors.mutedText} size={22} />
               </Pressable>
             </View>
           </View>
+          </>}
         </LifeCard>
       ))}
-      {!loading && data?.tasks.length === 0 ? <Text style={styles.empty}>No active tasks yet.</Text> : null}
+      {!loading && data && tasks.length === 0 ? <Text style={styles.empty}>{view === "Today" ? "Nothing scheduled for today." : view === "Upcoming" ? "No upcoming tasks." : "No tasks yet."}</Text> : null}
     </ScrollView>
   );
 }
@@ -236,15 +198,10 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.md },
   title: { color: colors.text, fontSize: 30, fontWeight: "700" },
   cardTitle: { color: colors.text, fontSize: 18, fontWeight: "700", marginBottom: spacing.sm },
-  optionLabel: { color: colors.text, fontWeight: "700", marginTop: spacing.sm },
   options: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginVertical: spacing.sm },
-  sizeOptions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginVertical: spacing.sm },
-  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  sizeChip: { minWidth: "30%", flexGrow: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, alignItems: "center" },
-  day: { width: 40, height: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  chip: { minHeight: 44, justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   selectedChip: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.mutedText, fontWeight: "700" },
-  sizeReward: { color: colors.accent, fontSize: 12, marginTop: 2 },
   selectedChipText: { color: colors.background },
   summary: { color: colors.mutedText },
   taskRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
@@ -252,7 +209,7 @@ const styles = StyleSheet.create({
   taskTitle: { color: colors.text, fontSize: 17, fontWeight: "700" },
   description: { color: colors.mutedText, marginTop: 3 },
   meta: { color: colors.accent, fontSize: 12, marginTop: spacing.xs },
-  actions: { flexDirection: "row", gap: spacing.xs },
+  actions: { gap: spacing.xs },
   iconButton: { minWidth: 44, minHeight: 44, borderRadius: radius.md, backgroundColor: colors.cardLight, alignItems: "center", justifyContent: "center" },
   disabled: { opacity: 0.35 },
   inactiveCard: { opacity: 0.55 },

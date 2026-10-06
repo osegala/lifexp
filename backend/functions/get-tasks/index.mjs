@@ -12,7 +12,8 @@ import {
     visibleTasks,
     wasCompletedOn,
     weekday
-} from "./task-rules.mjs";
+} from "/opt/nodejs/task-rules.mjs";
+import { nextScheduledDate, scheduleFromItem } from "/opt/nodejs/task-schedule.mjs";
 import {
     authSubject,
     badRequest,
@@ -73,6 +74,9 @@ function taskResponse(item, today, timeZone) {
         taskSize: reward.taskSize,
         repeatType: item.repeatType?.S ?? "NONE",
         repeatDays: repeatDays(item),
+        startDate: item.startDate?.S ?? null,
+        dueTime: item.dueTime?.S ?? null,
+        nextScheduledDate: nextScheduledDate(scheduleFromItem(item), today, completedToday),
         active: item.active?.BOOL !== false,
         archived,
         archivedAt: item.archivedAt?.S ?? null,

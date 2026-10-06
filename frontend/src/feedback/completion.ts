@@ -96,5 +96,15 @@ export function completionAnnouncement(event: CompletionEvent) {
   return `${task.title} completed. ${rewards.xp} XP and ${rewards.coins} coins earned.`
     + (rewards.worldPoints ? ` ${rewards.worldPoints} World Points earned.` : "")
     + (progression.level > progression.previousLevel ? ` Level up! Level ${progression.level}.` : "")
+    + questCompletionMessages(event.response).map(message => ` ${message}.`).join("")
     + newAchievements.map(a => ` Achievement unlocked: ${a.name}.`).join("");
+}
+
+export function questCompletionMessages(response: CompletionResponse): string[] {
+  const { goalRewards, activityStreak } = response;
+  const messages: string[] = [];
+  if (goalRewards?.daily.awarded) messages.push(`Daily Quest Complete · +${goalRewards.daily.worldPoints} World Points`);
+  if (goalRewards?.weekly.awarded) messages.push(`Weekly Quest Complete · +${goalRewards.weekly.worldPoints} World Points`);
+  if (activityStreak?.increased) messages.push(`${activityStreak.currentDays} Day Streak · Today counts`);
+  return messages;
 }
