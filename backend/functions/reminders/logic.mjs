@@ -5,8 +5,16 @@ const TASK_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const REMINDER_ID = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|req-[0-9a-f]{32})$/i;
 const CLIENT_REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
 const WEEKDAYS = new Set(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]);
-const CREATE_FIELDS = new Set(["type", "taskId", "enabled", "localTime", "daysOfWeek", "clientRequestId"]);
-const PATCH_FIELDS = new Set(["enabled", "localTime", "daysOfWeek"]);
+const CREATE_FIELDS = new Set(["type", "taskId", "enabled", "localTime", "offsetMinutes", "daysOfWeek", "clientRequestId"]);
+const PATCH_FIELDS = new Set(["enabled", "localTime", "offsetMinutes", "daysOfWeek"]);
+
+export function validateReminderTiming(values, task) {
+    if (values.offsetMinutes != null) {
+        if (![0, 5, 15, 30, 60].includes(values.offsetMinutes)) throw new ReminderError("INVALID_REMINDER_TIME", "Choose a supported reminder offset.");
+        if (values.localTime != null) throw new ReminderError("INVALID_REMINDER_TIME", "Choose either an offset or an explicit time.");
+        if (task && !task.dueTime?.S) throw new ReminderError("INVALID_REMINDER_TIME", "Set a task due time or choose an explicit reminder time.");
+    } else if (!LOCAL_TIME.test(values.localTime ?? "")) throw new ReminderError("INVALID_REMINDER_TIME", "localTime must be a local time in HH:MM format.");
+}
 
 export class ReminderError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -48,18 +56,16 @@ export function validateReminderCreate(body) {
     if (type === "DAILY") {
         throw new ReminderError("INVALID_REMINDER_TYPE", "The global daily reminder is managed through PATCH /preferences.");
     }
-    if (type !== "TASK") {
+    if (type !== "TASK" && type !== "TASK_DUE") {
         throw new ReminderError("INVALID_REMINDER_TYPE", "type must be TASK.");
     }
-    if (typeof body.localTime !== "string" || !LOCAL_TIME.test(body.localTime)) {
-        throw new ReminderError("INVALID_REMINDER_TIME", "localTime must be a local time in HH:MM format.");
-    }
+    validateReminderTiming(body);
     if (Object.hasOwn(body, "enabled") && typeof body.enabled !== "boolean") {
         throw new ReminderError("VALIDATION_ERROR", "enabled must be a boolean.");
     }
 
     const taskId = typeof body.taskId === "string" ? body.taskId.trim() : null;
-    if (type === "TASK" && !TASK_ID.test(taskId ?? "")) {
+    if (!TASK_ID.test(taskId ?? "")) {
         throw new ReminderError("VALIDATION_ERROR", "taskId is required for TASK reminders.");
     }
     const clientRequestId = body.clientRequestId == null ? null : String(body.clientRequestId).trim();
@@ -68,10 +74,11 @@ export function validateReminderCreate(body) {
     }
 
     return {
-        type,
+        type: "TASK_DUE",
         taskId,
         enabled: body.enabled ?? true,
-        localTime: body.localTime,
+        localTime: body.localTime ?? null,
+        offsetMinutes: body.offsetMinutes ?? null,
         daysOfWeek: normalizeDays(body.daysOfWeek),
         clientRequestId
     };
@@ -87,10 +94,14 @@ export function validateReminderPatch(body) {
         patch.enabled = body.enabled;
     }
     if (Object.hasOwn(body, "localTime")) {
-        if (typeof body.localTime !== "string" || !LOCAL_TIME.test(body.localTime)) {
+        if (body.localTime !== null && (typeof body.localTime !== "string" || !LOCAL_TIME.test(body.localTime))) {
             throw new ReminderError("INVALID_REMINDER_TIME", "localTime must be a local time in HH:MM format.");
         }
         patch.localTime = body.localTime;
+    }
+    if (Object.hasOwn(body, "offsetMinutes")) {
+        if (body.offsetMinutes !== null && ![0, 5, 15, 30, 60].includes(body.offsetMinutes)) throw new ReminderError("INVALID_REMINDER_TIME", "Choose a supported reminder offset.");
+        patch.offsetMinutes = body.offsetMinutes;
     }
     if (Object.hasOwn(body, "daysOfWeek")) patch.daysOfWeek = normalizeDays(body.daysOfWeek);
     return patch;
@@ -115,6 +126,7 @@ export function reminderResponse(item, effectiveNotificationsEnabled) {
         taskId: item.taskId?.S ?? null,
         enabled: item.enabled?.BOOL === true,
         localTime: item.localTime?.S ?? null,
+        offsetMinutes: item.offsetMinutes?.N == null ? null : Number(item.offsetMinutes.N),
         daysOfWeek: storedDays(item),
         nextDueAt: item.nextDueAt?.S ?? null,
         createdAt: item.createdAt?.S ?? null,
@@ -128,7 +140,7 @@ export function reminderResponse(item, effectiveNotificationsEnabled) {
 
 export function effectiveReminderState(reminder, preferences, hasEnabledDevice, task) {
     if (!preferences.notificationsEnabled || !hasEnabledDevice || reminder.enabled?.BOOL !== true) return false;
-    if (reminder.type?.S !== "TASK" || !preferences.taskRemindersEnabled) return false;
+    if (!["TASK", "TASK_DUE"].includes(reminder.type?.S) || !preferences.taskRemindersEnabled) return false;
     return Boolean(task) && task.active?.BOOL === true && task.archived?.BOOL !== true;
 }
 
@@ -159,10 +171,12 @@ export function reminderListResponse(reminders, profile, preferenceItem, devices
 
 export function reminderValuesFromItem(item) {
     return {
+        createdAt: item.createdAt?.S,
         type: item.type?.S,
         taskId: item.taskId?.S,
         enabled: item.enabled?.BOOL === true,
-        localTime: item.localTime?.S,
+        localTime: item.localTime?.S ?? null,
+        offsetMinutes: item.offsetMinutes?.N == null ? null : Number(item.offsetMinutes.N),
         daysOfWeek: storedDays(item),
         clientRequestId: item.clientRequestId?.S ?? null
     };
@@ -176,11 +190,12 @@ export function reminderItem(userId, reminderId, values, schedule, now) {
         reminderId: { S: reminderId },
         type: { S: values.type },
         enabled: { BOOL: values.enabled },
-        localTime: { S: values.localTime },
         daysOfWeek: { L: values.daysOfWeek.map((day) => ({ S: day })) },
         createdAt: { S: now },
         updatedAt: { S: now }
     };
+    if (values.localTime != null) item.localTime = { S: values.localTime };
+    if (values.offsetMinutes != null) item.offsetMinutes = { N: String(values.offsetMinutes) };
     item.taskId = { S: values.taskId };
     if (values.clientRequestId) item.clientRequestId = { S: values.clientRequestId };
     if (schedule) {
@@ -206,9 +221,10 @@ export function reminderUpdateRequest(tableName, userId, reminderId, patch, sche
     const remove = [];
     for (const [field, value] of Object.entries(patch)) {
         names[`#${field}`] = field;
+        if (value === null) { remove.push(`#${field}`); continue; }
         values[`:${field}`] = Array.isArray(value)
             ? { L: value.map((day) => ({ S: day })) }
-            : typeof value === "boolean" ? { BOOL: value } : { S: value };
+            : typeof value === "boolean" ? { BOOL: value } : typeof value === "number" ? { N: String(value) } : { S: value };
         set.push(`#${field} = :${field}`);
     }
     for (const field of ["nextDueAt", "GSI1PK", "GSI1SK"]) {

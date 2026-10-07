@@ -1,5 +1,5 @@
 import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
-import { notificationSchedule } from "/opt/nodejs/scheduling.mjs";
+import { taskReminderSchedule } from "/opt/nodejs/planning.mjs";
 import {
     ReminderError,
     assertTaskCanReceiveReminder,
@@ -7,7 +7,8 @@ import {
     reminderUpdateRequest,
     reminderValuesFromItem,
     validReminderId,
-    validateReminderPatch
+    validateReminderPatch,
+    validateReminderTiming
 } from "./logic.mjs";
 import {
     authSubject,
@@ -54,29 +55,29 @@ export const handler = async (event) => {
         if (!existing) return notFound("REMINDER_NOT_FOUND", "Reminder not found.");
 
         const values = { ...reminderValuesFromItem(existing), ...patch };
-        if (values.type !== "TASK") {
+        if (!["TASK", "TASK_DUE"].includes(values.type)) {
             return conflict("INVALID_REMINDER_TYPE", "Only TASK reminder records are supported.");
         }
         const task = await getItem({ PK: { S: userPk }, SK: { S: `TASK#${values.taskId}` } });
         assertTaskCanReceiveReminder(task);
+        if (values.enabled) validateReminderTiming(values, task);
         const timeZone = profile.timeZone?.S ?? "UTC";
         const now = new Date();
-        const schedule = notificationSchedule({
-            enabled: values.enabled,
-            timeZone,
-            localTime: values.localTime,
-            daysOfWeek: values.daysOfWeek,
-            identifier: `${userId}#${reminderId}`
-        }, now);
+        const schedule = taskReminderSchedule(values, task, timeZone, `${userId}#${reminderId}`, now);
 
-        const result = await client.send(new UpdateItemCommand(reminderUpdateRequest(
+        const request = reminderUpdateRequest(
             TABLE_NAME,
             userId,
             reminderId,
             patch,
             schedule,
             now.toISOString()
-        )));
+        );
+        if (existing.updatedAt) {
+            request.ConditionExpression += " AND #updatedAt = :expectedUpdatedAt";
+            request.ExpressionAttributeValues[":expectedUpdatedAt"] = existing.updatedAt;
+        }
+        const result = await client.send(new UpdateItemCommand(request));
         return response(200, {
             timeZone,
             reminder: reminderResponse(result.Attributes)
@@ -84,7 +85,7 @@ export const handler = async (event) => {
     } catch (error) {
         if (error instanceof ReminderError) return errorResponse(error.statusCode, error.code, error.message);
         if (error.name === "ConditionalCheckFailedException") {
-            return notFound("REMINDER_NOT_FOUND", "Reminder not found.");
+            return conflict("REMINDER_CHANGED", "Reminder changed. Reload and try again.");
         }
         return internalServerError("Update reminder failed", error);
     }

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
-import { notificationSchedule } from "/opt/nodejs/scheduling.mjs";
+import { taskReminderSchedule } from "/opt/nodejs/planning.mjs";
 import {
     ReminderError,
     assertTaskCanReceiveReminder,
@@ -8,7 +8,8 @@ import {
     reminderItem,
     reminderPutRequest,
     reminderResponse,
-    validateReminderCreate
+    validateReminderCreate,
+    validateReminderTiming
 } from "./logic.mjs";
 import {
     authSubject,
@@ -17,7 +18,6 @@ import {
     handleApiError,
     internalServerError,
     jsonResponse as response,
-    notFound,
     parseJsonBody,
     requireActivePlayer,
     unauthorized
@@ -71,15 +71,10 @@ export const handler = async (event) => {
             });
         }
         assertTaskCanReceiveReminder(task);
+        validateReminderTiming(values, task);
 
         const now = new Date();
-        const schedule = notificationSchedule({
-            enabled: values.enabled,
-            timeZone,
-            localTime: values.localTime,
-            daysOfWeek: values.daysOfWeek,
-            identifier: `${userId}#${reminderId}`
-        }, now);
+        const schedule = taskReminderSchedule({ ...values, createdAt: now.toISOString() }, task, timeZone, `${userId}#${reminderId}`, now);
         const item = reminderItem(userId, reminderId, values, schedule, now.toISOString());
         await client.send(new PutItemCommand(reminderPutRequest(TABLE_NAME, item)));
         return response(201, {

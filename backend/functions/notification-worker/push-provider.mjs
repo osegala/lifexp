@@ -10,17 +10,18 @@ export function createExpoProvider({
 } = {}) {
     return {
         mode,
-        async send({ token, title, body, data }) {
+        async send({ token, title, body, data, sound = true }) {
             if (mode !== "LIVE") return { status: "PREPARED", errorCode: null };
 
             try {
                 const response = await fetchImpl(EXPO_URL, {
                     method: "POST",
+                    signal: AbortSignal.timeout(5000),
                     headers: {
                         "Content-Type": "application/json",
                         Accept: "application/json"
                     },
-                    body: JSON.stringify({ to: token, title, body, data })
+                    body: JSON.stringify({ to: token, title, body, data, sound: sound ? "default" : null })
                 });
                 if (!response.ok) return { status: "FAILED", errorCode: `HTTP_${response.status}` };
                 const result = await response.json();

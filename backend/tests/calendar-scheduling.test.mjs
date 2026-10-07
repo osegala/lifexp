@@ -8,6 +8,7 @@ import * as rules from "../layers/api-shared/nodejs/task-rules.mjs";
 import * as input from "../layers/api-shared/nodejs/task-input.mjs";
 import * as rewards from "../layers/api-shared/nodejs/task-rewards.mjs";
 import * as http from "../layers/api-shared/nodejs/http.mjs";
+import * as wakeups from "../layers/api-shared/nodejs/notification-wakeup.mjs";
 import { planCompletion } from "../layers/api-shared/nodejs/task-completion.mjs";
 import { levelInfo } from "../layers/api-shared/nodejs/leveling.mjs";
 import * as archive from "../functions/delete-task/logic.mjs";
@@ -136,7 +137,7 @@ function apiFixture() {
     async send(command) {
       const request = command.input;
       if (command instanceof GetItemCommand) return { Item: structuredClone(items.get(request.Key.SK.S)) };
-      if (command instanceof QueryCommand) return { Items: structuredClone([...items.values()].filter(item => item.SK.S.startsWith("TASK#"))) };
+      if (command instanceof QueryCommand) return { Items: structuredClone([...items.values()].filter(item => item.SK.S.startsWith(request.ExpressionAttributeValues[":prefix"]?.S ?? "TASK#"))) };
       writes.push(request);
       if (command instanceof PutItemCommand) { items.set(request.Item.SK.S, structuredClone(request.Item)); return {}; }
       assert.ok(command instanceof UpdateItemCommand);
@@ -161,6 +162,7 @@ function apiFixture() {
     const imports = { "node:crypto": { randomUUID }, "@aws-sdk/client-dynamodb": sdk, "./logic.mjs": archive,
       "/opt/nodejs/http.mjs": http, "/opt/nodejs/task-input.mjs": input, "/opt/nodejs/task-rewards.mjs": rewards,
       "/opt/nodejs/dates.mjs": dates, "/opt/nodejs/task-schedule.mjs": schedule, "/opt/nodejs/task-rules.mjs": rules };
+    imports["/opt/nodejs/notification-wakeup.mjs"] = wakeups;
     const source = readFileSync(new URL(`../functions/${name}/index.mjs`, import.meta.url), "utf8")
       .replace(/import\s*\{([^}]+)\}\s*from\s*"([^"]+)";/g, (_, members, path) => `const {${members.replace(/\bas\b/g, ":")}} = imports[${JSON.stringify(path)}];`)
       .replace("export const handler", "const handler");

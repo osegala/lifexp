@@ -61,7 +61,7 @@ test("frontend contains no legacy users, social, subscription-dev, weekly-quest,
 test("task screen uses the SAM task methods and server-owned completion contract", () => {
   const tasks = read("app/(tabs)/tasks.tsx");
   assert.match(tasks, /api\.get<TasksResponse>\(apiRoutes\.tasks\)/);
-  assert.match(tasks, /api\.post\(apiRoutes\.tasks,/);
+  assert.match(tasks, /api\.post<Task>\(apiRoutes\.tasks,/);
   assert.match(tasks, /api\.post<CompletionResponse>\(apiRoutes\.completeTask\(task\.taskId\), \{\}\)/);
   assert.match(tasks, /api\.delete\(apiRoutes\.task\(task\.taskId\)\)/);
   assert.doesNotMatch(tasks, /dueDate|scheduledTime|repeatEndsAt|xpReward\s*:|coinReward\s*:/);

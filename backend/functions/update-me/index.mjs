@@ -1,4 +1,5 @@
-import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, UpdateItemCommand, QueryCommand, TransactWriteItemsCommand } from "@aws-sdk/client-dynamodb";
+import { notificationWakeups } from "/opt/nodejs/notification-wakeup.mjs";
 import { ProfilePatchError, validateProfilePatch } from "./logic.mjs";
 import {
     APPEARANCE_VALUES,
@@ -7,6 +8,7 @@ import {
 import {
     authSubject,
     badRequest,
+    conflict,
     handleApiError,
     internalServerError,
     jsonResponse as response,
@@ -47,7 +49,7 @@ export const handler = async (event) => {
             values[`:${field}`] = { S: value };
             assignments.push(`#${field} = :${field}`);
         }
-        const result = await client.send(new UpdateItemCommand({
+        const request = {
             TableName: TABLE_NAME,
             Key: { PK: { S: `USER#${userId}` }, SK: { S: "PROFILE" } },
             UpdateExpression: `SET ${assignments.join(", ")}`,
@@ -55,7 +57,18 @@ export const handler = async (event) => {
             ExpressionAttributeNames: names,
             ExpressionAttributeValues: values,
             ReturnValues: "ALL_NEW"
-        }));
+        };
+        let result;
+        if ("timeZone" in patch) {
+            const wakeups = await notificationWakeups(client, QueryCommand, TABLE_NAME, `USER#${userId}`, values[":updatedAt"].S);
+            const preferences = (await client.send(new GetItemCommand({ TableName: TABLE_NAME, Key: { PK: request.Key.PK, SK: { S: "PREFERENCES" } }, ConsistentRead: true }))).Item;
+            if (preferences?.GSI1PK) wakeups.push({ Update: { TableName: TABLE_NAME, Key: { PK: preferences.PK, SK: preferences.SK },
+                UpdateExpression: "SET GSI1SK = :sort", ConditionExpression: "#updated = :updated",
+                ExpressionAttributeNames: { "#updated": "updatedAt" }, ExpressionAttributeValues: { ":updated": preferences.updatedAt, ":sort": { S: `${values[":updatedAt"].S}#PREFERENCES` } } } });
+            const { ReturnValues: _returnValues, ...update } = request;
+            await client.send(new TransactWriteItemsCommand({ TransactItems: [{ Update: update }, ...wakeups] }));
+            result = { Attributes: (await client.send(new GetItemCommand({ TableName: TABLE_NAME, Key: request.Key, ConsistentRead: true }))).Item };
+        } else result = await client.send(new UpdateItemCommand(request));
 
         const appearance = normalizeAppearance(result.Attributes);
         return response(200, {
@@ -66,6 +79,7 @@ export const handler = async (event) => {
             updatedAt: result.Attributes?.updatedAt?.S ?? values[":updatedAt"].S
         });
     } catch (error) {
+        if (error.name === "TransactionCanceledException") return conflict("PROFILE_CHANGED", "Profile or reminders changed. Reload and try again.");
         if (error.name === "ConditionalCheckFailedException") {
             return notFound("PROFILE_NOT_FOUND", "Player profile not found.");
         }

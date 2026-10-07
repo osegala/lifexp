@@ -60,7 +60,7 @@ Every `EXPO_PUBLIC_` value is embedded in the client bundle and readable by app 
 
 The EAS `development` profile is an internal development-client build and contains the approved DEV public configuration. The `preview` profile also selects `dev` and may source its API URL from its EAS environment. The `production` profile contains only the approved public production identifiers and selects `prod`. Building, publishing, submitting, or updating production requires separate approval.
 
-No Expo device-token registration currently exists in the frontend. It may later register devices through the production `/devices` API, but production notification delivery remains `DRY_RUN`. Enabling actual push delivery requires a separate approved backend change.
+Profile now exposes notification preferences; TaskEditor exposes occurrence reminders. Native Expo device registration reuses `/devices`, with permission requested only after an explicit notification/reminder action. Web can save preferences/reminders without requesting push permission. Delivery remains `DRY_RUN`; enabling real delivery requires separate approval. See [Notifications & Reminders](../NOTIFICATIONS_REMINDERS.md) for behavior, local validation and native-build caveats.
 
 ## Auth and API behavior
 
@@ -72,10 +72,10 @@ Deletion removes the Cognito identity and all user-owned backend records, includ
 
 The active task, goals, achievements, world, shop, inventory, entitlement, and profile screens use the routes in `backend/template.yaml`. Weekly progress is read from `/goals`; rewards are granted by task completion and have no client-side claim action. Premium status is read-only through `/entitlements`, and no development entitlement setter is present.
 
-Social, visiting another player's base, and building-interior customization are hidden or disabled because the SAM backend does not expose those contracts. Those screens make no network requests. Notification preferences, devices, reminders, history, and task editing are supported by SAM but do not yet have frontend screens.
+Social, visiting another player's base, and building-interior customization are hidden or disabled because the SAM backend does not expose those contracts. Those screens make no network requests. Notification preferences and reminder editing use the existing SAM contracts; token registration is contextual and there is no notification-history screen.
 
 Avatar body type is appearance-only state saved locally with SecureStore. It is not part of `PROFILE`, is not sent to Cognito, and is never included in `PATCH /me`; only `displayName` and `timeZone` are editable profile fields in the app. Owned cosmetics and equipped slots come from `/inventory`.
 
 ## Native configuration
 
-The current native configuration uses iOS bundle identifier `com.osegssteam.owen` and Android package `com.osegssteam.owen`. No camera, location, or push-notification permission is requested by the current feature set. Do not change signing credentials as part of local development setup.
+The current native configuration uses iOS bundle identifier `com.osegssteam.owen` and Android package `com.osegssteam.owen`. No camera or location permission is requested. The `expo-notifications` plugin needs a notification-capable native development build; notification permission is never prompted on launch. No signing credentials or EAS profiles were changed.

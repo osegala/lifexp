@@ -1,7 +1,9 @@
 import {
     DynamoDBClient,
     GetItemCommand,
-    UpdateItemCommand
+    UpdateItemCommand,
+    QueryCommand,
+    TransactWriteItemsCommand
 } from "@aws-sdk/client-dynamodb";
 import {
     authSubject,
@@ -18,6 +20,7 @@ import {
 } from "/opt/nodejs/http.mjs";
 import { validateTaskPatch } from "/opt/nodejs/task-input.mjs";
 import { resolveTaskReward, rewardForTaskSize } from "/opt/nodejs/task-rewards.mjs";
+import { notificationWakeups } from "/opt/nodejs/notification-wakeup.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -199,7 +202,7 @@ export const handler = async (event) => {
             removeExpressions.length ? `REMOVE ${removeExpressions.join(", ")}` : ""
         ].filter(Boolean).join(" ");
 
-        const result = await client.send(new UpdateItemCommand({
+        const request = {
             TableName: TABLE_NAME,
             Key: key,
             UpdateExpression: updateExpression,
@@ -207,11 +210,19 @@ export const handler = async (event) => {
             ExpressionAttributeValues: values,
             ConditionExpression: `attribute_exists(PK) AND attribute_exists(SK) AND (attribute_not_exists(#archived) OR #archived = :false) AND ${versionCondition}`,
             ReturnValues: "ALL_NEW"
-        }));
+        };
+        const affectsReminders = ["repeatType", "repeatDays", "startDate", "dueTime", "active"].some(field => field in patch);
+        const wakeups = affectsReminders ? await notificationWakeups(client, QueryCommand, TABLE_NAME, key.PK.S, values[":updatedAt"].S, taskId) : [];
+        let result;
+        if (wakeups.length) {
+            const { ReturnValues: _returnValues, ...update } = request;
+            await client.send(new TransactWriteItemsCommand({ TransactItems: [{ Update: update }, ...wakeups] }));
+            result = { Attributes: (await client.send(new GetItemCommand({ TableName: TABLE_NAME, Key: key, ConsistentRead: true }))).Item };
+        } else result = await client.send(new UpdateItemCommand(request));
 
         return response(200, taskResponse(result.Attributes));
     } catch (error) {
-        if (error.name === "ConditionalCheckFailedException") {
+        if (["ConditionalCheckFailedException", "TransactionCanceledException"].includes(error.name)) {
             return conflict("TASK_CHANGED", "Task changed while saving. Refresh and try again.");
         }
         return internalServerError("Update task failed", error);

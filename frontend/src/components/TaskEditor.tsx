@@ -5,6 +5,8 @@ import { colors, radius, spacing } from "../theme/theme";
 import type { Task, TaskSize, TasksResponse } from "../types";
 import { DAY_NAMES, TASK_SIZE_OPTIONS, WEEKDAYS, type TaskInput } from "../tasks/scheduling";
 import LifeInput from "./LifeInput";
+import { useTaskReminder } from "../notifications/useTaskReminder";
+import { REMINDER_OPTIONS, reminderTiming } from "../notifications/model";
 
 type RepeatChoice = Task["repeatType"] | "CUSTOM";
 const REPEAT_OPTIONS: { value: RepeatChoice; label: string }[] = [
@@ -13,12 +15,13 @@ const REPEAT_OPTIONS: { value: RepeatChoice; label: string }[] = [
   { value: "CUSTOM", label: "Custom weekdays" },
 ];
 
-export default function TaskEditor({ task, time, disabled, onSave, onCancel }: {
+export default function TaskEditor({ task, time, disabled, onSave, onCancel, onReminderNotice }: {
   task?: Task;
   time?: TasksResponse["time"];
   disabled: boolean;
-  onSave: (input: TaskInput) => Promise<void>;
+  onSave: (input: TaskInput, savedTaskId?: string) => Promise<string | void>;
   onCancel?: () => void;
+  onReminderNotice?: (message: string) => void;
 }) {
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
@@ -31,6 +34,8 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel }: {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const savedTaskId = useRef<string | undefined>(task?.taskId);
+  const reminder = useTaskReminder(task?.taskId);
   const locked = disabled || saving;
 
   function selectRepeat(value: RepeatChoice) {
@@ -51,20 +56,32 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel }: {
       || !Number.isFinite(Date.parse(`${date}T00:00:00Z`))
       || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)) return setError("Use a valid date in YYYY-MM-DD format.");
     if (clock && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(clock)) return setError("Use a 24-hour time in HH:mm format.");
+    if (reminder.loading || reminder.error) return setError("Load the saved reminder before saving. Use Retry reminders below.");
+    try { reminderTiming(reminder.choice, reminder.clock, clock); } catch (failure) { return setError((failure as Error).message); }
     savingRef.current = true;
     setSaving(true);
     setError("");
+    let taskSaved = false;
     try {
-      await onSave({ title: title.trim(), description: description.trim() || null, taskSize,
+      const id = await onSave({ title: title.trim(), description: description.trim() || null, taskSize,
         repeatType: repeat === "CUSTOM" ? "WEEKLY" : repeat,
         repeatDays: repeat === "WEEKLY" || repeat === "CUSTOM" ? WEEKDAYS.filter(day => days.includes(day)) : [],
-        startDate: date || null, dueTime: clock || null });
+        startDate: date || null, dueTime: clock || null }, savedTaskId.current);
+      savedTaskId.current = id || savedTaskId.current;
+      taskSaved = true;
+      if (savedTaskId.current) {
+        const message = await reminder.save(savedTaskId.current, clock);
+        // Keep permission status visible when the edit form closes after saving.
+        if (task && message) onReminderNotice?.(message);
+      }
+      if (task) onCancel?.();
       if (!task) {
         setTitle(""); setDescription(""); setTaskSize("NORMAL"); setRepeat("NONE");
         setDays([]); setStartDate(""); setDueTime(""); setScheduleOpen(false);
+        savedTaskId.current = undefined; reminder.reset();
       }
     } catch (failure) {
-      setError(apiError(failure, "Could not save the task. Your changes are still here.").message);
+      setError(taskSaved ? "The task was saved, but its reminder could not be saved. Retry; this will not create another task." : apiError(failure, "Could not save the task. Your changes are still here.").message);
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -107,8 +124,21 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel }: {
     <Text style={styles.label}>Due time (optional) · HH:mm</Text>
     <LifeInput accessibilityLabel="Due time, 24-hour HH:mm, optional" placeholder="09:00" value={dueTime} onChangeText={setDueTime}
       autoCapitalize="none" autoCorrect={false} maxLength={5} editable={!locked} />
-    <Text style={styles.hint}>Times use {time?.timeZone ?? "your profile timezone"}. Complete anytime on a scheduled day; no reminder is sent.</Text>
+    <Text style={styles.hint}>Times use {time?.timeZone ?? "your profile timezone"}. Complete anytime on a scheduled day.</Text>
+    <Text style={styles.label}>Reminder</Text>
+    <View style={styles.options}>{REMINDER_OPTIONS.map(option => <Pressable key={option.value} accessibilityRole="button"
+      accessibilityLabel={`Reminder: ${option.label}`} accessibilityState={{ selected: reminder.choice === option.value, disabled: locked || reminder.loading || !!reminder.error }}
+      disabled={locked || reminder.loading || !!reminder.error} onPress={() => reminder.setChoice(option.value)} style={[styles.chip, reminder.choice === option.value && styles.selected]}>
+      <Text style={[styles.chipText, reminder.choice === option.value && styles.selectedText]}>{option.label}</Text>
+    </Pressable>)}</View>
+    {reminder.choice === "CUSTOM" && <><Text style={styles.label}>Reminder time · HH:mm</Text>
+      <LifeInput accessibilityLabel="Reminder time, 24-hour HH:mm" value={reminder.clock} onChangeText={reminder.setClock} placeholder="08:45" maxLength={5} editable={!locked} /></>}
+    <Text style={styles.hint}>Offsets follow the due time and repeat schedule. Without a due time, choose an explicit time. Quiet hours suppress reminders; they are not delayed. Notifications also require enabled preferences and device permission.</Text>
     </>}
+    {reminder.loading && <Text style={styles.hint}>Loading saved reminder…</Text>}
+    {!!reminder.error && <><Text accessibilityRole="alert" style={styles.error}>{reminder.error}</Text>
+      <Pressable accessibilityRole="button" onPress={reminder.retry} style={styles.chip}><Text style={styles.chipText}>Retry reminders</Text></Pressable></>}
+    {!!reminder.notice && <Text accessibilityLiveRegion="polite" style={styles.hint}>{reminder.notice}</Text>}
     {task && <Text style={styles.hint}>Changing the schedule starts a new task streak. Past completions and your best streak stay saved.</Text>}
     {!!error && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: locked, busy: saving }} disabled={locked} onPress={() => void save()}

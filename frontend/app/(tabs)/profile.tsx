@@ -5,6 +5,7 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { useAuth } from "../../src/context/AuthContext";
 import LifeCard from "../../src/components/LifeCard";
+import NotificationSettings from "../../src/components/NotificationSettings";
 import LifeButton from "../../src/components/LifeButton";
 import XPBar from "../../src/components/XPBar";
 import { colors, spacing } from "../../src/theme/theme";
@@ -12,6 +13,7 @@ import LifeInput from "../../src/components/LifeInput";
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
 import { clearLocalAccountData } from "../../src/storage/localAccountData";
+import { disableCurrentDevice } from "../../src/notifications/device";
 
 export default function ProfileScreen() {
   const { user, logout, clearDeletedAccountSession, refreshUser } = useAuth();
@@ -58,7 +60,7 @@ export default function ProfileScreen() {
       await logout();
       router.replace({ pathname: "/login" });
     } catch {
-      Alert.alert("Could not sign out", "Your saved sign-in couldn't be removed. Please try again.");
+      Alert.alert("Could not sign out", "We could not disable device notifications or clear your sign-in. Reconnect and try again.");
     } finally {
       setLoggingOut(false);
     }
@@ -69,6 +71,7 @@ export default function ProfileScreen() {
     deletionPending.current = true;
     setDeletingAccount(true);
     try {
+      await disableCurrentDevice();
       await api.delete(apiRoutes.me);
       await Promise.allSettled([
         clearLocalAccountData(user?.id),
@@ -169,6 +172,8 @@ export default function ProfileScreen() {
 
         <LifeButton title={saving ? "Saving…" : "Save settings"} onPress={saveProfile} disabled={saving || !displayName.trim() || !timeZone.trim()} />
       </LifeCard>
+
+      <NotificationSettings timeZone={user?.timeZone ?? "UTC"} />
 
       <LifeButton title={loggingOut ? "Signing out…" : "Logout"} variant="danger" onPress={handleLogout} disabled={loggingOut} />
 

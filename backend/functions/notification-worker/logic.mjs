@@ -88,7 +88,7 @@ export function claimRequest(tableName, indexItem, claimedAt) {
         TableName: tableName,
         Key: { PK: indexItem.PK, SK: indexItem.SK },
         UpdateExpression: "SET #deliveryClaimKey = :dueKey, #deliveryClaimedAt = :claimedAt",
-        ConditionExpression: "#dueSort = :dueKey AND (attribute_not_exists(#deliveryClaimKey) OR #deliveryClaimKey <> :dueKey)",
+        ConditionExpression: "#dueSort = :dueKey AND (attribute_not_exists(#deliveryClaimKey) OR #deliveryClaimKey <> :dueKey OR #deliveryClaimedAt < :expired)",
         ExpressionAttributeNames: {
             "#dueSort": "GSI1SK",
             "#deliveryClaimKey": "deliveryClaimKey",
@@ -96,7 +96,8 @@ export function claimRequest(tableName, indexItem, claimedAt) {
         },
         ExpressionAttributeValues: {
             ":dueKey": { S: dueKey },
-            ":claimedAt": { S: claimedAt }
+            ":claimedAt": { S: claimedAt },
+            ":expired": { S: new Date(Date.parse(claimedAt) - 120_000).toISOString() }
         },
         ReturnValues: "ALL_NEW"
     };
@@ -118,6 +119,7 @@ export function advanceRequest(tableName, config, dueKey, schedule, attemptedAt)
     };
     const set = ["#lastDeliveryKey = :dueKey", "#lastAttemptedAt = :attemptedAt"];
     const remove = ["#deliveryClaimKey", "#deliveryClaimedAt"];
+    if (config.updatedAt) { names["#updatedAt"] = "updatedAt"; values[":updatedAt"] = config.updatedAt; }
     if (schedule) {
         values[":nextDueAt"] = { S: schedule.nextDueAt };
         values[":duePartition"] = { S: schedule.GSI1PK };
@@ -130,7 +132,7 @@ export function advanceRequest(tableName, config, dueKey, schedule, attemptedAt)
         TableName: tableName,
         Key: { PK: config.PK, SK: config.SK },
         UpdateExpression: `SET ${set.join(", ")} REMOVE ${remove.join(", ")}`,
-        ConditionExpression: "#dueSort = :dueKey AND #deliveryClaimKey = :dueKey",
+        ConditionExpression: "#dueSort = :dueKey AND #deliveryClaimKey = :dueKey" + (config.updatedAt ? " AND #updatedAt = :updatedAt" : ""),
         ExpressionAttributeNames: names,
         ExpressionAttributeValues: values
     };

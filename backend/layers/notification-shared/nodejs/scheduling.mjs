@@ -73,6 +73,14 @@ function utcCandidates(year, month, day, hour, minute, timeZone) {
         .sort((a, b) => a - b);
 }
 
+// Missing wall times are skipped; a repeated wall time uses its first instant.
+export function localInstant(date, localTime, timeZone) {
+    if (!LOCAL_TIME.test(localTime ?? "")) return null;
+    const [year, month, day] = date.split("-").map(Number);
+    const [hour, minute] = localTime.split(":").map(Number);
+    return utcCandidates(year, month, day, hour, minute, timeZone)[0] ?? null;
+}
+
 export function nextDueAt({ timeZone, localTime, daysOfWeek = [] }, after = new Date()) {
     if (!LOCAL_TIME.test(localTime ?? "")) throw new RangeError("Invalid local time");
     const allowedDays = new Set(daysOfWeek);

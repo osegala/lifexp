@@ -173,7 +173,7 @@ test("one environment-scoped schedule invokes the notification worker with safe 
     assert.doesNotMatch(block, /dynamodb:(?:Scan|DeleteItem)/);
     assert.deepEqual(
         [...block.matchAll(/- dynamodb:([A-Za-z]+)/g)].map((match) => match[1]).sort(),
-        ["GetItem", "PutItem", "Query", "UpdateItem"]
+        ["ConditionCheckItem", "GetItem", "PutItem", "Query", "UpdateItem"]
     );
 });
 
@@ -265,7 +265,7 @@ test("every public API handler receives and imports the canonical API helper lay
         /requireActivePlayer\(event, dynamodb, TABLE_NAME, GetItemCommand, \{ allowMissing: true \}\)/
     );
     assert.doesNotMatch(resourceBlock("CreateProfileFunction"), /ApiSharedLayer/);
-    assert.doesNotMatch(resourceBlock("NotificationWorkerFunction"), /ApiSharedLayer/);
+    assert.match(resourceBlock("NotificationWorkerFunction"), /ApiSharedLayer/); // canonical task dates and global activity streak
 });
 
 test("POST tasks rejects a stale JWT before any task write can run", () => {

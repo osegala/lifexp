@@ -1010,12 +1010,14 @@ Resources:
       Description: Claims due notification configurations and prepares or delivers push attempts.
       Timeout: 30
       Layers:
+        - Ref: ApiSharedLayer
         - Ref: NotificationSharedLayer
       Environment:
         Variables:
           PUSH_DELIVERY_MODE:
             Ref: PushDeliveryMode
           NOTIFICATION_BATCH_SIZE: "25"
+          DAILY_TASK_TARGET: "3"
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -1037,6 +1039,7 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
                 - dynamodb:UpdateItem
+                - dynamodb:ConditionCheckItem
               Resource:
                 Fn::GetAtt:
                   - EvrenthiaDevTable
@@ -1147,6 +1150,7 @@ Resources:
               Action:
                 - dynamodb:GetItem
                 - dynamodb:UpdateItem
+                - dynamodb:Query
               Resource:
                 Fn::GetAtt:
                   - EvrenthiaDevTable
@@ -1663,6 +1667,7 @@ Resources:
               Action:
                 - dynamodb:GetItem
                 - dynamodb:UpdateItem
+                - dynamodb:Query
               Resource:
                 Fn::GetAtt:
                   - EvrenthiaDevTable

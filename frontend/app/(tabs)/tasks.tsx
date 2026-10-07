@@ -28,6 +28,7 @@ export default function TasksScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [completionError, setCompletionError] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [reminderNotice, setReminderNotice] = useState("");
   const loadVersion = useRef(0);
 
   const loadTasks = useCallback(async () => {
@@ -51,11 +52,13 @@ export default function TasksScreen() {
     return () => { clearInterval(timer); subscription.remove(); loadVersion.current++; };
   }, [loadTasks]));
 
-  async function createTask(input: TaskInput) {
+  async function createTask(input: TaskInput, savedTaskId?: string) {
     try {
       setBusy("create");
-      await api.post(apiRoutes.tasks, { ...input, active: true });
+      const response = savedTaskId ? await api.patch<Task>(apiRoutes.task(savedTaskId), input)
+        : await api.post<Task>(apiRoutes.tasks, { ...input, active: true });
       await loadTasks();
+      return response.data.taskId;
     } finally {
       setBusy(null);
     }
@@ -65,8 +68,8 @@ export default function TasksScreen() {
     try {
       setBusy(task.taskId);
       await api.patch(apiRoutes.task(task.taskId), input);
-      setEditing(null);
       await loadTasks();
+      return task.taskId;
     } finally { setBusy(null); }
   }
 
@@ -118,6 +121,7 @@ export default function TasksScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text accessibilityRole="header" style={styles.title}>Tasks</Text>
+      {!!reminderNotice && <Text accessibilityLiveRegion="polite" style={styles.summary}>{reminderNotice}</Text>}
       {!!completionError && <Text accessibilityRole="alert" style={styles.error}>{completionError}</Text>}
       {!!loadError && <View>
         <Text accessibilityRole="alert" style={styles.error}>{loadError}</Text>
@@ -146,7 +150,7 @@ export default function TasksScreen() {
       {tasks.map((task) => (
         <LifeCard compact key={task.taskId} style={[!task.active && styles.inactiveCard, task.completedToday && styles.completedCard]}>
           {editing === task.taskId ? <TaskEditor task={task} time={data?.time} disabled={busy !== null}
-            onSave={input => editTask(task, input)} onCancel={() => setEditing(null)} /> : <>
+            onSave={input => editTask(task, input)} onCancel={() => setEditing(null)} onReminderNotice={setReminderNotice} /> : <>
           <View style={styles.taskRow}>
             <View style={styles.taskCopy}>
               <Text style={styles.taskTitle}>{task.title}</Text>

@@ -1,5 +1,5 @@
 import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
-import { notificationSchedule } from "/opt/nodejs/scheduling.mjs";
+import { preferenceSchedule } from "/opt/nodejs/planning.mjs";
 import {
     PreferenceError,
     preferenceUpdateRequest,
@@ -9,10 +9,10 @@ import {
 import {
     authSubject,
     badRequest,
+    conflict,
     handleApiError,
     internalServerError,
     jsonResponse as response,
-    notFound,
     parseJsonBody,
     requireActivePlayer,
     unauthorized
@@ -45,22 +45,20 @@ export const handler = async (event) => {
 
         const { patch, resolved } = validatePreferencePatch(body, preferencesFromItem(existing.Item));
         const now = new Date();
-        const schedule = notificationSchedule({
-            enabled: resolved.notificationsEnabled && resolved.dailyReminderEnabled,
-            timeZone: profile.timeZone?.S ?? "UTC",
-            localTime: resolved.dailyReminderTime,
-            daysOfWeek: [],
-            identifier: `${userId}#DAILY`
-        }, now);
-        const result = await client.send(new UpdateItemCommand(preferenceUpdateRequest(
+        const schedule = preferenceSchedule(resolved, profile.timeZone?.S ?? "UTC", `${userId}#DAILY`, now);
+        const request = preferenceUpdateRequest(
             TABLE_NAME,
             userId,
             patch,
             schedule,
             now.toISOString()
-        )));
+        );
+        request.ConditionExpression = existing.Item?.updatedAt ? "#updatedAt = :expected" : "attribute_not_exists(#updatedAt)";
+        if (existing.Item?.updatedAt) request.ExpressionAttributeValues[":expected"] = existing.Item.updatedAt;
+        const result = await client.send(new UpdateItemCommand(request));
         return response(200, preferencesFromItem(result.Attributes));
     } catch (error) {
+        if (error.name === "ConditionalCheckFailedException") return conflict("PREFERENCES_CHANGED", "Notification settings changed. Reload and try again.");
         if (error instanceof PreferenceError) {
             const code = error.message.startsWith("dailyReminderTime")
                 ? "INVALID_REMINDER_TIME"

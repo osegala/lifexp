@@ -5,7 +5,6 @@ import {
     handleApiError,
     internalServerError,
     jsonResponse as response,
-    notFound,
     requireActivePlayer,
     unauthorized
 } from "/opt/nodejs/http.mjs";
@@ -25,6 +24,7 @@ async function queryPrefix(pk, prefix) {
             TableName: TABLE_NAME,
             KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
             ExpressionAttributeValues: { ":pk": { S: pk }, ":prefix": { S: prefix } },
+            ConsistentRead: true,
             ExclusiveStartKey
         }));
         items.push(...(result.Items ?? []));
@@ -50,7 +50,7 @@ export const handler = async (event) => {
             queryPrefix(userPk, "REMINDER#"),
             queryPrefix(userPk, "DEVICE#")
         ]);
-        const taskReminders = reminders.filter((reminder) => reminder.type?.S === "TASK");
+        const taskReminders = reminders.filter((reminder) => ["TASK", "TASK_DUE"].includes(reminder.type?.S));
         const taskIds = [...new Set(taskReminders
             .map((reminder) => reminder.taskId?.S)
             .filter(Boolean))];

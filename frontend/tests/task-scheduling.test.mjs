@@ -6,6 +6,7 @@ import ts from "typescript";
 import * as scheduling from "../src/tasks/scheduling.ts";
 import * as theme from "../src/theme/theme.ts";
 import { apiError } from "../src/api/errors.ts";
+import * as reminders from "../src/notifications/model.ts";
 
 const require = createRequire(import.meta.url);
 function load(path, imports) {
@@ -45,6 +46,7 @@ const task = (id, extra = {}) => ({ taskId: id, title: id, description: null, re
 function editor({ initial, save = async () => {} } = {}) {
   const h = hooks(), submissions = [];
   const Editor = load("../src/components/TaskEditor.tsx", { react: h.react, "react-native": native, "../api/client": { apiError },
+    "../notifications/model": reminders, "../notifications/useTaskReminder": { useTaskReminder: () => ({ choice: "NONE", clock: "", save: async () => {}, reset() {} }) },
     "../theme/theme": theme, "../tasks/scheduling": scheduling, "./LifeInput": "Input" });
   const render = () => h.render(() => Editor({ task: initial, time, disabled: false, onSave: async value => { submissions.push(value); await save(value); } }));
   if (!initial) button(render(), "Schedule options").props.onPress();
@@ -170,6 +172,7 @@ test("Tasks creates/edits through existing routes, renders due time, and refresh
   await ui.create().onSave(input);
   assert.deepEqual(ui.calls[0], ["POST", "tasks", { ...input, active: true }]);
   ui.press("Edit Read"); await ui.editor().onSave({ ...input, repeatType: "NONE", repeatDays: [] });
+  ui.editor().onCancel(); // Editor closes only after its reminder save also succeeds.
   assert.equal(ui.calls[1][0], "PATCH"); assert.equal(ui.calls[1][1], "tasks/Read"); assert.equal(ui.editor(), undefined);
   ui.press("Upcoming tasks"); assert.match(text(ui.render()), /Next: 2026-10-06/);
   assert.equal(button(ui.render(), "Complete Read").props.disabled, true);

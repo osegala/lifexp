@@ -9,7 +9,8 @@ import {
 } from "../layers/notification-shared/nodejs/scheduling.mjs";
 import {
     preferenceUpdateRequest,
-    preferencesFromItem
+    preferencesFromItem,
+    DEFAULT_PREFERENCES
 } from "../layers/notification-shared/nodejs/preferences.mjs";
 import {
     disableReminderRequest,
@@ -258,6 +259,7 @@ test("GET preferences and NotificationWorker import the same canonical resolver"
         soundEnabled: { BOOL: false }
     };
     assert.deepEqual(preferencesFromItem(raw), {
+        ...DEFAULT_PREFERENCES,
         notificationsEnabled: true,
         dailyReminderEnabled: true,
         dailyReminderTime: "19:30",

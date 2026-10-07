@@ -2,6 +2,13 @@ export const DEFAULT_PREFERENCES = Object.freeze({
     notificationsEnabled: true,
     dailyReminderEnabled: false,
     dailyReminderTime: null,
+    dailyQuestReminderEnabled: false,
+    dailyQuestReminderTime: "18:00",
+    streakReminderEnabled: false,
+    streakReminderTime: "20:00",
+    quietHoursEnabled: false,
+    quietHoursStart: "22:00",
+    quietHoursEnd: "07:00",
     weeklySummaryEnabled: false,
     taskRemindersEnabled: true,
     soundEnabled: true,
@@ -11,12 +18,16 @@ export const DEFAULT_PREFERENCES = Object.freeze({
 const BOOLEAN_FIELDS = [
     "notificationsEnabled",
     "dailyReminderEnabled",
+    "dailyQuestReminderEnabled",
+    "streakReminderEnabled",
+    "quietHoursEnabled",
     "weeklySummaryEnabled",
     "taskRemindersEnabled",
     "soundEnabled",
     "hapticsEnabled"
 ];
-const ALLOWED_FIELDS = new Set([...BOOLEAN_FIELDS, "dailyReminderTime"]);
+const TIME_FIELDS = ["dailyReminderTime", "dailyQuestReminderTime", "streakReminderTime", "quietHoursStart", "quietHoursEnd"];
+const ALLOWED_FIELDS = new Set([...BOOLEAN_FIELDS, ...TIME_FIELDS]);
 const LOCAL_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 export class PreferenceError extends Error {}
@@ -30,16 +41,14 @@ export function resolvePreferences(stored = {}) {
     for (const field of BOOLEAN_FIELDS) {
         if (typeof stored[field] === "boolean") resolved[field] = stored[field];
     }
-    if (stored.dailyReminderTime === null || validLocalTime(stored.dailyReminderTime)) {
-        resolved.dailyReminderTime = stored.dailyReminderTime;
-    }
+    for (const field of TIME_FIELDS) if (validLocalTime(stored[field]) || (field === "dailyReminderTime" && stored[field] === null)) resolved[field] = stored[field];
     return resolved;
 }
 
 export function preferencesFromItem(item) {
     const stored = {};
     for (const field of BOOLEAN_FIELDS) stored[field] = item?.[field]?.BOOL;
-    stored.dailyReminderTime = item?.dailyReminderTime?.S ?? null;
+    for (const field of TIME_FIELDS) stored[field] = item?.[field]?.S ?? DEFAULT_PREFERENCES[field];
     return {
         ...resolvePreferences(stored),
         nextDueAt: item?.nextDueAt?.S ?? null
@@ -61,17 +70,16 @@ export function validatePreferencePatch(body, current = DEFAULT_PREFERENCES) {
         if (typeof body[field] !== "boolean") throw new PreferenceError(`${field} must be a boolean`);
         patch[field] = body[field];
     }
-    if (Object.hasOwn(body, "dailyReminderTime")) {
-        if (body.dailyReminderTime !== null && !validLocalTime(body.dailyReminderTime)) {
-            throw new PreferenceError("dailyReminderTime must be null or a local time in HH:MM format");
-        }
-        patch.dailyReminderTime = body.dailyReminderTime;
+    for (const field of TIME_FIELDS) if (Object.hasOwn(body, field)) {
+        if (!(field === "dailyReminderTime" && body[field] === null) && !validLocalTime(body[field])) throw new PreferenceError(`${field} must be a local time in HH:MM format`);
+        patch[field] = body[field];
     }
 
     const resolved = { ...resolvePreferences(current), ...patch };
     if (resolved.dailyReminderEnabled && !resolved.dailyReminderTime) {
         throw new PreferenceError("dailyReminderTime is required when dailyReminderEnabled is true");
     }
+    if (resolved.quietHoursEnabled && resolved.quietHoursStart === resolved.quietHoursEnd) throw new PreferenceError("Quiet hours must have different start and end times");
     return { patch, resolved };
 }
 

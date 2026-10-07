@@ -3,6 +3,7 @@ import { AppState, Platform } from "react-native";
 import { api } from "../api/client";
 import { AuthSession } from "../auth/session";
 import { cognitoAuth } from "../auth/cognito";
+import { disableCurrentDevice, enableDeviceNotifications, watchDeviceToken } from "../notifications/device";
 
 function useSessionValue() {
   const [session] = useState(() => new AuthSession(api, cognitoAuth));
@@ -10,6 +11,15 @@ function useSessionValue() {
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
 
   useEffect(() => session.start(), [session]);
+
+  useEffect(() => {
+    if (!snapshot.user?.id) return;
+    let active = true, remove = () => {};
+    void enableDeviceNotifications(false);
+    void watchDeviceToken().then(cleanup => { if (active) remove = cleanup; else cleanup(); });
+    const subscription = AppState.addEventListener("change", state => { if (state === "active") void enableDeviceNotifications(false); });
+    return () => { active = false; remove(); subscription.remove(); };
+  }, [snapshot.user?.id]);
 
   useEffect(() => {
     const retry = () => {
@@ -27,6 +37,10 @@ function useSessionValue() {
   }, [session]);
 
   const triggerDashboardRefresh = useCallback(() => setDashboardRefreshKey(value => value + 1), []);
+  const logout = useCallback(async () => {
+    await disableCurrentDevice();
+    await session.logout();
+  }, [session]);
 
   return useMemo(() => ({
     ...snapshot,
@@ -35,11 +49,11 @@ function useSessionValue() {
     login: session.login,
     register: session.register,
     confirmRegistration: session.confirmRegistration,
-    logout: session.logout,
+    logout,
     clearDeletedAccountSession: session.clearDeletedAccountSession,
     refreshUser: session.refreshUser,
     retrySession: session.retrySession,
-  }), [snapshot, dashboardRefreshKey, triggerDashboardRefresh, session]);
+  }), [snapshot, dashboardRefreshKey, triggerDashboardRefresh, session, logout]);
 }
 
 const AuthContext = createContext<ReturnType<typeof useSessionValue> | undefined>(undefined);
