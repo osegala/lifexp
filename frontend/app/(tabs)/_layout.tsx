@@ -4,6 +4,7 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { colors } from "../../src/theme/theme";
 import { useAuth } from "../../src/context/AuthContext";
 import { CompletionFeedbackProvider } from "../../src/context/CompletionFeedbackContext";
+import { AdProvider } from "../../src/ads/Ads";
 
 export default function TabLayout() {
   const { token, user, loading } = useAuth();
@@ -29,6 +30,7 @@ export default function TabLayout() {
 
   return (
     <CompletionFeedbackProvider key={String(user?.id ?? "loading")}>
+    <AdProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -100,6 +102,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </AdProvider>
     </CompletionFeedbackProvider>
   );
 }

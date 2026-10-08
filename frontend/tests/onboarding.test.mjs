@@ -206,13 +206,14 @@ test("real root guards protect every main route while onboarding is incomplete a
     "react-native-gesture-handler": { GestureHandlerRootView: "Gestures" },
     "react-native-safe-area-context": { SafeAreaProvider: "SafeAreaProvider", SafeAreaView: "SafeAreaView" },
     "../src/context/AuthContext": { AuthProvider: "AuthProvider", useAuth: () => session },
+    "../src/ads/Ads": { AdProvider: "AdProvider" },
     "../src/components/SessionRecovery": "Recovery", "../src/theme/theme": theme, "../src/auth/destination": { authDestination },
   }).default;
   const screens = () => nodes(Root()).filter(n => n.type === "Screen").map(n => n.props.name);
   session = { token: "token", user: { onboardingCompleted: false }, loading: false };
   assert.deepEqual(screens(), ["index", "onboarding"]);
   session.user.onboardingCompleted = true;
-  assert.deepEqual(screens(), ["index", "(tabs)", "base-interior", "social-base", "modal"]);
+  assert.deepEqual(screens(), ["index", "(tabs)", "base-interior", "social-base", "modal", "premium"]);
   session = { token: "token", user: null, sessionError: "offline", loading: false };
   assert.deepEqual(screens(), []); assert.ok(nodes(Root()).some(n => n.type === "Recovery" && n.props.fullScreen));
   session = { token: "token", user: null, loading: true };

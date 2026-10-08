@@ -2,10 +2,7 @@ import {
     DynamoDBClient,
     GetItemCommand
 } from "@aws-sdk/client-dynamodb";
-import {
-    effectiveEntitlement,
-    entitlementFromItem
-} from "./logic.mjs";
+import { readEntitlement } from "/opt/nodejs/entitlements.mjs";
 import {
     authSubject,
     handleApiError,
@@ -30,16 +27,7 @@ export const handler = async (event) => {
     }
 
     try {
-        const result = await client.send(new GetItemCommand({
-            TableName: TABLE_NAME,
-            Key: {
-                PK: { S: `USER#${userId}` },
-                SK: { S: "ENTITLEMENTS" }
-            },
-            ConsistentRead: true
-        }));
-
-        return response(200, effectiveEntitlement(entitlementFromItem(result.Item)));
+        return response(200, await readEntitlement(client, TABLE_NAME, userId, GetItemCommand));
     } catch (error) {
         return internalServerError("Get entitlements failed", error);
     }

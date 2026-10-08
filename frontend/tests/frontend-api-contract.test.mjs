@@ -29,6 +29,9 @@ test("every active frontend network feature maps to an existing SAM route", () =
     ["PATCH", apiRoutes.me],
     ["DELETE", apiRoutes.me],
     ["GET", apiRoutes.entitlements],
+    ["GET", apiRoutes.adReward],
+    ["POST", apiRoutes.adReward],
+    ["POST", apiRoutes.prepareAdReward],
     ["GET", apiRoutes.goals],
     ["GET", apiRoutes.achievements],
     ["GET", apiRoutes.tasks],
@@ -103,7 +106,8 @@ test("weekly progress uses GET goals and has no client claim mutation", () => {
 
 test("shop uses read-only entitlements and the catalog-backed purchase route", () => {
   const shop = read("app/(tabs)/shop.tsx");
-  assert.match(shop, /api\.get<EntitlementResponse>\(apiRoutes\.entitlements\)/);
+  assert.match(shop, /useEntitlements\(\)/);
+  assert.doesNotMatch(shop, /api\.get.*entitlements/);
   assert.match(shop, /api\.post\(apiRoutes\.shopPurchase, \{ itemId: item\.itemId \}\)/);
   assert.doesNotMatch(shop, /dev\/activate|price\s*:/);
 });

@@ -142,6 +142,8 @@ export type ShopItem = {
   requiredLevel: number;
   effectiveRequiredLevel: number;
   requiredAchievement: string | null;
+  requiresPremium?: boolean;
+  premiumRequirementSatisfied?: boolean;
   achievementRequirement: {
     achievementId: string;
     name: string;
@@ -168,8 +170,10 @@ export type ShopResponse = {
 
 export type EntitlementResponse = {
   plan: "FREE" | "PREMIUM";
+  premium: boolean;
   subscriptionStatus: string;
   adsEnabled: boolean;
   expiresAt: string | null;
   autoRenew: boolean;
+  source: "NONE" | "APPLE" | "GOOGLE" | "ADMIN" | "TEST";
 };

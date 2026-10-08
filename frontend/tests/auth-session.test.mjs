@@ -4,6 +4,7 @@ import test from "node:test";
 import axios, { AxiosError } from "axios";
 import { AuthSession, userFromProfile } from "../src/auth/session.ts";
 import { authDestination } from "../src/auth/destination.ts";
+import { FREE_ENTITLEMENTS } from "../src/entitlements/model.ts";
 
 const identity = { token: "saved-id-token", userId: "user-sub-1", email: "hero@example.test" };
 const nextIdentity = { token: "new-id-token", userId: "user-sub-2", email: "second@example.test" };
@@ -17,6 +18,8 @@ const deferred = () => {
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 };
+const premiumEntitlement = { ...FREE_ENTITLEMENTS, plan: "PREMIUM", premium: true, adsEnabled: false,
+  subscriptionStatus: "ACTIVE", expiresAt: "2099-01-01T00:00:00Z", source: "TEST" };
 const response = (config, data) => ({ config, data, status: 200, statusText: "OK", headers: {} });
 const httpError = (config, status, data = {}) => new AxiosError(
   `Request failed: ${status}`,
@@ -83,6 +86,71 @@ function harness(t, { session = identity } = {}) {
   };
   return h;
 }
+
+test("entitlement failure leaves the core profile usable, defaults FREE and hides ads until confirmed", async t => {
+  const h = harness(t); h.entitlement = () => { throw new Error("offline"); };
+  await h.ready();
+  const s = h.authSession.getSnapshot();
+  assert.equal(s.user.id, identity.userId); assert.equal(s.sessionError, null);
+  assert.deepEqual(s.entitlements, FREE_ENTITLEMENTS); assert.equal(s.entitlementsConfirmed, false);
+  assert.equal(s.entitlementsLoading, false); assert.ok(s.entitlementsError); assert.equal(s.user.premiumActive, false);
+  h.entitlement = config => response(config, premiumEntitlement);
+  assert.equal(await h.authSession.refreshEntitlements(), true);
+  assert.equal(h.authSession.getSnapshot().user.premiumActive, true);
+});
+
+test("a pending entitlement request cannot delay the core profile or route", async t => {
+  const h = harness(t), wait = deferred();
+  h.entitlement = config => wait.promise.then(() => response(config, FREE_ENTITLEMENTS));
+  await h.ready();
+  assert.equal(h.authSession.getSnapshot().user.id, identity.userId);
+  assert.equal(h.authSession.getSnapshot().loading, false);
+  assert.equal(h.authSession.getSnapshot().entitlementsLoading, true);
+  assert.equal(h.authSession.getSnapshot().entitlementsConfirmed, false);
+  wait.resolve(); await nextTick();
+  assert.equal(h.authSession.getSnapshot().entitlementsConfirmed, true);
+});
+
+test("loading refreshes are deduplicated and cannot flash a FREE ad over cached Premium", async t => {
+  const h = harness(t); h.entitlement = config => response(config, premiumEntitlement); await h.ready();
+  const wait = deferred(); h.entitlement = config => wait.promise.then(() => response(config, FREE_ENTITLEMENTS));
+  const first = h.authSession.refreshEntitlements(), second = h.authSession.refreshEntitlements();
+  assert.equal(first, second); assert.equal(h.authSession.getSnapshot().entitlementsLoading, true);
+  assert.equal(h.authSession.getSnapshot().entitlements.premium, true);
+  wait.resolve(); assert.equal(await first, true);
+  assert.deepEqual(h.authSession.getSnapshot().entitlements, FREE_ENTITLEMENTS);
+  assert.equal(h.calls.filter(c => c.url === "/entitlements").length, 2);
+});
+
+test("unknown or inconsistent response cannot grant Premium; a failed refresh discards stale privilege", async t => {
+  const h = harness(t); h.entitlement = config => response(config, premiumEntitlement); await h.ready();
+  for (const data of [{ ...premiumEntitlement, subscriptionStatus: "UNKNOWN" }, { ...FREE_ENTITLEMENTS, premium: true }, null]) {
+    h.entitlement = config => response(config, data); assert.equal(await h.authSession.refreshEntitlements(), false);
+    assert.equal(h.authSession.getSnapshot().entitlements.premium, false);
+    assert.equal(h.authSession.getSnapshot().entitlementsConfirmed, false);
+  }
+});
+
+for (const clear of ["logout", "clearDeletedAccountSession"]) {
+  test(`${clear} clears entitlement state and ignores a late Premium response`, async t => {
+    const h = harness(t); h.entitlement = config => response(config, premiumEntitlement); await h.ready();
+    const wait = deferred(); h.entitlement = config => wait.promise.then(() => response(config, premiumEntitlement));
+    const refresh = h.authSession.refreshEntitlements(); await nextTick(); await h.authSession[clear]();
+    wait.resolve(); assert.equal(await refresh, false);
+    assert.deepEqual(h.authSession.getSnapshot().entitlements, FREE_ENTITLEMENTS);
+    assert.equal(h.authSession.getSnapshot().entitlementsConfirmed, false); assert.equal(h.authSession.getSnapshot().user, null);
+  });
+}
+
+test("a late old-account entitlement cannot overwrite a newly authenticated FREE user", async t => {
+  const h = harness(t); await h.ready(); const wait = deferred();
+  h.entitlement = config => config.headers.get("Authorization").includes(identity.token)
+    ? wait.promise.then(() => response(config, premiumEntitlement)) : response(config, FREE_ENTITLEMENTS);
+  const refresh = h.authSession.refreshEntitlements(); await nextTick();
+  await h.authSession.login("second@example.test", "password"); wait.resolve(); await refresh;
+  assert.equal(h.authSession.getSnapshot().user.id, nextIdentity.userId);
+  assert.deepEqual(h.authSession.getSnapshot().entitlements, FREE_ENTITLEMENTS);
+});
 
 test("restores the Cognito session and authenticates profile requests with its ID token", async t => {
   const h = harness(t);

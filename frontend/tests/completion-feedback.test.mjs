@@ -205,6 +205,7 @@ async function dashboard(readGoals) {
     "../../src/api/client": { apiError, api: { get: async route => ({ data: route === "goals" ? await readGoals() : { summary: { earned: 0, total: 0 } } }) } },
     "../../src/api/routes": { apiRoutes: { goals: "goals", achievements: "achievements" } },
     "../../src/components/LifeCard": "LifeCard", "../../src/components/XPBar": "XPBar", "../../src/components/QuestProgress": "Quests",
+    "../../src/ads/Ads": { BannerAdPlacement: "Banner" },
     "../../src/context/AuthContext": { useAuth: () => ({ user: {}, refreshUser: async () => true, dashboardRefreshKey: refreshKey }) },
     "../../src/theme/theme": theme
   });
@@ -420,7 +421,10 @@ test("provider keeps the web live region mounted and coordinates FIFO display/di
   assert.equal(text(announce(first)), "");
   assert.equal(announce(first).props["aria-live"], "polite");
   assert.equal(announce(first).props["aria-atomic"], true);
-  first.props.value(response("one")); first.props.value(response("two"));
+  const celebrate = tree => nodes(tree).find(n => typeof n.props.value === "function").props.value;
+  assert.equal(first.props.value, false, "ads are not suppressed while idle");
+  celebrate(first)(response("one")); celebrate(first)(response("two"));
+  assert.equal(render().props.value, true, "completion feedback suppresses ads");
   buildingContext(first).enqueue({ id: "upgrade", upgrades: buildings.buildingUpgrades(world(1), world(2)) });
   assert.equal(buildingContext(render()).pending, undefined, "building feedback waits for completion feedback");
   assert.equal(current(render()).event.response.task.taskId, "one");
@@ -431,8 +435,10 @@ test("provider keeps the web live region mounted and coordinates FIFO display/di
   assert.equal(current(render()), undefined);
   assert.equal(text(announce(render())), "");
   assert.equal(buildingContext(render()).pending.id, "upgrade", "unconsumed event survives until World focuses");
+  assert.equal(render().props.value, true, "queued building feedback also suppresses ads");
   buildingContext(render()).finish("upgrade");
   assert.equal(buildingContext(render()).pending, undefined);
+  assert.equal(render().props.value, false);
 });
 
 function world(workshopLevel, gardenLevel = 1) {

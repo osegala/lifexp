@@ -1,4 +1,5 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { BannerAdPlacement } from "../../src/ads/Ads";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -129,6 +130,7 @@ export default function DashboardScreen() {
           </View>
         ))}
       </LifeCard>
+      <BannerAdPlacement placement="HOME" />
     </ScrollView>
   );
 }

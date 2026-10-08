@@ -45,6 +45,14 @@ Parameters:
       - LIVE
     Description: Notification delivery mode; DRY_RUN is the safe default for every environment.
 
+  DevRewardedAdsEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "false"
+      - "true"
+    Description: Explicit DEV-only rewarded-ad simulation; production always rejects this adapter.
+
   CognitoDeletionProtection:
     Type: String
     Default: INACTIVE
@@ -201,6 +209,16 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-GetEntitlements"
+      RetentionInDays:
+        Ref: LogRetentionDays
+
+  AdRewardsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-AdRewards"
       RetentionInDays:
         Ref: LogRetentionDays
 
@@ -700,6 +718,62 @@ Resources:
   # ----------------------------------------------------
   # PREFERENCES
   # ----------------------------------------------------
+
+  AdRewardsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-AdRewards"
+      CodeUri: functions/ad-rewards/
+      Handler: index.handler
+      Description: Server-authoritative daily rewarded-ad status, DEV receipt preparation and idempotent coin grants.
+      Layers:
+        - Ref: ApiSharedLayer
+      Environment:
+        Variables:
+          DEV_REWARDED_ADS_ENABLED:
+            Ref: DevRewardedAdsEnabled
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:ConditionCheckItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        RewardStatus:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /ads/reward
+            Method: GET
+            Auth:
+              Authorizer: EvrenthiaCognito
+        RewardClaim:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /ads/reward
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+        PrepareDevReward:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /ads/reward/prepare
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
 
   GetPreferencesFunction:
     Type: AWS::Serverless::Function

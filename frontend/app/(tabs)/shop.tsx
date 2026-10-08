@@ -1,5 +1,5 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -11,24 +11,23 @@ import CosmeticImage from "../../src/components/CosmeticImage";
 import LifeCard from "../../src/components/LifeCard";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme/theme";
-import type { EntitlementResponse, ShopItem, ShopResponse } from "../../src/types";
+import type { ShopItem, ShopResponse } from "../../src/types";
+import { useEntitlements } from "../../src/entitlements/useEntitlements";
+import { BannerAdPlacement, RewardedAdButton } from "../../src/ads/Ads";
+import LifeButton from "../../src/components/LifeButton";
 
 export default function ShopScreen() {
   const { refreshUser } = useAuth();
   const [shop, setShop] = useState<ShopResponse | null>(null);
-  const [entitlement, setEntitlement] = useState<EntitlementResponse | null>(null);
+  const entitlement = useEntitlements();
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const loadShop = useCallback(async () => {
     try {
       setLoading(true);
-      const [shopResponse, entitlementResponse] = await Promise.all([
-        api.get<ShopResponse>(apiRoutes.shop),
-        api.get<EntitlementResponse>(apiRoutes.entitlements),
-      ]);
+      const shopResponse = await api.get<ShopResponse>(apiRoutes.shop);
       setShop(shopResponse.data);
-      setEntitlement(entitlementResponse.data);
       await refreshUser();
     } catch (error) {
       Alert.alert("Shop", apiError(error, "Could not load the shop.").message);
@@ -54,7 +53,7 @@ export default function ShopScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={styles.title}>Shop</Text>
           <Text style={styles.muted}>Catalog prices and unlock requirements are set by Evrenthia.</Text>
         </View>
@@ -67,16 +66,22 @@ export default function ShopScreen() {
       <LifeCard compact>
         <Text style={styles.cardTitle}>Evrenthia Premium</Text>
         <Text style={styles.muted}>
-          {entitlement?.plan === "PREMIUM"
-            ? `Premium ${entitlement.subscriptionStatus.toLowerCase()}`
+          {entitlement.loading ? "Checking your plan…" : entitlement.premium
+            ? "Premium · Ad-free"
             : "Premium purchasing is not available in this app version."}
         </Text>
+        <LifeButton title="View Premium" variant="secondary" onPress={() => router.push("/premium")} />
       </LifeCard>
 
       {loading && !shop ? <ActivityIndicator color={colors.primary} /> : null}
       {(shop?.items ?? []).map((item) => (
         <ShopItemRow key={item.itemId} item={item} busy={busyId === item.itemId} onPurchase={() => void purchase(item)} />
       ))}
+      <BannerAdPlacement placement="SHOP" />
+      <RewardedAdButton onReward={result => {
+        setShop(current => current ? { ...current, player: { ...current.player, coins: result.coins } } : current);
+        void refreshUser();
+      }} />
     </ScrollView>
   );
 }
@@ -112,14 +117,15 @@ function ShopItemRow({ item, busy, onPurchase }: { item: ShopItem; busy: boolean
         {locked ? (
           <>
             <Text style={styles.lockedText}>Locked</Text>
+            {item.requiresPremium && !item.premiumRequirementSatisfied ? <Text style={styles.muted}>Evrenthia Premium required</Text> : null}
             {requirement ? (
               <>
                 <Text style={styles.muted}>Complete &quot;{requirement.name}&quot;</Text>
                 <Text style={styles.muted}>{requirement.currentValue} / {requirement.requiredValue} {progressUnit}</Text>
               </>
-            ) : (
+            ) : !item.requiresPremium || item.premiumRequirementSatisfied ? (
               <Text style={styles.muted}>Reach level {item.effectiveRequiredLevel}</Text>
-            )}
+            ) : null}
           </>
         ) : (
           <>
@@ -133,7 +139,7 @@ function ShopItemRow({ item, busy, onPurchase }: { item: ShopItem; busy: boolean
           <Text style={styles.statusText}>{label}</Text>
         </View>
       ) : (
-        <Pressable onPress={onPurchase} disabled={!item.canPurchase || busy} style={[styles.buyButton, (!item.canPurchase || busy) && styles.disabled]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${item.name}`} accessibilityState={{ disabled: !item.canPurchase || busy }} onPress={onPurchase} disabled={!item.canPurchase || busy} style={[styles.buyButton, (!item.canPurchase || busy) && styles.disabled]}>
           <Text style={styles.buyText}>{label}</Text>
         </Pressable>
       )}
@@ -145,15 +151,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.md },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md },
+  headerCopy: { flex: 1 },
   title: { color: colors.text, fontSize: 30, fontWeight: "700" },
   muted: { color: colors.mutedText, marginTop: 3 },
   coinBadge: { flexDirection: "row", gap: spacing.xs, alignItems: "center", backgroundColor: colors.card, borderRadius: radius.pill, padding: spacing.sm },
   coinText: { color: colors.text, fontWeight: "800" },
   cardTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  item: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  item: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.md },
   preview: { width: 72, height: 72, alignItems: "center", justifyContent: "center", backgroundColor: colors.cardLight, borderRadius: radius.md, overflow: "hidden" },
   image: { width: 68, height: 68 },
-  itemCopy: { flex: 1 },
+  itemCopy: { flex: 1, minWidth: 100 },
   itemName: { color: colors.text, fontSize: 17, fontWeight: "700" },
   lockedText: { color: colors.danger, fontWeight: "800", marginTop: 3 },
   buyButton: { minWidth: 82, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.primary },

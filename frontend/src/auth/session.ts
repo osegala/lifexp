@@ -1,6 +1,7 @@
 import { isAxiosError, isCancel } from "axios";
 import type { AxiosInstance, InternalAxiosRequestConfig } from "axios";
-import type { User } from "../types";
+import type { EntitlementResponse, User } from "../types";
+import { FREE_ENTITLEMENTS, isPremium, normalizeEntitlements } from "../entitlements/model.ts";
 import type { CognitoAuth, CognitoIdentity, RegistrationStep } from "./cognito";
 
 type SessionState = {
@@ -9,6 +10,10 @@ type SessionState = {
   loading: boolean;
   sessionError: string | null;
   sessionNotice: string | null;
+  entitlements: EntitlementResponse;
+  entitlementsLoading: boolean;
+  entitlementsConfirmed: boolean;
+  entitlementsError: string | null;
 };
 
 type ProfileResponse = {
@@ -23,10 +28,11 @@ type ProfileResponse = {
   coins: number;
 };
 
-type EntitlementResponse = { plan?: string; subscriptionStatus?: string };
 type ApiErrorResponse = { error?: { code?: string } };
 type SessionRequest = InternalAxiosRequestConfig & { sessionRevision?: number };
 const AUTH_TIMEOUT = 15_000;
+const emptyEntitlements = () => ({ entitlements: FREE_ENTITLEMENTS, entitlementsLoading: false,
+  entitlementsConfirmed: false, entitlementsError: null });
 
 function isAccountNotFound(error: unknown) {
   return isAxiosError<ApiErrorResponse>(error)
@@ -37,7 +43,7 @@ function isAccountNotFound(error: unknown) {
 export function userFromProfile(
   profile: ProfileResponse,
   identity: CognitoIdentity,
-  entitlement: EntitlementResponse = {},
+  entitlement: Partial<EntitlementResponse> = FREE_ENTITLEMENTS,
 ): User {
   if (typeof profile.onboardingCompleted !== "boolean") {
     throw new Error("The server did not return onboarding status.");
@@ -59,7 +65,7 @@ export function userFromProfile(
     currentStreak: 0,
     longestStreak: 0,
     coins: profile.coins,
-    premiumActive: entitlement.plan === "PREMIUM" && entitlement.subscriptionStatus !== "EXPIRED",
+    premiumActive: isPremium(normalizeEntitlements(entitlement)),
   };
 }
 
@@ -67,10 +73,12 @@ export function userFromProfile(
 export class AuthSession {
   private state: SessionState = {
     token: null, user: null, loading: true, sessionError: null, sessionNotice: null,
+    ...emptyEntitlements(),
   };
   private revision = 0;
   private listeners = new Set<() => void>();
   private refresh: { revision: number; promise: Promise<boolean> } | null = null;
+  private entitlementRefresh: { revision: number; promise: Promise<boolean> } | null = null;
   private signOutPending: Promise<void> = Promise.resolve();
   private client: AxiosInstance;
   private auth: CognitoAuth;
@@ -136,6 +144,7 @@ export class AuthSession {
     this.update({
       token: null, user: null, loading: false, sessionError: null,
       sessionNotice: notice,
+      ...emptyEntitlements(),
     });
     void this.signOutFromCognito().catch(() => {});
   }
@@ -147,10 +156,10 @@ export class AuthSession {
       const identity = await this.auth.getSession();
       if (revision !== this.revision) return false;
       if (!identity) {
-        this.update({ token: null, user: null });
+        this.update({ token: null, user: null, ...emptyEntitlements() });
         return false;
       }
-      this.update({ token: identity.token, user: null });
+      this.update({ token: identity.token, user: null, ...emptyEntitlements() });
       return await this.fetchUser(revision, identity);
     } catch {
       if (revision === this.revision) {
@@ -195,13 +204,12 @@ export class AuthSession {
 
   private async fetchUser(revision: number, identity: CognitoIdentity) {
     try {
-      const [profile, entitlement] = await Promise.all([
-        this.client.get<ProfileResponse>("/me", { timeout: AUTH_TIMEOUT }),
-        this.client.get<EntitlementResponse>("/entitlements", { timeout: AUTH_TIMEOUT }),
-      ]);
+      // Plan availability must not hold up the core profile or onboarding route.
+      void this.loadEntitlements(revision);
+      const profile = await this.client.get<ProfileResponse>("/me", { timeout: AUTH_TIMEOUT });
       if (revision !== this.revision) return false;
       this.update({
-        user: userFromProfile(profile.data, identity, entitlement.data),
+        user: userFromProfile(profile.data, identity, this.state.entitlements),
         sessionError: null,
         sessionNotice: null,
       });
@@ -217,6 +225,33 @@ export class AuthSession {
     }
   }
 
+  refreshEntitlements = () => this.state.token ? this.loadEntitlements(this.revision) : Promise.resolve(false);
+
+  private loadEntitlements(revision: number): Promise<boolean> {
+    if (this.entitlementRefresh?.revision === revision) return this.entitlementRefresh.promise;
+    this.update({ entitlementsLoading: true, entitlementsError: null });
+    const promise = (async () => {
+      try {
+        const response = await this.client.get("/entitlements", { timeout: AUTH_TIMEOUT });
+        if (revision !== this.revision) return false;
+        const entitlements = normalizeEntitlements(response.data);
+        this.update({ entitlements, entitlementsConfirmed: true,
+          user: this.state.user ? { ...this.state.user, premiumActive: isPremium(entitlements) } : null });
+        return true;
+      } catch {
+        if (revision === this.revision) this.update({ ...emptyEntitlements(), entitlementsLoading: true,
+          entitlementsError: "Could not check your plan. Your core features remain available.",
+          user: this.state.user ? { ...this.state.user, premiumActive: false } : null });
+        return false;
+      } finally {
+        if (revision === this.revision) this.update({ entitlementsLoading: false });
+      }
+    })();
+    this.entitlementRefresh = { revision, promise };
+    void promise.finally(() => { if (this.entitlementRefresh?.promise === promise) this.entitlementRefresh = null; });
+    return promise;
+  }
+
   login = async (email: string, password: string) => {
     await this.signOutPending;
     const expectedRevision = this.revision;
@@ -228,7 +263,7 @@ export class AuthSession {
     const revision = ++this.revision;
     this.update({
       token: identity.token, user: null, loading: true,
-      sessionError: null, sessionNotice: null,
+      sessionError: null, sessionNotice: null, ...emptyEntitlements(),
     });
     try {
       if (!await this.fetchUser(revision, identity)) {
@@ -254,7 +289,7 @@ export class AuthSession {
   logout = async () => {
     await this.signOutFromCognito();
     this.revision++;
-    this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null });
+    this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null, ...emptyEntitlements() });
   };
 
   clearDeletedAccountSession = async () => {
@@ -265,7 +300,7 @@ export class AuthSession {
     }
     this.revision++;
     this.refresh = null;
-    this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null });
+    this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null, ...emptyEntitlements() });
   };
 
   retrySession = () => this.state.token ? this.refreshUser() : this.restore();

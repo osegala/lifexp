@@ -43,6 +43,7 @@ function SessionNavigator() {
           <Stack.Screen name="base-interior" />
           <Stack.Screen name="social-base" />
           <Stack.Screen name="modal" />
+          <Stack.Screen name="premium" />
         </Stack.Protected>
         <Stack.Protected guard={!token}>
           <Stack.Screen name="login" />

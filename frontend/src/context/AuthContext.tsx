@@ -52,6 +52,7 @@ function useSessionValue() {
     logout,
     clearDeletedAccountSession: session.clearDeletedAccountSession,
     refreshUser: session.refreshUser,
+    refreshEntitlements: session.refreshEntitlements,
     retrySession: session.retrySession,
   }), [snapshot, dashboardRefreshKey, triggerDashboardRefresh, session, logout]);
 }

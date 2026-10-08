@@ -4,7 +4,6 @@ import {
     authSubject,
     errorResponse,
     handleApiError,
-    internalServerError,
     jsonResponse as response,
     parseJsonBody,
     requireActivePlayer,
@@ -69,6 +68,6 @@ export const handler = async (event) => {
             equipment: readEquipment(result.Attributes)
         });
     } catch (error) {
-        return internalServerError("Equip item failed", error);
+        return handleApiError(error, "Equip item failed");
     }
 };

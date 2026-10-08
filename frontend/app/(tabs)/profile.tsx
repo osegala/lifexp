@@ -14,9 +14,11 @@ import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
 import { clearLocalAccountData } from "../../src/storage/localAccountData";
 import { disableCurrentDevice } from "../../src/notifications/device";
+import { useEntitlements } from "../../src/entitlements/useEntitlements";
 
 export default function ProfileScreen() {
   const { user, logout, clearDeletedAccountSession, refreshUser } = useAuth();
+  const entitlement = useEntitlements();
   const [loggingOut, setLoggingOut] = useState(false);
   const [displayName, setDisplayName] = useState(user?.username ?? "");
   const [timeZone, setTimeZone] = useState(user?.timeZone ?? "UTC");
@@ -174,6 +176,13 @@ export default function ProfileScreen() {
       </LifeCard>
 
       <NotificationSettings timeZone={user?.timeZone ?? "UTC"} />
+
+      <LifeCard>
+        <Text accessibilityRole="header" style={styles.cardTitle}>{entitlement.loading ? "Checking plan…" : entitlement.premium ? "Premium" : "Free Plan"}</Text>
+        <Text style={styles.helper}>{entitlement.premium ? "Ad-free" : "Your core productivity features are included."}</Text>
+        {!!entitlement.error && <Text accessibilityRole="alert" style={styles.helper}>{entitlement.error}</Text>}
+        <LifeButton title={entitlement.premium ? "View Premium" : "Upgrade to Premium"} variant="secondary" onPress={() => router.push("/premium")} />
+      </LifeCard>
 
       <LifeButton title={loggingOut ? "Signing out…" : "Logout"} variant="danger" onPress={handleLogout} disabled={loggingOut} />
 

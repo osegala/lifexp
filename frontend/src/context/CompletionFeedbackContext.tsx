@@ -9,6 +9,7 @@ import type { BuildingUpgradeBatch } from "../base/buildingProgress";
 
 type ConfirmCompletion = (response: CompletionResponse, previousUser?: User | null) => void;
 const CompletionContext = createContext<ConfirmCompletion | null>(null);
+const FeedbackActiveContext = createContext(false);
 const BuildingFeedbackContext = createContext<{
   pending: BuildingUpgradeBatch | undefined;
   enqueue: (batch: BuildingUpgradeBatch) => void;
@@ -32,6 +33,7 @@ export function CompletionFeedbackProvider({ children }: { children: ReactNode }
   const feedback = useMemo(() => current
     ? <CompletionFeedback key={current.id} event={current} onDone={finish} /> : null, [current, finish]);
   return (
+    <FeedbackActiveContext.Provider value={!!current || queue.buildings.length > 0}>
     <CompletionContext.Provider value={celebrate}>
       <BuildingFeedbackContext.Provider value={buildings}>
         <View style={styles.root}>
@@ -43,6 +45,7 @@ export function CompletionFeedbackProvider({ children }: { children: ReactNode }
         </View>
       </BuildingFeedbackContext.Provider>
     </CompletionContext.Provider>
+    </FeedbackActiveContext.Provider>
   );
 }
 
@@ -57,6 +60,8 @@ export function useCompletionFeedback() {
   if (!value) throw new Error("useCompletionFeedback must be inside CompletionFeedbackProvider");
   return value;
 }
+
+export const useFeedbackActive = () => useContext(FeedbackActiveContext);
 
 const styles = StyleSheet.create({
   root: { flex: 1 },

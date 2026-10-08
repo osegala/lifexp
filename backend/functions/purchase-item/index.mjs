@@ -23,7 +23,6 @@ import {
     conflict,
     errorResponse,
     handleApiError,
-    internalServerError,
     jsonResponse as response,
     parseJsonBody,
     requireActivePlayer,
@@ -32,6 +31,7 @@ import {
     validateBodyFields
 } from "/opt/nodejs/http.mjs";
 import { levelFromXp } from "/opt/nodejs/leveling.mjs";
+import { requirePremium } from "/opt/nodejs/entitlements.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -73,6 +73,7 @@ function readCatalog(item, itemId) {
         price: Number(item.price?.N ?? 0),
         requiredLevel: Number(item.requiredLevel?.N ?? 1),
         requiredAchievement: item.requiredAchievement?.S ?? null,
+        requiresPremium: item.requiresPremium?.BOOL === true,
         active: item.active?.BOOL !== false
     };
 }
@@ -148,6 +149,10 @@ export const handler = async (event) => {
             throw error;
         }
 
+        // Premium gates new purchases, never ownership or use of an owned item.
+        if (catalog.requiresPremium) {
+            await requirePremium(client, TABLE_NAME, userId, GetItemCommand);
+        }
         const now = new Date().toISOString();
         const newAchievements = evaluateAchievementAwards({
             catalog: achievementCatalogItems.map(achievementCatalogFromItem),
@@ -214,6 +219,6 @@ export const handler = async (event) => {
         if (error.name === "TransactionCanceledException") {
             return conflict("PURCHASE_CONFLICT", "Purchase conflicted with another update. Please try again.");
         }
-        return internalServerError("Purchase item failed", error);
+        return handleApiError(error, "Purchase item failed");
     }
 };

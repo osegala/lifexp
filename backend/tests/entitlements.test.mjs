@@ -15,10 +15,12 @@ const now = new Date("2026-09-23T12:00:00.000Z");
 test("missing entitlement defaults to FREE with ads", () => {
     assert.deepEqual(effectiveEntitlement(null, now), {
         plan: "FREE",
+        premium: false,
         subscriptionStatus: "FREE",
         adsEnabled: true,
         expiresAt: null,
-        autoRenew: false
+        autoRenew: false,
+        source: "NONE"
     });
 });
 
@@ -30,10 +32,12 @@ test("FREE entitlement enables ads regardless of stored adsEnabled", () => {
         autoRenew: true
     }, now), {
         plan: "FREE",
+        premium: false,
         subscriptionStatus: "FREE",
         adsEnabled: true,
         expiresAt: null,
-        autoRenew: false
+        autoRenew: false,
+        source: "NONE"
     });
 });
 
@@ -46,10 +50,12 @@ test("ACTIVE PREMIUM disables ads regardless of stored adsEnabled", () => {
         autoRenew: true
     }, now), {
         plan: "PREMIUM",
+        premium: true,
         subscriptionStatus: "ACTIVE",
         adsEnabled: false,
         expiresAt: "2026-10-23T12:00:00.000Z",
-        autoRenew: true
+        autoRenew: true,
+        source: "NONE"
     });
 });
 
@@ -61,10 +67,12 @@ test("expired PREMIUM becomes effective FREE with ads", () => {
         autoRenew: true
     }, now), {
         plan: "FREE",
+        premium: false,
         subscriptionStatus: "EXPIRED",
         adsEnabled: true,
         expiresAt: "2026-09-23T11:59:59.000Z",
-        autoRenew: false
+        autoRenew: false,
+        source: "NONE"
     });
 });
 
@@ -76,10 +84,12 @@ test("canceled PREMIUM remains active before expiry and cannot auto-renew", () =
         autoRenew: true
     }, now), {
         plan: "PREMIUM",
+        premium: true,
         subscriptionStatus: "CANCELED",
         adsEnabled: false,
         expiresAt: "2026-09-24T12:00:00.000Z",
-        autoRenew: false
+        autoRenew: false,
+        source: "NONE"
     });
 });
 
@@ -107,10 +117,12 @@ test("public entitlement response excludes transaction identifiers", () => {
     });
     assert.deepEqual(Object.keys(effectiveEntitlement(record, now)), [
         "plan",
+        "premium",
         "subscriptionStatus",
         "adsEnabled",
         "expiresAt",
-        "autoRenew"
+        "autoRenew",
+        "source"
     ]);
 });
 

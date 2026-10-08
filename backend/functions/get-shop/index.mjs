@@ -21,6 +21,7 @@ import {
     unauthorized
 } from "/opt/nodejs/http.mjs";
 import { levelFromXp } from "/opt/nodejs/leveling.mjs";
+import { isPremium, readEntitlement } from "/opt/nodejs/entitlements.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -39,6 +40,7 @@ function catalogItem(item) {
         price: Number(item.price?.N ?? 0),
         requiredLevel: Number(item.requiredLevel?.N ?? 1),
         requiredAchievement: item.requiredAchievement?.S ?? null,
+        requiresPremium: item.requiresPremium?.BOOL === true,
         assetKey: item.assetKey?.S ?? null,
         active: item.active?.BOOL !== false,
         sortOrder: Number(item.sortOrder?.N ?? 0)
@@ -90,6 +92,8 @@ export const handler = async (event) => {
             playerBuildingsFromItems(playerBuildingsResult.Items)
         );
         const offers = catalog.map((item) => ({ ...item, ...cosmeticOffer(item, effects) }));
+        const premium = offers.some(item => item.requiresPremium)
+            ? isPremium(await readEntitlement(client, TABLE_NAME, userId, GetItemCommand)) : false;
         const progress = {
             tasksCompleted: Number(profile.tasksCompleted?.N ?? 0),
             level,
@@ -110,7 +114,7 @@ export const handler = async (event) => {
 
         return response(200, {
             player: { level, coins },
-            items: buildShopItems(offers, ownedIds, achievementIds, coins, level, requirements)
+            items: buildShopItems(offers, ownedIds, achievementIds, coins, level, requirements, premium)
         });
     } catch (error) {
         return internalServerError("Get shop failed", error);

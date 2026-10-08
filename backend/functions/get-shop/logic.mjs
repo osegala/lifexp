@@ -1,4 +1,4 @@
-export function buildShopItems(catalog, ownedIds, achievementIds, coins, level, requirements = new Map()) {
+export function buildShopItems(catalog, ownedIds, achievementIds, coins, level, requirements = new Map(), premium = false) {
     return catalog
         .filter((item) => item.active !== false)
         .map((item) => {
@@ -12,9 +12,13 @@ export function buildShopItems(catalog, ownedIds, achievementIds, coins, level, 
             const owned = ownedIds.has(item.itemId);
             const hasLevel = level >= effectiveRequiredLevel;
             const hasAchievement = !requiredAchievement || achievementIds.has(requiredAchievement);
-            const unlocked = hasLevel && hasAchievement;
+            const requiresPremium = item.requiresPremium === true;
+            const hasPremium = !requiresPremium || owned || premium;
+            const unlocked = hasLevel && hasAchievement && hasPremium;
             const canAfford = coins >= effectivePrice;
             const lockReasons = [];
+
+            if (!hasPremium) lockReasons.push({ type: "PREMIUM" });
 
             if (!hasLevel) {
                 lockReasons.push({ type: "LEVEL", requiredLevel, effectiveRequiredLevel });
@@ -37,6 +41,8 @@ export function buildShopItems(catalog, ownedIds, achievementIds, coins, level, 
                 requiredLevel,
                 effectiveRequiredLevel,
                 requiredAchievement,
+                requiresPremium,
+                premiumRequirementSatisfied: hasPremium,
                 achievementRequirement: requirement ? {
                     ...requirement,
                     progressPercent: requirement.requiredValue > 0
