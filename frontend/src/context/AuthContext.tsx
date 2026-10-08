@@ -4,13 +4,27 @@ import { api } from "../api/client";
 import { AuthSession } from "../auth/session";
 import { cognitoAuth } from "../auth/cognito";
 import { disableCurrentDevice, enableDeviceNotifications, watchDeviceToken } from "../notifications/device";
+import { BillingClient } from "../billing/client";
+import { billingProvider } from "../billing/provider";
+import { apiRoutes } from "../api/routes";
+import type { AxiosRequestConfig } from "axios";
 
 function useSessionValue() {
   const [session] = useState(() => new AuthSession(api, cognitoAuth));
+  const [billing] = useState(() => new BillingClient(billingProvider, async userId => {
+    await api.post(apiRoutes.billingSync, {}, { expectedUserId: userId } as AxiosRequestConfig);
+    if (String(session.getSnapshot().user?.id) !== userId) throw new Error("Account changed");
+    if (!await session.refreshEntitlements()) throw new Error("Plan refresh failed");
+    if (String(session.getSnapshot().user?.id) !== userId) throw new Error("Account changed");
+    return session.getSnapshot().entitlements.premium;
+  }));
+  const billingState = useSyncExternalStore(billing.subscribe, billing.getSnapshot, billing.getSnapshot);
   const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot, session.getSnapshot);
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
+  const billingUserId = snapshot.user ? String(snapshot.user.id) : null;
 
   useEffect(() => session.start(), [session]);
+  useEffect(() => { void billing.identify(billingUserId); }, [billing, billingUserId]);
 
   useEffect(() => {
     if (!snapshot.user?.id) return;
@@ -39,22 +53,29 @@ function useSessionValue() {
   const triggerDashboardRefresh = useCallback(() => setDashboardRefreshKey(value => value + 1), []);
   const logout = useCallback(async () => {
     await disableCurrentDevice();
+    await billing.identify(null);
     await session.logout();
-  }, [session]);
+  }, [session, billing]);
+  const clearDeletedAccountSession = useCallback(async () => {
+    await billing.identify(null);
+    await session.clearDeletedAccountSession();
+  }, [billing, session]);
 
   return useMemo(() => ({
     ...snapshot,
+    billing,
+    billingState,
     dashboardRefreshKey,
     triggerDashboardRefresh,
     login: session.login,
     register: session.register,
     confirmRegistration: session.confirmRegistration,
     logout,
-    clearDeletedAccountSession: session.clearDeletedAccountSession,
+    clearDeletedAccountSession,
     refreshUser: session.refreshUser,
     refreshEntitlements: session.refreshEntitlements,
     retrySession: session.retrySession,
-  }), [snapshot, dashboardRefreshKey, triggerDashboardRefresh, session, logout]);
+  }), [snapshot, billing, billingState, dashboardRefreshKey, triggerDashboardRefresh, session, logout, clearDeletedAccountSession]);
 }
 
 const AuthContext = createContext<ReturnType<typeof useSessionValue> | undefined>(undefined);

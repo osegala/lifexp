@@ -1,6 +1,7 @@
 export const apiRoutes = {
   me: "/me",
   entitlements: "/entitlements",
+  billingSync: "/billing/sync",
   adReward: "/ads/reward",
   prepareAdReward: "/ads/reward/prepare",
   goals: "/goals",

@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.osegssteam.owen",
+      "bundleIdentifier": "com.osegssteam.evrenthia",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -22,7 +22,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.osegssteam.owen"
+      "package": "com.osegssteam.evrenthia"
     },
     "web": {
       "output": "static",

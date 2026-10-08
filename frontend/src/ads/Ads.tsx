@@ -13,26 +13,29 @@ import { colors, spacing } from "../theme/theme";
 import { resolveAdMode, routeAllowsBanner, type AdMode, type BannerPlacement } from "./model";
 import { devAdAdapter } from "./adapter";
 import { RewardedAds, REWARDED_AD_COINS, type RewardedAdResult } from "./rewarded";
+import { adMobAdapter, NativeBanner, nativeAdsSupported, liveAdsConfigured, setNativeAdScope } from "./native";
 
 const AdsContext = createContext<({ mode: AdMode; eligible: boolean; canShowPersistentAds: boolean; canUseRewardedAds: boolean;
   rewardedAdsRemainingToday: number | null; rewardedAdLoading: boolean; flow: RewardedAds }
   & ReturnType<RewardedAds["getSnapshot"]>) | null>(null);
 
-/** Provider/config boundary. Only our own authenticated DEV API is used; no ad network is connected. */
+/** Native inventory remains behind authoritative Free eligibility, route/feedback guards and consent. */
 export function AdProvider({ children }: { children: ReactNode }) {
   const entitlements = useEntitlements();
-  const { user, loading } = useAuth();
+  const { user, loading, billingState } = useAuth();
   const pathname = usePathname();
   const feedbackActive = useFeedbackActive();
   const userId = user ? String(user.id) : null;
-  const [flow] = useState(() => new RewardedAds(devAdAdapter));
+  const mode = resolveAdMode(process.env.EXPO_PUBLIC_ADS_MODE, environment.environment, __DEV__, nativeAdsSupported,
+    process.env.EXPO_PUBLIC_LIVE_ADS_ENABLED === "true", liveAdsConfigured);
+  const [flow] = useState(() => new RewardedAds(mode === "placeholder" ? devAdAdapter : adMobAdapter));
   const state = useSyncExternalStore(flow.subscribe, flow.getSnapshot, flow.getSnapshot);
-  const mode = resolveAdMode(process.env.EXPO_PUBLIC_ADS_MODE, environment.environment, __DEV__);
   const eligible = !loading && user?.onboardingCompleted === true && entitlements.confirmed
-    && !entitlements.loading && shouldShowAds(entitlements);
-  const canShowPersistentAds = mode === "placeholder" && eligible && !feedbackActive
+    && !entitlements.loading && !billingState?.busy && !billingState?.verificationPending && shouldShowAds(entitlements);
+  const canShowPersistentAds = mode !== "disabled" && eligible && !feedbackActive
     && (routeAllowsBanner("HOME", pathname) || routeAllowsBanner("SHOP", pathname));
   const canUseRewardedAds = canShowPersistentAds && routeAllowsBanner("SHOP", pathname);
+  setNativeAdScope(userId, canShowPersistentAds && mode !== "placeholder");
   useEffect(() => {
     flow.setScope(userId, canUseRewardedAds);
     if (!canUseRewardedAds) return;
@@ -41,7 +44,7 @@ export function AdProvider({ children }: { children: ReactNode }) {
     const subscription = AppState.addEventListener("change", next => { if (next === "active") void flow.refresh(); });
     return () => { clearInterval(timer); subscription.remove(); };
   }, [flow, userId, canUseRewardedAds]);
-  useEffect(() => () => flow.dispose(), [flow]);
+  useEffect(() => () => { flow.dispose(); setNativeAdScope(null, false); }, [flow]);
   return <AdsContext.Provider value={{ mode, eligible, canShowPersistentAds, canUseRewardedAds, ...state, flow,
     rewardedAdsRemainingToday: state.status?.rewardedAdsRemainingToday ?? null,
     rewardedAdLoading: ["checking", "preparing", "claiming"].includes(state.phase) }}>{children}</AdsContext.Provider>;
@@ -55,10 +58,11 @@ export function useAds() {
 }
 
 export function BannerAdPlacement({ placement }: { placement: BannerPlacement }) {
-  const { mode, eligible } = useAds();
+  const { mode, eligible, canShowPersistentAds } = useAds();
   const pathname = usePathname();
   const feedbackActive = useFeedbackActive();
-  if (mode !== "placeholder" || !eligible || feedbackActive || !routeAllowsBanner(placement, pathname)) return null;
+  if (!canShowPersistentAds || !eligible || feedbackActive || !routeAllowsBanner(placement, pathname)) return null;
+  if (mode === "test" || mode === "live") return <NativeBanner placement={placement} />;
   return <LifeCard compact style={styles.placeholder} accessibilityLabel={`Ad placement — DEV only. ${placement === "HOME" ? "Home" : "Shop"} banner. No ad network is connected.`}>
     <Text style={styles.label}>Ad placement — DEV only</Text>
     <Text style={styles.copy}>{placement === "HOME" ? "Home" : "Shop"} banner · No ad network is connected.</Text>
@@ -75,19 +79,19 @@ export function RewardedAdButton({ onReward }: { onReward?: (result: RewardedAdR
   const ready = ads.phase === "ready" || ads.phase === "claiming";
   const exhausted = ads.rewardedAdsRemainingToday === 0;
   return <LifeCard compact style={styles.rewarded}>
-    <Text style={styles.label}>Rewarded ad — DEV only</Text>
-    <Text style={styles.copy}>Optional · {REWARDED_AD_COINS} coins per confirmed ad. No ad network is connected.</Text>
+    <Text style={styles.label}>{ads.mode === "placeholder" ? "Rewarded ad — DEV only" : ads.mode === "test" ? "Rewarded ad — test only" : "Optional rewarded ad"}</Text>
+    <Text style={styles.copy}>Optional · {REWARDED_AD_COINS} coins per confirmed ad.{ads.mode === "placeholder" ? " No ad network is connected." : " Rewards require server verification."}</Text>
     <Text style={styles.copy}>{ads.rewardedAdsRemainingToday === null ? "Daily allowance has not been confirmed."
       : `${ads.rewardedAdsRemainingToday} ad rewards remaining today · ${ads.status?.timeZone}`}</Text>
     {ads.error ? <Text accessibilityRole="alert" style={styles.copy}>{ads.error}</Text> : null}
     {ads.message ? <Text accessibilityRole="text" accessibilityLiveRegion="polite" style={styles.copy}>{ads.message}</Text> : null}
     {ready ? <>
-      <Text style={styles.copy}>DEV simulation ready. Closing this without completing grants no coins.</Text>
-      <LifeButton title={ads.phase === "claiming" ? "Confirming reward…" : "Complete DEV rewarded ad"} disabled={ads.rewardedAdLoading}
+      <Text style={styles.copy}>{ads.mode === "placeholder" ? "DEV simulation ready. Closing this without completing grants no coins." : "Waiting for verified server confirmation. No coins have been added locally."}</Text>
+      <LifeButton title={ads.phase === "claiming" ? "Verifying reward…" : ads.mode === "placeholder" ? "Complete DEV rewarded ad" : "Retry reward verification"} disabled={ads.rewardedAdLoading}
         onPress={() => { void ads.completeDevRewardedAd().then(result => { if (result) onReward?.(result); }); }} />
-      <LifeButton title="Cancel DEV ad" variant="secondary" disabled={ads.rewardedAdLoading} onPress={ads.cancelRewardedAd} />
+      <LifeButton title={ads.mode === "placeholder" ? "Cancel DEV ad" : "Dismiss verification"} variant="secondary" disabled={ads.rewardedAdLoading} onPress={ads.cancelRewardedAd} />
     </> : <>
-      {ads.status?.available === false ? <Text style={styles.copy}>The DEV reward adapter is disabled on this server.</Text> : null}
+      {ads.status?.available === false ? <Text style={styles.copy}>The reward provider is disabled on this server.</Text> : null}
       <LifeButton title={exhausted ? "Daily ad rewards claimed" : ads.rewardedAdLoading ? "Checking ad rewards…" : `Watch an ad for ${REWARDED_AD_COINS} coins`}
         disabled={exhausted || ads.rewardedAdLoading || !ads.status?.available}
         onPress={() => { void ads.requestRewardedAd().then(result => { if (result) onReward?.(result); }); }} />

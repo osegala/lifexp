@@ -68,7 +68,7 @@ export default function ShopScreen() {
         <Text style={styles.muted}>
           {entitlement.loading ? "Checking your plan…" : entitlement.premium
             ? "Premium · Ad-free"
-            : "Premium purchasing is not available in this app version."}
+            : "View Premium for subscription options."}
         </Text>
         <LifeButton title="View Premium" variant="secondary" onPress={() => router.push("/premium")} />
       </LifeCard>

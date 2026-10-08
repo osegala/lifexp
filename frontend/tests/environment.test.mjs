@@ -111,12 +111,14 @@ test("EAS production selects only the approved public production configuration",
   assert.deepEqual(eas.build.production.env, prodValues);
 });
 
-test("the Expo app includes an SDK-compatible development client and stable native IDs", () => {
+test("the Expo app includes an SDK-compatible development client and permanent Evrenthia native IDs", () => {
   const packageJson = JSON.parse(read("package.json"));
   const app = JSON.parse(read("app.json")).expo;
   assert.match(packageJson.dependencies["expo-dev-client"], /^~57\./);
-  assert.equal(app.ios.bundleIdentifier, "com.osegssteam.owen");
-  assert.equal(app.android.package, "com.osegssteam.owen");
+  assert.equal(app.ios.bundleIdentifier, "com.osegssteam.evrenthia");
+  assert.equal(app.android.package, "com.osegssteam.evrenthia");
+  assert.equal(app.scheme, "frontend");
+  assert.equal(app.extra.eas.projectId, "6377495a-2e34-40a4-ba9f-bb8c5e9594c7");
 });
 
 test("the documented local environment uses the exact development backend", () => {

@@ -30,7 +30,7 @@ test("template creates and references the isolated development table", () => {
     assert.doesNotMatch(template, /\$\{TableName\}|\n  TableName:\n    Type: String|TableName: Evrenthia(?:\s|$)/);
 
     const dynamoPolicyResources = template.match(/Fn::GetAtt:\n\s+- EvrenthiaDevTable\n\s+- Arn/g) ?? [];
-    assert.equal(dynamoPolicyResources.length, 34);
+    assert.equal(dynamoPolicyResources.length, 35);
 });
 
 test("development table has one sparse due-notification index", () => {
@@ -53,7 +53,7 @@ test("all Lambda log groups use environment-scoped names and retention", () => {
     assert.match(template, /LoggingConfig:\n\s+LogFormat: JSON\n\s+ApplicationLogLevel: INFO\n\s+SystemLogLevel: WARN/);
     assert.match(template, /LogRetentionDays:[\s\S]*?Default: 14[\s\S]*?Description: CloudWatch Logs retention period/);
     const functions = [
-        "CreateProfile", "GetMe", "GetEntitlements", "AdRewards", "GetPreferences", "UpdatePreferences",
+        "CreateProfile", "GetMe", "GetEntitlements", "AdRewards", "Billing", "GetPreferences", "UpdatePreferences",
         "GetDevices", "RegisterDevice", "DisableDevice", "GetReminders", "CreateReminder",
         "UpdateReminder", "DeleteReminder", "NotificationWorker", "GetTasks", "CreateTask",
         "UpdateTask", "DeleteTask", "CompleteTask", "GetGoals", "GetHistory",
@@ -226,7 +226,7 @@ test("every public API handler receives and imports the canonical API helper lay
         ["PurchaseItemFunction", "purchase-item/index.mjs"], ["GetInventoryFunction", "get-inventory/index.mjs"],
         ["EquipItemFunction", "equip-item/index.mjs"], ["UnequipItemFunction", "unequip-item/index.mjs"],
         ["GetWorldFunction", "get-world/index.mjs"], ["UpgradeBuildingFunction", "upgrade-building/index.mjs"],
-        ["GetEntitlementsFunction", "get-entitlements/index.mjs"], ["AdRewardsFunction", "ad-rewards/index.mjs"], ["GetPreferencesFunction", "preferences/get.mjs"],
+        ["GetEntitlementsFunction", "get-entitlements/index.mjs"], ["AdRewardsFunction", "ad-rewards/index.mjs"], ["BillingFunction", "billing/index.mjs"], ["GetPreferencesFunction", "preferences/get.mjs"],
         ["UpdatePreferencesFunction", "preferences/update.mjs"], ["GetDevicesFunction", "devices/get.mjs"],
         ["RegisterDeviceFunction", "devices/register.mjs"], ["DisableDeviceFunction", "devices/disable.mjs"],
         ["GetRemindersFunction", "reminders/get.mjs"], ["CreateReminderFunction", "reminders/create.mjs"],
@@ -236,7 +236,7 @@ test("every public API handler receives and imports the canonical API helper lay
         .map((match) => match[1])
         .filter((resource) => /Authorizer: EvrenthiaCognito/.test(resourceBlock(resource)))
         .sort();
-    assert.equal(handlers.length, 30);
+    assert.equal(handlers.length, 31);
     assert.deepEqual(authenticatedFunctions, handlers.map(([resource]) => resource).sort());
 
     for (const [resource, path] of handlers) {

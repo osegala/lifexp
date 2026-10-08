@@ -108,6 +108,8 @@ export class AuthSession {
 
   start = () => {
     const requestId = this.client.interceptors.request.use(config => {
+      const expected = (config as typeof config & { expectedUserId?: string }).expectedUserId;
+      if (expected && String(this.state.user?.id) !== expected) throw new Error("Account changed before monetization request");
       (config as SessionRequest).sessionRevision = this.revision;
       if (this.state.token) {
         config.headers.set("Authorization", `Bearer ${this.state.token}`);

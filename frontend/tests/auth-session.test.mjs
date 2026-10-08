@@ -152,6 +152,16 @@ test("a late old-account entitlement cannot overwrite a newly authenticated FREE
   assert.deepEqual(h.authSession.getSnapshot().entitlements, FREE_ENTITLEMENTS);
 });
 
+test("billing and ad requests bound to an old user cannot send with a new account's JWT", async t => {
+  const h = harness(t); await h.ready();
+  await h.client.post("/billing/sync", {}, { expectedUserId: identity.userId });
+  await h.authSession.login("second@example.test", "password");
+  const requests = h.calls.length;
+  await assert.rejects(h.client.post("/billing/sync", {}, { expectedUserId: identity.userId }));
+  await assert.rejects(h.client.get("/ad-rewards", { expectedUserId: identity.userId }));
+  assert.equal(h.calls.length, requests);
+});
+
 test("restores the Cognito session and authenticates profile requests with its ID token", async t => {
   const h = harness(t);
   await h.ready();

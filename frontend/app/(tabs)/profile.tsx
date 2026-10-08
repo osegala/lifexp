@@ -92,7 +92,7 @@ export default function ProfileScreen() {
     if (deletionPending.current) return;
     Alert.alert(
       "Delete Account",
-      "This permanently deletes your Evrenthia account and all associated game data. This action cannot be undone.",
+      "This permanently deletes your Evrenthia account and all associated game data. This action cannot be undone. Deleting this account does not cancel an Apple or Google subscription; manage billing separately in your app store.",
       [
         { text: "Cancel", style: "cancel" },
         { text: "Delete My Account", style: "destructive", onPress: () => void deleteAccount() },
@@ -188,7 +188,7 @@ export default function ProfileScreen() {
 
       <LifeCard>
         <Text style={styles.cardTitle}>Delete Account</Text>
-        <Text style={styles.helper}>Permanently delete your account, game progress, tasks, purchases, and settings.</Text>
+        <Text style={styles.helper}>Permanently delete your account, game progress, tasks, purchases, and settings. This does not cancel Apple or Google subscription billing.</Text>
         <LifeButton
           title={deletingAccount ? "Deleting Account…" : "Delete Account"}
           variant="danger"

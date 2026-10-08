@@ -104,6 +104,7 @@ function uiFixture(t) {
     "../entitlements/useEntitlements": { useEntitlements: () => state.entitlements }, "../entitlements/model": model,
     "../config/environment": { environment: { environment: "dev" } }, "../components/LifeCard": "Card", "../components/LifeButton": "Button",
     "../theme/theme": theme, "./model": adsModel, "./adapter": { devAdAdapter: f.adapter }, "./rewarded": rewarded,
+    "./native": load("../src/ads/native.tsx", {}),
   });
   const render = onReward => { effects.length = 0; context.value = ads.AdProvider({ children: null }).props.value; return ads.RewardedAdButton({ onReward }); };
   return { ...f, state, ads, render, effects };

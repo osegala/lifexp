@@ -73,7 +73,7 @@ test("logout disables current device before clearing opt-in and failed disable r
   assert.equal(f.calls[1][0], `/devices/${f.calls[0][1].deviceId}`); assert.equal(await f.device.enableDeviceNotifications(false), "cancelled");
   const g = permissionFixture({ granted: true, fail: true }); await g.device.enableDeviceNotifications(); await assert.rejects(g.device.disableCurrentDevice(), /Reconnect/);
   const auth = readFileSync(new URL("../src/context/AuthContext.tsx", import.meta.url), "utf8");
-  assert.match(auth, /await disableCurrentDevice\(\);\s+await session.logout\(\)/);
+  assert.match(auth, /await disableCurrentDevice\(\);\s+await billing.identify\(null\);\s+await session.logout\(\)/);
   const profile = readFileSync(new URL("../app/(tabs)/profile.tsx", import.meta.url), "utf8");
   assert.match(profile, /await disableCurrentDevice\(\);\s+await api.delete\(apiRoutes.me\)/);
 });

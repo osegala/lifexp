@@ -53,6 +53,48 @@ Parameters:
       - "true"
     Description: Explicit DEV-only rewarded-ad simulation; production always rejects this adapter.
 
+  RevenueCatSecretApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+  RevenueCatWebhookAuthorization:
+    Type: String
+    NoEcho: true
+    Default: ""
+  RevenueCatProjectId:
+    Type: String
+    Default: ""
+  RevenueCatEntitlementId:
+    Type: String
+    Default: ""
+  RevenueCatProducts:
+    Type: String
+    Default: "[]"
+    Description: JSON allowlist of RevenueCat product id, appId, storeIdentifier and store.
+  RevenueCatEnvironment:
+    Type: String
+    Default: sandbox
+    AllowedValues: [sandbox, production]
+  AdMobSsvEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["false", "true"]
+  AdMobLiveEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["false", "true"]
+  AdMobClaimSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Base64-encoded 32-byte claim encryption key; backend only.
+  AdMobIosRewardedUnitId:
+    Type: String
+    Default: ""
+  AdMobAndroidRewardedUnitId:
+    Type: String
+    Default: ""
+
   CognitoDeletionProtection:
     Type: String
     Default: INACTIVE
@@ -219,6 +261,16 @@ Resources:
     Properties:
       LogGroupName:
         Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-AdRewards"
+      RetentionInDays:
+        Ref: LogRetentionDays
+
+  BillingLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${FunctionNamePrefix}-Billing"
       RetentionInDays:
         Ref: LogRetentionDays
 
@@ -726,13 +778,23 @@ Resources:
         Fn::Sub: "${FunctionNamePrefix}-AdRewards"
       CodeUri: functions/ad-rewards/
       Handler: index.handler
-      Description: Server-authoritative daily rewarded-ad status, DEV receipt preparation and idempotent coin grants.
+      Description: Reward status, prepared claims, signed AdMob SSV and DEV-only simulation.
       Layers:
         - Ref: ApiSharedLayer
       Environment:
         Variables:
           DEV_REWARDED_ADS_ENABLED:
             Ref: DevRewardedAdsEnabled
+          ADMOB_SSV_ENABLED:
+            Ref: AdMobSsvEnabled
+          ADMOB_LIVE_ENABLED:
+            Ref: AdMobLiveEnabled
+          ADMOB_CLAIM_SECRET:
+            Ref: AdMobClaimSecret
+          ADMOB_IOS_REWARDED_UNIT_ID:
+            Ref: AdMobIosRewardedUnitId
+          ADMOB_ANDROID_REWARDED_UNIT_ID:
+            Ref: AdMobAndroidRewardedUnitId
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -774,6 +836,72 @@ Resources:
             Method: POST
             Auth:
               Authorizer: EvrenthiaCognito
+
+        AdMobSsv:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /webhooks/admob/reward
+            Method: GET
+            Auth:
+              Authorizer: NONE
+
+  BillingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: "${FunctionNamePrefix}-Billing"
+      CodeUri: functions/billing/
+      Handler: index.handler
+      Timeout: 30
+      Layers:
+        - Ref: ApiSharedLayer
+      Environment:
+        Variables:
+          REVENUECAT_SECRET_API_KEY:
+            Ref: RevenueCatSecretApiKey
+          REVENUECAT_WEBHOOK_AUTHORIZATION:
+            Ref: RevenueCatWebhookAuthorization
+          REVENUECAT_PROJECT_ID:
+            Ref: RevenueCatProjectId
+          REVENUECAT_ENTITLEMENT_ID:
+            Ref: RevenueCatEntitlementId
+          REVENUECAT_PRODUCTS:
+            Ref: RevenueCatProducts
+          REVENUECAT_ENVIRONMENT:
+            Ref: RevenueCatEnvironment
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:ConditionCheckItem
+              Resource:
+                Fn::GetAtt:
+                  - EvrenthiaDevTable
+                  - Arn
+      Events:
+        Sync:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /billing/sync
+            Method: POST
+            Auth:
+              Authorizer: EvrenthiaCognito
+        RevenueCatWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: EvrenthiaDevApi
+            Path: /webhooks/revenuecat
+            Method: POST
+            Auth:
+              Authorizer: NONE
 
   GetPreferencesFunction:
     Type: AWS::Serverless::Function

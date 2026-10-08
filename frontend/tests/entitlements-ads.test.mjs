@@ -35,7 +35,7 @@ test("canonical UI normalization accepts existing server responses but never dev
   assert.equal(model.normalizeEntitlements({ ...premium, expiresAt: "2000-01-01" }).premium, true);
 });
 
-test("ad configuration has no live mode and cannot enable even placeholders in a production build/environment", () => {
+test("default ad configuration cannot enable live ads or DEV placeholders in production", () => {
   assert.equal(adsModel.resolveAdMode(undefined, "dev", true), "disabled");
   assert.equal(adsModel.resolveAdMode("placeholder", "dev", true), "placeholder");
   for (const [value, env, dev] of [["live", "dev", true], ["placeholder", "prod", true], ["placeholder", "dev", false]]) assert.equal(adsModel.resolveAdMode(value, env, dev), "disabled");
@@ -54,7 +54,8 @@ function adFixture() {
     "../entitlements/useEntitlements": { useEntitlements: hook }, "../entitlements/model": model,
     "../config/environment": { environment: { environment: "dev" } }, "../components/LifeCard": "Card", "../components/LifeButton": "Button",
     "../theme/theme": theme, "./model": adsModel, "./adapter": { devAdAdapter: {} },
-    "./rewarded": load("../src/ads/rewarded.ts", { "../api/errors": load("../src/api/errors.ts", {}) }) });
+    "./rewarded": load("../src/ads/rewarded.ts", { "../api/errors": load("../src/api/errors.ts", {}) }),
+    "./native": load("../src/ads/native.tsx", {}) });
   state.render = placement => { context.value = ads.AdProvider({ children: null }).props.value; return ads.BannerAdPlacement({ placement }); };
   state.ads = ads;
   return state;
@@ -117,6 +118,7 @@ function screen(path, entitlement) {
   const calls = [];
   const Screen = load(path, { react, "react-native": native, "expo-router": { useFocusEffect() {}, router: { push: x => calls.push(x), replace: x => calls.push(x), navigate() {} } },
     "@expo/vector-icons/MaterialCommunityIcons": "Icon", "../../src/context/AuthContext": { useAuth: () => ({ user: { username: "Hero", timeZone: "UTC" } }) },
+    "../src/context/AuthContext": { useAuth: () => ({ billing: { provider: { available: false } }, billingState: { busy: false, ready: false, options: [] } }) },
     "../../src/api/client": {}, "../../src/api/routes": {}, "../../src/storage/localAccountData": {}, "../../src/notifications/device": {},
     "../../src/components/NotificationSettings": "Notifications", "../../src/components/XPBar": "XPBar", "../../src/components/LifeInput": "Input",
     ...Object.fromEntries(["../src", "../../src"].flatMap(prefix => [
@@ -139,11 +141,12 @@ test("Premium page never simulates purchase/restore or claims confirmation durin
   for (const e of [{ ...model.FREE_ENTITLEMENTS, confirmed: true }, { ...premium, confirmed: true }, { ...model.FREE_ENTITLEMENTS, confirmed: false, loading: true }, { ...model.FREE_ENTITLEMENTS, confirmed: false, error: "Could not check your plan." }]) {
     let refreshed = 0;
     const ui = screen("../app/premium.tsx", { ...e, refresh: () => { refreshed++; } });
-    assert.match(text(ui.tree), /Evrenthia Premium.*No ads.*Purchases are not available/s);
-    const purchase = nodes(ui.tree).find(n => n.props.title === "Purchases unavailable"); assert.equal(purchase.props.disabled, true);
+    assert.match(text(ui.tree), /Evrenthia Premium.*No ads.*not on web or Expo Go/s);
+    const purchase = nodes(ui.tree).find(n => n.props.title === "Load subscription prices");
+    if (!e.premium) assert.equal(purchase.props.disabled, true);
     const refresh = nodes(ui.tree).find(n => n.props.title?.includes("plan") && n.type === "Button"); refresh.props.onPress(); assert.equal(refreshed, 1);
     nodes(ui.tree).find(n => n.props.title === "Back to Profile").props.onPress(); assert.deepEqual(ui.calls, ["/(tabs)/profile"]);
     assert.match(text(ui.tree), e.confirmed ? /Your plan is confirmed/ : /has not yet been confirmed/);
-    assert.equal(nodes(ui.tree).some(n => n.props.title === "Restore Purchases"), false);
+    assert.equal(nodes(ui.tree).find(n => n.props.title === "Restore Purchases").props.disabled, true);
   }
 });
