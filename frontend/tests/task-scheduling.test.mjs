@@ -19,7 +19,7 @@ function load(path, imports) {
     if (!(id in imports)) throw new Error(`Unmocked import: ${id}`);
     return imports[id];
   });
-  return exports.default;
+  return exports.default ?? exports;
 }
 function hooks() {
   let cursor = 0;
@@ -140,7 +140,12 @@ test("labels and Today/Upcoming use server availability, date and chronological 
 async function screen({ get, post = async () => ({}), patch = async () => ({}) }) {
   const h = hooks(), calls = [], events = [];
   let focus, resume;
+  const taskApi = { post: async (route, input) => { calls.push(["POST", route, input]); return { data: await post(route, input) }; },
+    patch: async (route, input) => { calls.push(["PATCH", route, input]); return { data: await patch(route, input) }; } };
+  const saving = load("../src/tasks/saveTask.ts", { "../api/client": { api: taskApi },
+    "../api/routes": { apiRoutes: { tasks: "tasks", task: id => `tasks/${id}` } } });
   const Screen = load("../app/(tabs)/tasks.tsx", {
+    "../../src/tasks/saveTask": saving,
     react: h.react, "react-native": { ...native, AppState: { currentState: "active", addEventListener: (_, listener) => { resume = listener; return { remove() {} }; } } },
     "expo-router": { useFocusEffect: fn => { focus = fn; } }, "@expo/vector-icons/MaterialCommunityIcons": "Icon",
     "../../src/api/client": { apiError, api: { get: async route => ({ data: await get(route) }),

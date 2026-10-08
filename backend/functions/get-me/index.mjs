@@ -78,6 +78,8 @@ async (event) => {
                     "UTC",
 
                 ...normalizeAppearance(profile),
+                // Profiles predating onboarding must retain normal app access.
+                onboardingCompleted: profile.onboardingCompleted?.BOOL ?? true,
 
                 level:
                     levelInfo.level,

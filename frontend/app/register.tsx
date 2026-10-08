@@ -13,15 +13,9 @@ import {
 import LifeButton from "../src/components/LifeButton";
 import LifeCard from "../src/components/LifeCard";
 import LifeInput from "../src/components/LifeInput";
-import AvatarRenderer from "../src/components/AvatarRenderer";
-import AppearanceEditor from "../src/components/AppearanceEditor";
 import { authErrorMessage } from "../src/auth/errors";
 import { useAuth } from "../src/context/AuthContext";
 import { colors, radius, spacing } from "../src/theme/theme";
-import { api } from "../src/api/client";
-import { apiRoutes } from "../src/api/routes";
-import { DEFAULT_APPEARANCE } from "../src/avatar/appearance";
-import type { AvatarAppearance } from "../src/avatar/appearance";
 
 const skyImage = require("../assets/base/backgrounds/sky.png");
 const baseImage = require("../assets/base/buildings/library/library-level-1.png");
@@ -34,7 +28,6 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
-  const [appearance, setAppearance] = useState<AvatarAppearance>(DEFAULT_APPEARANCE);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -55,13 +48,12 @@ export default function RegisterScreen() {
     try {
       setLoading(true);
       setError("");
-      const nextStep = await register(trimmedUsername, trimmedEmail, password, appearance.bodyType);
+      const nextStep = await register(trimmedUsername, trimmedEmail, password, "BOY");
       if (nextStep === "CONFIRM_SIGN_UP") {
         setAwaitingConfirmation(true);
       } else {
         await login(trimmedEmail, password);
-        await api.patch(apiRoutes.me, appearance);
-        router.replace("/(tabs)/dashboard");
+        router.replace("/");
       }
     } catch (error) {
       setError(authErrorMessage(error, "signUp"));
@@ -80,8 +72,7 @@ export default function RegisterScreen() {
       setLoading(true);
       setError("");
       await confirmRegistration(email.trim(), confirmationCode.trim(), password);
-      await api.patch(apiRoutes.me, appearance);
-      router.replace("/(tabs)/dashboard");
+      router.replace("/");
     } catch (error) {
       setError(authErrorMessage(error, "confirm"));
     } finally {
@@ -144,7 +135,7 @@ export default function RegisterScreen() {
 
         <Text style={styles.label}>Password</Text>
         <LifeInput
-          placeholder="At least 4 characters"
+          placeholder="At least 8 characters"
           value={password}
           onChangeText={(value) => {
             setPassword(value);
@@ -174,24 +165,7 @@ export default function RegisterScreen() {
           </>
         )}
 
-        <Text style={styles.label}>Starter avatar</Text>
-        <View style={styles.avatarPreview}>
-          <AvatarRenderer
-            bodyType={appearance.bodyType}
-            hairId={appearance.hairId}
-            skinColorId={appearance.skinColorId}
-            hairColorId={appearance.hairColorId}
-            eyeColorId={appearance.eyeColorId}
-          />
-        </View>
-        <AppearanceEditor
-          appearance={appearance}
-          dirty={false}
-          saving={false}
-          showSaveButton={false}
-          onChange={(patch) => setAppearance((current) => ({ ...current, ...patch }))}
-          onSave={() => {}}
-        />
+        <Text style={styles.helperText}>After confirming your account, choose your avatar and first tasks.</Text>
 
         {!!error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -281,11 +255,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     marginTop: spacing.sm,
-  },
-  avatarPreview: {
-    width: 280,
-    maxWidth: "100%",
-    alignSelf: "center",
   },
   errorText: {
     color: colors.danger,

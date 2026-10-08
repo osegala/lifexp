@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
     DynamoDBClient,
     GetItemCommand,
@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import {
     authSubject,
+    conflict,
     handleApiError,
     internalServerError,
     jsonResponse as response,
@@ -38,7 +39,11 @@ export const handler = async (event) => {
         return handleApiError(error, "Create task validation failed");
     }
 
-    const taskId = randomUUID();
+    // An optional retry key reuses this user's task record, including after a lost response.
+    const taskId = input.clientRequestId
+        ? createHash("sha256").update(`${userId}:${input.clientRequestId}`).digest("hex")
+        : randomUUID();
+    const requestHash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
     const now = new Date().toISOString();
     const { repeatType, repeatDays } = input;
     const startDate = input.startDate ?? (repeatType !== "NONE"
@@ -69,6 +74,7 @@ export const handler = async (event) => {
     }
     if (startDate) item.startDate = { S: startDate };
     if (input.dueTime) item.dueTime = { S: input.dueTime };
+    if (input.clientRequestId) item.createRequestHash = { S: requestHash };
 
     try {
         await client.send(new PutItemCommand({
@@ -96,6 +102,17 @@ export const handler = async (event) => {
             updatedAt: now
         });
     } catch (error) {
+        if (input.clientRequestId && error.name === "ConditionalCheckFailedException") {
+            try {
+                const existing = (await client.send(new GetItemCommand({ TableName: TABLE_NAME,
+                    Key: { PK: item.PK, SK: item.SK }, ConsistentRead: true }))).Item;
+                if (existing?.createRequestHash?.S !== requestHash) {
+                    return conflict("TASK_REQUEST_CHANGED", "This retry key was already used for a different task.");
+                }
+                // A replay acknowledges the original creation without resetting edits/completions.
+                return response(200, { taskId });
+            } catch (failure) { return internalServerError("Read task retry failed", failure); }
+        }
         return internalServerError("Create task failed", error);
     }
 };

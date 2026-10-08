@@ -38,7 +38,7 @@ export default function LoginScreen() {
       setLoading(true);
       setError("");
       await login(email.trim(), password);
-      router.replace("/(tabs)/dashboard");
+      router.replace("/");
     } catch (error) {
       setError(authErrorMessage(error, "signIn"));
     } finally {

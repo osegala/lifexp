@@ -3,6 +3,7 @@ export type User = {
   username: string;
   email: string;
   timeZone: string;
+  onboardingCompleted: boolean;
   totalXp: number;
   level: number;
   xpIntoLevel: number;

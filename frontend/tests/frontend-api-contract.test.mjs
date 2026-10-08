@@ -61,7 +61,8 @@ test("frontend contains no legacy users, social, subscription-dev, weekly-quest,
 test("task screen uses the SAM task methods and server-owned completion contract", () => {
   const tasks = read("app/(tabs)/tasks.tsx");
   assert.match(tasks, /api\.get<TasksResponse>\(apiRoutes\.tasks\)/);
-  assert.match(tasks, /api\.post<Task>\(apiRoutes\.tasks,/);
+  assert.match(tasks, /await saveTask\(input, savedTaskId\)/);
+  assert.match(read("src/tasks/saveTask.ts"), /api\.post<\{ taskId: string \}>\(apiRoutes\.tasks,/);
   assert.match(tasks, /api\.post<CompletionResponse>\(apiRoutes\.completeTask\(task\.taskId\), \{\}\)/);
   assert.match(tasks, /api\.delete\(apiRoutes\.task\(task\.taskId\)\)/);
   assert.doesNotMatch(tasks, /dueDate|scheduledTime|repeatEndsAt|xpReward\s*:|coinReward\s*:/);
@@ -127,11 +128,11 @@ test("social and interior screens are inert and hidden from tab navigation", () 
 });
 
 test("appearance persists through PATCH me and profile settings remain narrowly scoped", () => {
-  const register = read("app/register.tsx");
+  const setup = read("app/onboarding.tsx");
   const profile = read("app/(tabs)/profile.tsx");
   const session = read("src/auth/session.ts");
-  assert.match(register, /api\.patch\(apiRoutes\.me, appearance\)/);
-  assert.match(register, /<AppearanceEditor[\s\S]*?showSaveButton=\{false\}/);
+  assert.match(setup, /api\.patch<AvatarAppearance>\(apiRoutes\.me, appearance,/);
+  assert.match(setup, /<AppearanceEditor[\s\S]*?showSaveButton=\{false\}/);
   assert.match(profile, /api\.patch\(apiRoutes\.me, \{\s*displayName: displayName\.trim\(\),\s*timeZone: timeZone\.trim\(\),\s*\}\)/);
   assert.doesNotMatch(profile, /bodyType|xp\s*:|coins\s*:|worldPoints\s*:/);
   assert.doesNotMatch(session, /api\.patch|client\.patch/);

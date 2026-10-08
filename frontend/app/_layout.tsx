@@ -5,6 +5,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import SessionRecovery from "../src/components/SessionRecovery";
 import { colors } from "../src/theme/theme";
+import { authDestination } from "../src/auth/destination";
 
 export default function RootLayout() {
   return (
@@ -27,13 +28,17 @@ function SessionNavigator() {
     return <View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
   if (sessionError && !user) return <SessionRecovery fullScreen />;
+  const destination = authDestination(token, user);
 
   return (
     <View style={styles.root}>
       {token && sessionError ? <SessionRecovery /> : null}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
-        <Stack.Protected guard={!!token}>
+        <Stack.Protected guard={destination === "/onboarding"}>
+          <Stack.Screen name="onboarding" />
+        </Stack.Protected>
+        <Stack.Protected guard={destination === "/(tabs)/dashboard"}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="base-interior" />
           <Stack.Screen name="social-base" />

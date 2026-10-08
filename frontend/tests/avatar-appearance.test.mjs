@@ -406,11 +406,12 @@ test("Avatar screen keeps appearance controls in an on-demand modal", () => {
   assert.ok(screen.indexOf("<Modal") < screen.indexOf("<AppearanceEditor"));
 });
 
-test("registration reuses the complete appearance editor and persists one appearance model", () => {
-  const register = read("../app/register.tsx");
-  assert.match(register, /<AppearanceEditor[\s\S]*?appearance=\{appearance\}[\s\S]*?showSaveButton=\{false\}/);
-  assert.match(register, /<AvatarRenderer[\s\S]*?bodyType=\{appearance\.bodyType\}[\s\S]*?eyeColorId=\{appearance\.eyeColorId\}/);
-  assert.match(register, /api\.patch\(apiRoutes\.me, appearance\)/);
+test("first-run onboarding reuses the complete appearance editor and persists one appearance model", () => {
+  const setup = read("../app/onboarding.tsx");
+  assert.match(setup, /<AppearanceEditor[\s\S]*?appearance=\{appearance\}[\s\S]*?showSaveButton=\{false\}/);
+  assert.match(setup, /<AvatarRenderer \{\.\.\.appearance\}/);
+  assert.match(setup, /api\.patch<AvatarAppearance>\(apiRoutes\.me, appearance,/);
+  assert.doesNotMatch(read("../app/register.tsx"), /<AppearanceEditor|api\.patch/);
 });
 
 test("appearance cache keys are isolated by authenticated user and account deletion targets that key", () => {

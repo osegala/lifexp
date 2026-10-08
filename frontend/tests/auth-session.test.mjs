@@ -3,10 +3,12 @@ import { setImmediate as nextTick } from "node:timers/promises";
 import test from "node:test";
 import axios, { AxiosError } from "axios";
 import { AuthSession, userFromProfile } from "../src/auth/session.ts";
+import { authDestination } from "../src/auth/destination.ts";
 
 const identity = { token: "saved-id-token", userId: "user-sub-1", email: "hero@example.test" };
 const nextIdentity = { token: "new-id-token", userId: "user-sub-2", email: "second@example.test" };
 const profile = {
+  onboardingCompleted: true,
   displayName: "Test Hero", level: 3, xp: 200, xpIntoLevel: 50,
   xpForNextLevel: 200, xpToNextLevel: 150, coins: 20, timeZone: "America/New_York",
 };
@@ -91,6 +93,33 @@ test("restores the Cognito session and authenticates profile requests with its I
   assert.deepEqual(h.calls.map(call => call.url).sort(), ["/entitlements", "/me"]);
   assert.ok(h.calls.every(call => call.headers.get("Authorization") === `Bearer ${identity.token}`));
   assert.ok(h.calls.every(call => call.timeout === 15000));
+});
+
+test("onboarding route follows server state through incomplete login, completion refresh, logout and login", async t => {
+  const h = harness(t); h.profile = config => response(config, { ...profile, onboardingCompleted: false });
+  await h.ready();
+  const destination = () => authDestination(h.authSession.getSnapshot().token, h.authSession.getSnapshot().user);
+  assert.equal(destination(), "/onboarding");
+  h.profile = config => response(config, { ...profile, onboardingCompleted: true });
+  assert.equal(await h.authSession.refreshUser(), true); assert.equal(destination(), "/(tabs)/dashboard");
+  await h.authSession.logout(); assert.equal(destination(), "/login");
+  await h.authSession.login("hero@example.test", "password"); assert.equal(destination(), "/(tabs)/dashboard");
+});
+
+test("missing or invalid API completion state is recoverable, never inferred from a token", async t => {
+  const h = harness(t); h.profile = config => response(config, { ...profile, onboardingCompleted: undefined });
+  await h.ready(); assert.equal(h.authSession.getSnapshot().user, null);
+  assert.ok(h.authSession.getSnapshot().sessionError);
+  assert.equal(authDestination(h.authSession.getSnapshot().token, null), null);
+  h.profile = config => response(config, profile); assert.equal(await h.authSession.retrySession(), true);
+  for (const onboardingCompleted of [undefined, null, "false", 0]) assert.throws(() => userFromProfile({ ...profile, onboardingCompleted }, identity));
+});
+
+test("failed profile refresh keeps incomplete status until server confirmation", async t => {
+  const h = harness(t); h.profile = config => response(config, { ...profile, onboardingCompleted: false });
+  await h.ready(); h.profile = () => { throw new Error("offline"); };
+  assert.equal(await h.authSession.refreshUser(), false);
+  assert.equal(authDestination(h.authSession.getSnapshot().token, h.authSession.getSnapshot().user), "/onboarding");
 });
 
 test("an empty Cognito session stays signed out without API requests", async t => {
@@ -291,6 +320,7 @@ test("a delayed expiry sign-out finishes before a later login starts", async t =
 test("profile mapping preserves progression and premium state", () => {
   const user = userFromProfile(profile, identity, { plan: "PREMIUM", subscriptionStatus: "ACTIVE" });
   assert.deepEqual(user, {
+    onboardingCompleted: true,
     id: identity.userId,
     username: profile.displayName,
     email: identity.email,

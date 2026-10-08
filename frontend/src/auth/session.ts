@@ -12,6 +12,7 @@ type SessionState = {
 };
 
 type ProfileResponse = {
+  onboardingCompleted: boolean;
   displayName: string;
   timeZone: string;
   level: number;
@@ -38,7 +39,11 @@ export function userFromProfile(
   identity: CognitoIdentity,
   entitlement: EntitlementResponse = {},
 ): User {
+  if (typeof profile.onboardingCompleted !== "boolean") {
+    throw new Error("The server did not return onboarding status.");
+  }
   return {
+    onboardingCompleted: profile.onboardingCompleted,
     id: identity.userId,
     username: profile.displayName,
     email: identity.email,

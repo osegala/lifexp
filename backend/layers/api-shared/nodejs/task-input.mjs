@@ -13,7 +13,7 @@ function invalid(code, message, field, fieldCode = "INVALID") {
     throw new ApiError(400, code, message, field ? [{ field, code: fieldCode, message }] : undefined);
 }
 
-function validateObject(body) {
+function validateObject(body, creating = false) {
     if (!body || Array.isArray(body) || typeof body !== "object") {
         invalid("VALIDATION_ERROR", "Request body must be a JSON object.");
     }
@@ -27,7 +27,7 @@ function validateObject(body) {
                 message: `${field} is managed by the server.`
             })));
     }
-    const unsupported = fields.filter((field) => !EDITABLE_FIELDS.has(field));
+    const unsupported = fields.filter((field) => !EDITABLE_FIELDS.has(field) && !(creating && field === "clientRequestId"));
     if (unsupported.length) {
         throw new ApiError(400, "VALIDATION_ERROR", "Request contains unsupported task fields.",
             unsupported.map((field) => ({ field, code: "UNSUPPORTED_FIELD", message: `${field} is not supported.` })));
@@ -117,7 +117,11 @@ function validateSchedule(repeatType, repeatDays, startDate) {
 }
 
 export function validateTaskCreate(body) {
-    validateObject(body);
+    validateObject(body, true);
+    if (body.clientRequestId !== undefined && (typeof body.clientRequestId !== "string"
+        || !/^[a-zA-Z0-9_-]{16,80}$/.test(body.clientRequestId))) {
+        invalid("VALIDATION_ERROR", "clientRequestId must be 16–80 letters, numbers, hyphens or underscores.", "clientRequestId");
+    }
     const repeatType = normalizeRepeatType(body.repeatType ?? "NONE");
     const repeatDays = normalizeRepeatDays(body.repeatDays ?? []);
     const startDate = dateValue(body.startDate);
@@ -128,6 +132,7 @@ export function validateTaskCreate(body) {
     }
     return {
         title: normalizeTitle(body.title, true),
+        ...(body.clientRequestId === undefined ? {} : { clientRequestId: body.clientRequestId }),
         description: normalizeDescription(body.description) ?? null,
         taskSize: normalizeTaskSize(body.taskSize ?? "NORMAL"),
         repeatType,

@@ -15,13 +15,15 @@ const REPEAT_OPTIONS: { value: RepeatChoice; label: string }[] = [
   { value: "CUSTOM", label: "Custom weekdays" },
 ];
 
-export default function TaskEditor({ task, time, disabled, onSave, onCancel, onReminderNotice }: {
+export default function TaskEditor({ task, time, disabled, onSave, onCancel, onReminderNotice, suggestions, onBusyChange }: {
   task?: Task;
   time?: TasksResponse["time"];
   disabled: boolean;
   onSave: (input: TaskInput, savedTaskId?: string) => Promise<string | void>;
   onCancel?: () => void;
   onReminderNotice?: (message: string) => void;
+  suggestions?: readonly string[];
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
@@ -60,6 +62,7 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel, onR
     try { reminderTiming(reminder.choice, reminder.clock, clock); } catch (failure) { return setError((failure as Error).message); }
     savingRef.current = true;
     setSaving(true);
+    onBusyChange?.(true);
     setError("");
     let taskSaved = false;
     try {
@@ -85,11 +88,17 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel, onR
     } finally {
       savingRef.current = false;
       setSaving(false);
+      onBusyChange?.(false);
     }
   }
 
   return <View style={styles.form}>
     <Text accessibilityRole="header" style={styles.heading}>{task ? "Edit task" : "Add a task"}</Text>
+    {suggestions && <View style={styles.options}>{suggestions.map(suggestion => <Pressable key={suggestion}
+      accessibilityRole="button" accessibilityLabel={`Use suggestion: ${suggestion}`} accessibilityState={{ disabled: locked }}
+      disabled={locked} onPress={() => setTitle(suggestion)} style={styles.chip}>
+      <Text style={styles.chipText}>{suggestion}</Text>
+    </Pressable>)}</View>}
     <Text style={styles.label}>Task title</Text>
     <LifeInput accessibilityLabel="Task title" placeholder="What will you do?" maxLength={200} value={title} onChangeText={setTitle} editable={!locked} />
     <LifeInput accessibilityLabel="Description (optional)" placeholder="Description (optional)" maxLength={2000} value={description} onChangeText={setDescription} editable={!locked} />

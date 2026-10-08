@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import * as dates from "../layers/api-shared/nodejs/dates.mjs";
 import * as schedule from "../layers/api-shared/nodejs/task-schedule.mjs";
 import * as rules from "../layers/api-shared/nodejs/task-rules.mjs";
@@ -159,7 +159,7 @@ function apiFixture() {
   const sdk = { DynamoDBClient, GetItemCommand, PutItemCommand, UpdateItemCommand, QueryCommand };
   const handlers = {};
   for (const name of ["create-task", "get-tasks", "update-task", "delete-task"]) {
-    const imports = { "node:crypto": { randomUUID }, "@aws-sdk/client-dynamodb": sdk, "./logic.mjs": archive,
+    const imports = { "node:crypto": { createHash, randomUUID }, "@aws-sdk/client-dynamodb": sdk, "./logic.mjs": archive,
       "/opt/nodejs/http.mjs": http, "/opt/nodejs/task-input.mjs": input, "/opt/nodejs/task-rewards.mjs": rewards,
       "/opt/nodejs/dates.mjs": dates, "/opt/nodejs/task-schedule.mjs": schedule, "/opt/nodejs/task-rules.mjs": rules };
     imports["/opt/nodejs/notification-wakeup.mjs"] = wakeups;

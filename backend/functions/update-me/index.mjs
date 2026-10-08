@@ -46,7 +46,7 @@ export const handler = async (event) => {
         const assignments = ["#updatedAt = :updatedAt"];
         for (const [field, value] of Object.entries(patch)) {
             names[`#${field}`] = field;
-            values[`:${field}`] = { S: value };
+            values[`:${field}`] = typeof value === "boolean" ? { BOOL: value } : { S: value };
             assignments.push(`#${field} = :${field}`);
         }
         const request = {
@@ -76,6 +76,7 @@ export const handler = async (event) => {
             displayName: result.Attributes?.displayName?.S ?? "Adventurer",
             timeZone: result.Attributes?.timeZone?.S ?? "UTC",
             ...appearance,
+            onboardingCompleted: result.Attributes?.onboardingCompleted?.BOOL ?? true,
             updatedAt: result.Attributes?.updatedAt?.S ?? values[":updatedAt"].S
         });
     } catch (error) {

@@ -258,6 +258,7 @@ async function tasksScreen(post, { refreshUser = async () => {}, readWorld = asy
   let focus, refreshes = 0;
   const tasks = [task("one"), task("two")];
   const Screen = load("../app/(tabs)/tasks.tsx", {
+    "../../src/tasks/saveTask": { saveTask: () => assert.fail("completion must not create tasks") },
     react: h.react, "react-native": native,
     "@expo/vector-icons/MaterialCommunityIcons": "Icon",
     "expo-router": { useFocusEffect: fn => { focus = fn; } },

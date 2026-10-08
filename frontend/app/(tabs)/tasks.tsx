@@ -7,6 +7,7 @@ import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
 import LifeCard from "../../src/components/LifeCard";
 import TaskEditor from "../../src/components/TaskEditor";
+import { saveTask } from "../../src/tasks/saveTask";
 import { useAuth } from "../../src/context/AuthContext";
 import { useBuildingFeedback, useCompletionFeedback } from "../../src/context/CompletionFeedbackContext";
 import { buildingUpgrades } from "../../src/base/buildingProgress";
@@ -55,10 +56,9 @@ export default function TasksScreen() {
   async function createTask(input: TaskInput, savedTaskId?: string) {
     try {
       setBusy("create");
-      const response = savedTaskId ? await api.patch<Task>(apiRoutes.task(savedTaskId), input)
-        : await api.post<Task>(apiRoutes.tasks, { ...input, active: true });
+      const taskId = await saveTask(input, savedTaskId);
       await loadTasks();
-      return response.data.taskId;
+      return taskId;
     } finally {
       setBusy(null);
     }
