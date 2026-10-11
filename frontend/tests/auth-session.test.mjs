@@ -162,6 +162,19 @@ test("billing and ad requests bound to an old user cannot send with a new accoun
   assert.equal(h.calls.length, requests);
 });
 
+test("prepare requests retain account-binding protection without temporary auth diagnostics", async t => {
+  const previous = globalThis.__DEV__, logs = [];
+  globalThis.__DEV__ = true;
+  t.after(() => { if (previous === undefined) delete globalThis.__DEV__; else globalThis.__DEV__ = previous; });
+  t.mock.method(console, "info", (...args) => logs.push(args));
+  const h = harness(t); await h.ready();
+  await h.client.post("/ads/reward/prepare", {}, { expectedUserId: identity.userId });
+  await assert.rejects(h.client.post("/ads/reward/prepare", {}, { expectedUserId: nextIdentity.userId }));
+  assert.deepEqual(logs, []);
+  assert.doesNotMatch(JSON.stringify(logs), /saved-id-token|user-sub-1|user-sub-2|Bearer/);
+  assert.equal(h.calls.filter(c => c.url === "/ads/reward/prepare").length, 1);
+});
+
 test("restores the Cognito session and authenticates profile requests with its ID token", async t => {
   const h = harness(t);
   await h.ready();

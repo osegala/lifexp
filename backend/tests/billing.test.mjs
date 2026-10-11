@@ -164,7 +164,9 @@ test("billing endpoints use JWT only for sync; backend secrets are NoEcho and ne
   const template = readFileSync(new URL("../template.yaml", import.meta.url), "utf8");
   const block = template.split("  BillingFunction:\n")[1].split("  GetPreferencesFunction:\n")[0];
   assert.match(block, /Path: \/billing\/sync\n\s+Method: POST\n\s+Auth:\n\s+Authorizer: EvrenthiaCognito/);
-  assert.match(block, /Path: \/webhooks\/revenuecat\n\s+Method: POST\n\s+Auth:\n\s+Authorizer: NONE/);
+  const webhook = block.split("        RevenueCatWebhook:\n")[1];
+  assert.match(webhook, /Type: HttpApi[\s\S]*Path: \/webhooks\/revenuecat\n\s+Method: POST/);
+  assert.doesNotMatch(webhook, /\bAuth:/);
   assert.match(template, /RevenueCatSecretApiKey:\n\s+Type: String\n\s+NoEcho: true/);
   assert.doesNotMatch(block, /dynamodb:(?:DeleteItem|Scan|\*)/);
 });
