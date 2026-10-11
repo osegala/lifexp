@@ -104,7 +104,17 @@ test("auth and API modules consume the one canonical runtime configuration", () 
 
 test("EAS production selects only the approved public production configuration", () => {
   const eas = JSON.parse(read("eas.json"));
-  assert.deepEqual(eas.build.development.env, devValues);
+  const dev = eas.build.development.env;
+  for (const [name, value] of Object.entries(devValues)) assert.equal(dev[name], value);
+  assert.equal(dev.EXPO_PUBLIC_ADS_MODE, "test");
+  assert.equal(dev.EXPO_PUBLIC_LIVE_ADS_ENABLED, "false");
+  assert.equal(Object.hasOwn(dev, "EXPO_PUBLIC_ADMOB_TEST_DEVICE_IDS"), false);
+  for (const platform of ["IOS", "ANDROID"]) {
+    assert.match(dev[`EXPO_PUBLIC_ADMOB_${platform}_APP_ID`], /^ca-app-pub-9453537141674066~\d+$/);
+    for (const placement of ["HOME_BANNER", "SHOP_BANNER", "REWARDED"]) {
+      assert.match(dev[`EXPO_PUBLIC_ADMOB_${platform}_${placement}_UNIT_ID`], /^ca-app-pub-9453537141674066\/\d+$/);
+    }
+  }
   assert.equal(eas.build.development.developmentClient, true);
   assert.equal(eas.build.development.distribution, "internal");
   assert.equal(eas.build.preview.env.EXPO_PUBLIC_APP_ENV, "dev");

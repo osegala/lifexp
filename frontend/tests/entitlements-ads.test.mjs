@@ -6,6 +6,7 @@ import ts from "typescript";
 import * as model from "../src/entitlements/model.ts";
 import * as adsModel from "../src/ads/model.ts";
 import * as theme from "../src/theme/theme.ts";
+import * as adDiagnostics from "../src/ads/debug.ts";
 // Use the real controller; transpilation resolves its extensionless imports without a runtime loader.
 const require = createRequire(import.meta.url);
 const premium = { ...model.FREE_ENTITLEMENTS, plan: "PREMIUM", premium: true, adsEnabled: false, subscriptionStatus: "ACTIVE", source: "TEST" };
@@ -14,7 +15,7 @@ function load(path, imports) {
   const code = ts.transpileModule(readFileSync(new URL(path, import.meta.url), "utf8"), { compilerOptions: {
     module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } }).outputText;
-  new Function("require", "exports", code)(id => id === "react/jsx-runtime" ? require(id) : id in imports ? imports[id] : (() => { throw new Error(`Missing ${id}`); })(), exports);
+  new Function("require", "exports", code)(id => id === "react/jsx-runtime" ? require(id) : id in imports ? imports[id] : id === "./debug" ? adDiagnostics : (() => { throw new Error(`Missing ${id}`); })(), exports);
   return exports;
 }
 const react = { useCallback: fn => fn, useEffect() {}, useRef: value => ({ current: value }),

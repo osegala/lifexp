@@ -844,8 +844,6 @@ Resources:
               Ref: EvrenthiaDevApi
             Path: /webhooks/admob/reward
             Method: GET
-            Auth:
-              Authorizer: NONE
 
   BillingFunction:
     Type: AWS::Serverless::Function
@@ -900,8 +898,6 @@ Resources:
               Ref: EvrenthiaDevApi
             Path: /webhooks/revenuecat
             Method: POST
-            Auth:
-              Authorizer: NONE
 
   GetPreferencesFunction:
     Type: AWS::Serverless::Function

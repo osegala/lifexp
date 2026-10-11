@@ -8,6 +8,7 @@ import { apiRoutes } from "../src/api/routes.ts";
 import * as model from "../src/entitlements/model.ts";
 import * as adsModel from "../src/ads/model.ts";
 import * as theme from "../src/theme/theme.ts";
+import * as adDiagnostics from "../src/ads/debug.ts";
 
 const require = createRequire(import.meta.url);
 function load(path, imports) {
@@ -15,7 +16,7 @@ function load(path, imports) {
   const code = ts.transpileModule(readFileSync(new URL(path, import.meta.url), "utf8"), { compilerOptions: {
     module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } }).outputText;
-  new Function("require", "exports", code)(id => id === "react/jsx-runtime" ? require(id) : id in imports ? imports[id] : (() => { throw new Error(`Missing ${id}`); })(), exports);
+  new Function("require", "exports", code)(id => id === "react/jsx-runtime" ? require(id) : id in imports ? imports[id] : id === "./debug" ? adDiagnostics : (() => { throw new Error(`Missing ${id}`); })(), exports);
   return exports;
 }
 const rewarded = load("../src/ads/rewarded.ts", { "../api/errors": { apiError } });
@@ -125,6 +126,35 @@ test("real provider/CTA show only FREE Shop, remain absent in protected flows, a
   f.state.route = "/shop"; f.state.feedback = true; await checkHidden(); f.state.feedback = false;
   f.state.user.onboardingCompleted = false; await checkHidden();
   assert.deepEqual(f.calls, ["status"]);
+});
+
+test("rewarded diagnostics retain request/confirmation outcomes without button or token traces", async t => {
+  const f = uiFixture(t), logs = [];
+  t.mock.method(console, "info", (...args) => logs.push(args));
+  f.state.token = "private-auth-token";
+  await f.flow.refresh();
+  nodes(f.render()).find(n => n.props.title === "Watch an ad for 10 coins").props.onPress();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(logs.map(args => args[1]), ["rewarded.request.enter"]);
+  assert.deepEqual(logs[0][2], { enabled: true, phase: "idle", available: true, remaining: 3 });
+  await f.flow.complete();
+  assert.deepEqual(logs.at(-1).slice(1), ["rewarded.confirmation.success", { duplicate: false, remaining: 2 }]);
+  assert.doesNotMatch(JSON.stringify(logs), /private-auth-token/);
+  assert.equal(f.calls.filter(call => call === "prepare").length, 1);
+});
+
+test("failed server confirmation logs only a safe code and never invents a balance", async t => {
+  const previous = globalThis.__DEV__, logs = [];
+  globalThis.__DEV__ = true;
+  t.after(() => { if (previous === undefined) delete globalThis.__DEV__; else globalThis.__DEV__ = previous; });
+  t.mock.method(console, "info", (...args) => logs.push(args));
+  const f = fixture({ verifyRewardedCompletion: async () => { throw Object.assign(new Error("private-claim private-user"), { code: "ERR_NETWORK" }); } });
+  await f.flow.refresh(); await f.flow.request();
+  assert.equal(await f.flow.complete(), null);
+  assert.deepEqual(logs.at(-1).slice(1), ["rewarded.confirmation.failed", { code: "ERR_NETWORK" }]);
+  assert.doesNotMatch(JSON.stringify(logs), /private-/);
+  assert.equal(f.flow.getSnapshot().status.coins, 40);
+  assert.equal(f.flow.getSnapshot().phase, "ready");
 });
 
 test("real DEV controls support cancellation, explicit completion, loading, announced confirmation, and exhausted state", async t => {

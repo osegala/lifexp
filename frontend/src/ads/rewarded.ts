@@ -1,5 +1,6 @@
 import type { AdProviderAdapter } from "./adapter";
 import { apiError } from "../api/errors";
+import { adDebug, adDebugError } from "./debug";
 
 export const REWARDED_AD_COINS = 10;
 export const REWARDED_AD_DAILY_LIMIT = 3;
@@ -55,7 +56,11 @@ export class RewardedAds {
     } finally { if (revision === this.revision) this.update({ phase: "idle" }); }
   };
   request = async () => {
-    if (!this.enabled || this.state.phase !== "idle" || !this.state.status?.available || !this.state.status.rewardedAdsRemainingToday) return;
+    adDebug("rewarded.request.enter", { enabled: this.enabled, phase: this.state.phase,
+      available: this.state.status?.available, remaining: this.state.status?.rewardedAdsRemainingToday });
+    if (!this.enabled || this.state.phase !== "idle" || !this.state.status?.available || !this.state.status.rewardedAdsRemainingToday) {
+      return;
+    }
     const revision = this.revision;
     this.update({ phase: "preparing", error: null, message: null });
     try {
@@ -65,7 +70,8 @@ export class RewardedAds {
       this.receipt = completion.providerEventId;
       this.update({ phase: "ready" });
       if (!completion.devSimulation) return await this.complete();
-    } catch {
+    } catch (error) {
+      adDebug("rewarded.request.failed", adDebugError(error));
       if (revision === this.revision) this.update({ error: "Could not prepare the ad. No reward was confirmed." });
     } finally { if (revision === this.revision && this.getSnapshot().phase === "preparing") this.update({ phase: "idle" }); }
   };
@@ -78,11 +84,13 @@ export class RewardedAds {
       checkedStatus(result);
       if (typeof result.duplicate !== "boolean") throw new Error("Unconfirmed reward");
       if (revision !== this.revision) return null;
+      adDebug("rewarded.confirmation.success", { duplicate: result.duplicate, remaining: result.rewardedAdsRemainingToday });
       this.receipt = null;
       this.update({ status: result, phase: "idle", message: result.duplicate ? "This ad reward was already confirmed." : `${result.rewardCoins} coins confirmed by Evrenthia.` });
       return this.enabled ? result : null;
     } catch (error) {
       if (revision !== this.revision) return null;
+      adDebug("rewarded.confirmation.failed", adDebugError(error));
       const failure = apiError(error, "Could not confirm the reward.");
       if (failure.code === "AD_DAILY_LIMIT") {
         try {

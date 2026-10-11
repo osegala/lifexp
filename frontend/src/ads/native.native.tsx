@@ -8,6 +8,7 @@ import LifeButton from "../components/LifeButton";
 import type { AdProviderAdapter } from "./adapter";
 import type { RewardedAdResult, RewardedAdStatus } from "./rewarded";
 import type { BannerPlacement } from "./model";
+import { adDebug, adDebugError } from "./debug";
 
 const units = Platform.OS === "ios" ? {
   HOME: process.env.EXPO_PUBLIC_ADMOB_IOS_HOME_BANNER_UNIT_ID,
@@ -24,7 +25,6 @@ export const liveAdsConfigured = Object.values(units).every(v => /^ca-app-pub-\d
   && !v!.startsWith("ca-app-pub-3940256099942544/"))
   && /^ca-app-pub-\d+~\d+$/.test(appId ?? "") && !appId!.startsWith("ca-app-pub-3940256099942544~");
 const testDevices = (process.env.EXPO_PUBLIC_ADMOB_TEST_DEVICE_IDS ?? "").split(",").map(v => v.trim()).filter(Boolean);
-const testRewardUnit = process.env.EXPO_PUBLIC_ADMOB_TEST_REWARDED_UNIT_ID;
 let scope: { userId: string | null; allowed: boolean; revision: number } = { userId: null, allowed: false, revision: 0 };
 let consent: Promise<void> | null = null, initialization: Promise<unknown> | null = null;
 let cancelRewarded: (() => void) | null = null;
@@ -37,13 +37,17 @@ export function setNativeAdScope(userId: string | null, allowed: boolean) {
 const assertAllowed = (revision: number) => { if (!scope.allowed || !scope.userId || scope.revision !== revision) throw new Error("Ad placement is no longer eligible."); };
 const requestScope = () => ({ expectedUserId: scope.userId } as AxiosRequestConfig);
 const testMode = () => process.env.EXPO_PUBLIC_ADS_MODE === "test";
+const rewardedUnit = (demoUnit: string) => testMode() && !testDevices.length ? demoUnit : units.reward!;
 
-async function ready(revision: number) {
+async function ready(revision: number, placement: string) {
   assertAllowed(revision);
-  // Sample units cannot be configured with our SSV URL. Dedicated QA units require explicit test devices.
-  if (testMode() && testRewardUnit && (!/^ca-app-pub-\d+\/\d+$/.test(testRewardUnit)
-    || Object.values(units).includes(testRewardUnit) || !testDevices.length
-    || testDevices.some(v => !/^[a-f\d]{32}$/i.test(v)))) throw new Error("SSV QA requires a dedicated unit and registered test-device IDs.");
+  // Our SSV unit is test-only here: require explicit SDK test-device registration before using it.
+  if (testMode() && testDevices.length && (testDevices.some(v => !/^[a-f\d]{32}$/i.test(v)
+    && !(Platform.OS === "android" && v === "EMULATOR"))
+    || (placement === "rewarded" && (!/^ca-app-pub-\d+\/\d+$/.test(units.reward ?? "")
+      || units.reward!.startsWith("ca-app-pub-3940256099942544/"))))) {
+    throw new Error("SSV testing requires a configured rewarded unit and registered test-device IDs.");
+  }
   const sdk = await import("react-native-google-mobile-ads");
   assertAllowed(revision);
   if (!consent) {
@@ -53,10 +57,11 @@ async function ready(revision: number) {
   }
   await consent;
   assertAllowed(revision);
-  if (!(await sdk.AdsConsent.getConsentInfo()).canRequestAds) throw new Error("Consent does not permit ad requests.");
+  const info = await sdk.AdsConsent.getConsentInfo();
+  if (!info.canRequestAds) throw new Error("Consent does not permit ad requests.");
   assertAllowed(revision);
   if (!initialization) initialization = (async () => {
-    await sdk.default().setRequestConfiguration({ testDeviceIdentifiers: testMode() ? ["EMULATOR", ...testDevices] : [] });
+    await sdk.default().setRequestConfiguration({ testDeviceIdentifiers: testMode() ? [...new Set(["EMULATOR", ...testDevices])] : [] });
     assertAllowed(revision);
     return sdk.default().initialize();
   })().catch(error => { initialization = null; throw error; });
@@ -74,18 +79,18 @@ export function NativeBanner({ placement }: { placement: BannerPlacement }) {
     setState(null); setFailed(false);
     const invalidate = () => { if (active) { setState(null); setRefresh(x => x + 1); } };
     privacyListeners.add(invalidate);
-    void ready(revision).then(async sdk => {
+    void ready(revision, `banner:${placement}`).then(async sdk => {
       const info = await sdk.AdsConsent.getConsentInfo(); assertAllowed(revision);
       if (active) setState({ sdk, privacy: info.privacyOptionsRequirementStatus === "REQUIRED" });
-    }).catch(() => { if (active) setFailed(true); });
+    }).catch(error => { adDebug("banner.prepare.failed", { placement, ...adDebugError(error) }); if (active) setFailed(true); });
     return () => { active = false; privacyListeners.delete(invalidate); };
-  }, [refresh]);
+  }, [refresh, placement]);
   if (!state || !scope.allowed) return null;
   const { sdk } = state;
   return <View style={{ alignItems: "center", width: "100%" }}>
     {!failed ? <sdk.BannerAd unitId={testMode() ? sdk.TestIds.ADAPTIVE_BANNER : units[placement]!}
       size={sdk.BannerAdSize.ANCHORED_ADAPTIVE_BANNER} requestOptions={{ requestNonPersonalizedAdsOnly: true }}
-      onAdFailedToLoad={() => setFailed(true)} /> : null}
+      onAdFailedToLoad={error => { adDebug("banner.load.failed", { placement, ...adDebugError(error) }); setFailed(true); }} /> : null}
     {state.privacy ? <LifeButton title="Ad privacy options" variant="secondary" onPress={() => {
       void sdk.AdsConsent.showPrivacyOptionsForm().finally(() => {
         consent = null; privacyListeners.forEach(fn => fn());
@@ -102,14 +107,21 @@ export const adMobAdapter: AdProviderAdapter = {
   },
   async showRewarded() {
     const revision = scope.revision;
-    const sdk = await ready(revision);
-    const prepared = (await api.post<{ providerEventId: string; binding: string; adUnitId: string }>(apiRoutes.prepareAdReward,
-      { provider: "ADMOB", platform: Platform.OS === "ios" ? "IOS" : "ANDROID" }, requestScope())).data;
+    const sdk = await ready(revision, "rewarded");
+    const unit = rewardedUnit(sdk.TestIds.REWARDED);
+    const { data: prepared } = await api.post<{ providerEventId: string; binding: string; adUnitId: string }>(apiRoutes.prepareAdReward,
+      { provider: "ADMOB", platform: Platform.OS === "ios" ? "IOS" : "ANDROID" }, requestScope());
     assertAllowed(revision);
-    const unit = testMode() ? testRewardUnit || sdk.TestIds.REWARDED : units.reward!;
-    if (prepared.adUnitId !== unit || !prepared.providerEventId.startsWith("adm:") || !prepared.binding) throw new Error("Rewarded unit/claim configuration mismatch.");
+    if (prepared.adUnitId !== unit || !prepared.providerEventId.startsWith("adm:") || !prepared.binding) {
+      throw new Error("Rewarded unit/claim configuration mismatch.");
+    }
+    // The backend decrypts custom_data as the prepared claim and checks user_id against its binding.
+    const serverSideVerificationOptions = { userId: prepared.binding, customData: prepared.providerEventId };
     const ad = sdk.RewardedAd.createForAdRequest(unit, { requestNonPersonalizedAdsOnly: true,
-      serverSideVerificationOptions: { userId: prepared.binding, customData: prepared.providerEventId } });
+      serverSideVerificationOptions });
+    adDebug("rewarded.ssv_options", { ssv_options_attached: true,
+      custom_data_present: Boolean(serverSideVerificationOptions.customData),
+      custom_data_length: serverSideVerificationOptions.customData.length });
     await new Promise<void>((resolve, reject) => {
       let earned = false, finished = false;
       const removers: (() => void)[] = [];
@@ -121,15 +133,17 @@ export const adMobAdapter: AdProviderAdapter = {
       const timer = setTimeout(() => finish(new Error("Rewarded ad timed out.")), 120_000);
       cancelRewarded = () => finish(new Error("Ad placement is no longer eligible."));
       removers.push(ad.addAdEventListener(sdk.RewardedAdEventType.LOADED, () => {
-        try { assertAllowed(revision); void ad.show().catch(() => finish(new Error("Could not show the ad."))); }
+        try { assertAllowed(revision); void ad.show().catch(error => { adDebug("rewarded.show.failed", adDebugError(error)); finish(new Error("Could not show the ad.")); }); }
         catch { finish(new Error("Ad placement is no longer eligible.")); }
       }));
       // Only records completion for UI polling. Never posts a coin claim or updates a balance.
       removers.push(ad.addAdEventListener(sdk.RewardedAdEventType.EARNED_REWARD, () => { earned = true; }));
       removers.push(ad.addAdEventListener(sdk.AdEventType.CLOSED, () => finish(earned ? undefined : new Error("Ad closed without reward."))));
-      removers.push(ad.addAdEventListener(sdk.AdEventType.ERROR, () => finish(new Error("Ad unavailable."))));
+      removers.push(ad.addAdEventListener(sdk.AdEventType.ERROR, error => {
+        adDebug("rewarded.load.failed", adDebugError(error)); finish(new Error("Ad unavailable."));
+      }));
       try { assertAllowed(revision); ad.load(); }
-      catch { finish(new Error("Ad unavailable.")); }
+      catch (error) { adDebug("rewarded.load.failed", adDebugError(error)); finish(new Error("Ad unavailable.")); }
     });
     assertAllowed(revision);
     return { providerEventId: prepared.providerEventId, devSimulation: false };

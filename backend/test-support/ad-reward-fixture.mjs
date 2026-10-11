@@ -5,6 +5,7 @@ import * as http from "../layers/api-shared/nodejs/http.mjs";
 import * as dates from "../layers/api-shared/nodejs/dates.mjs";
 import * as entitlements from "../layers/api-shared/nodejs/entitlements.mjs";
 import * as logic from "../functions/ad-rewards/logic.mjs";
+import * as diagnostics from "../functions/ad-rewards/diagnostics.mjs";
 
 function load(file, imports, exports, DateClass = Date, env = {}) {
   const source = readFileSync(new URL(`../functions/ad-rewards/${file}.mjs`, import.meta.url), "utf8")
@@ -13,7 +14,7 @@ function load(file, imports, exports, DateClass = Date, env = {}) {
   return new Function("imports", "process", "Date", `${source}\nreturn {${exports.join(",")}};`)(imports, { env }, DateClass);
 }
 
-export function fixture({ env = "dev", enabled = "true", timeZone = "America/New_York", envVars = {}, request = async () => { throw new Error("Unexpected network request"); } } = {}) {
+export function fixture({ env = "dev", enabled = "true", timeZone = "America/New_York", envVars = {}, request = async () => { throw new Error("Unexpected network request"); }, verifySignature = crypto.verify } = {}) {
   const items = new Map(), writes = [], calls = [];
   let now = "2026-10-08T16:00:00.000Z", beforeTransaction, failAfterCommit = false;
   const key = item => `${item.PK.S}/${item.SK.S}`;
@@ -68,8 +69,8 @@ export function fixture({ env = "dev", enabled = "true", timeZone = "America/New
       return {};
     }
   }
-  const imports = { "node:crypto": crypto, "/opt/nodejs/http.mjs": http, "/opt/nodejs/dates.mjs": dates,
-    "/opt/nodejs/entitlements.mjs": entitlements, "./logic.mjs": logic,
+  const imports = { "node:crypto": { ...crypto, verify: verifySignature }, "/opt/nodejs/http.mjs": http, "/opt/nodejs/dates.mjs": dates,
+    "/opt/nodejs/entitlements.mjs": entitlements, "./logic.mjs": logic, "./diagnostics.mjs": diagnostics,
     "@aws-sdk/client-dynamodb": { DynamoDBClient, GetItemCommand, TransactWriteItemsCommand } };
   imports["./verification.mjs"] = load("verification", imports, ["receiptKey", "rewardVerifier"], FixedDate);
   const admob = load("admob", imports, ["admobVerifier", "transactionKey"], FixedDate);
@@ -89,4 +90,3 @@ export function fixture({ env = "dev", enabled = "true", timeZone = "America/New
   };
   return f;
 }
-

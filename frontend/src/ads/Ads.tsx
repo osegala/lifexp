@@ -94,7 +94,9 @@ export function RewardedAdButton({ onReward }: { onReward?: (result: RewardedAdR
       {ads.status?.available === false ? <Text style={styles.copy}>The reward provider is disabled on this server.</Text> : null}
       <LifeButton title={exhausted ? "Daily ad rewards claimed" : ads.rewardedAdLoading ? "Checking ad rewards…" : `Watch an ad for ${REWARDED_AD_COINS} coins`}
         disabled={exhausted || ads.rewardedAdLoading || !ads.status?.available}
-        onPress={() => { void ads.requestRewardedAd().then(result => { if (result) onReward?.(result); }); }} />
+        onPress={() => {
+          void ads.requestRewardedAd().then(result => { if (result) onReward?.(result); });
+        }} />
       {ads.error ? <LifeButton title="Retry ad reward status" variant="secondary" disabled={ads.rewardedAdLoading} onPress={() => { void ads.refreshRewardedAds(); }} /> : null}
     </>}
   </LifeCard>;

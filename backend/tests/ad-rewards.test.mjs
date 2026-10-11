@@ -117,5 +117,8 @@ test("SAM exposes JWT-only status/prepare/claim routes with bounded permissions 
   assert.match(block, /Path: \/ads\/reward\/prepare/); assert.match(block, /Ref: ApiSharedLayer/);
   assert.doesNotMatch(block, /dynamodb:(?:Scan|DeleteItem|\*)/);
   assert.match(template, /DevRewardedAdsEnabled:[\s\S]*?Default: "false"/);
-  assert.match(block, /Path: \/webhooks\/admob\/reward\n\s+Method: GET\n\s+Auth:\n\s+Authorizer: NONE/);
+  const webhook = block.split("        AdMobSsv:\n")[1];
+  assert.match(webhook, /Type: HttpApi[\s\S]*Path: \/webhooks\/admob\/reward\n\s+Method: GET/);
+  assert.doesNotMatch(webhook, /\bAuth:/);
+  assert.doesNotMatch(template, /DefaultAuthorizer:/);
 });
