@@ -13,7 +13,9 @@ import { APPEARANCE_VALUES } from "../../backend/layers/api-shared/nodejs/appear
 
 const require = createRequire(import.meta.url);
 const native = Object.fromEntries(["ActivityIndicator", "Image", "Modal", "Pressable", "ScrollView", "Text", "View"].map(name => [name, name]));
-native.StyleSheet = { create: value => value };
+native.StyleSheet = { create: value => value, absoluteFill: { position: "absolute" } };
+native.FlatList = "FlatList";
+native.Platform = { select: options => options.default };
 native.useWindowDimensions = () => ({ width: 375, height: 812 });
 // Match React Native Web: an Alert cannot be used to close a dirty editor.
 native.Alert = { alert() {} };
@@ -38,11 +40,11 @@ function nodes(tree) {
 }
 const text = tree => typeof tree === "string" ? tree : Array.isArray(tree)
   ? tree.map(text).join("") : tree?.props ? text(tree.props.children) : "";
-const button = (tree, label) => nodes(tree).find(node => node.type === "Pressable"
-  && (node.props.accessibilityLabel === label || text(node) === label));
+const button = (tree, label) => nodes(tree).find(node => (node.type === "Pressable" || node.type === "Button")
+  && (node.props.accessibilityLabel === label || node.props.title === label || text(node) === label));
 
 const Editor = load("../src/components/AppearanceEditor.tsx", {
-  "react-native": native, "../avatar/appearance": appearance, "../theme/theme": theme, "./LifeCard": "LifeCard",
+  "react-native": native, "../avatar/appearance": appearance, "../theme/theme": theme, "./LifeCard": "LifeCard", "./ui/Primitives": { UiPressable: "Pressable" },
 });
 
 async function screen({ validatePatch = () => {} } = {}) {
@@ -83,13 +85,27 @@ async function screen({ validatePatch = () => {} } = {}) {
     "../../src/avatar/appearance": appearance,
     "../../src/components/CosmeticImage": "CosmeticImage",
     "../../src/components/AvatarRenderer": "AvatarRenderer",
+    "../../src/components/AvatarContent": "AvatarContent",
     "../../src/components/AppearanceEditor": "AppearanceEditor",
     "../../src/components/LifeCard": "LifeCard",
     "../../src/context/AuthContext": { useAuth: () => ({ user: { id: "test-user" } }) },
     "../../src/theme/theme": theme,
     "../../src/config/environment": { environment: { environment: "dev" } },
   });
-  const render = () => { index = 0; return Component(); };
+  const Content = load("../src/components/AvatarContent.tsx", {
+    react: { useMemo: fn => fn() }, "react-native": native, "../theme/theme": theme,
+    "@expo/vector-icons/MaterialCommunityIcons": "Icon",
+    "../avatar/assetRegistry": { getEquippedSceneSource: () => undefined },
+    "./AvatarRenderer": "AvatarRenderer", "./AppearanceEditor": "AppearanceEditor", "./WardrobeCard": "WardrobeCard", "./LifeButton": "Button",
+    "./ui/Indicators": { BadgePill: "Badge" },
+    "./ui/Primitives": { UiPressable: "Pressable", UiText: "Text", SurfaceCard: "Card", EmptyState: "EmptyState", FilterChip: "FilterChip", SectionHeader: "SectionHeader" },
+  });
+  const render = () => {
+    index = 0;
+    const tree = Content(Component().props);
+    const list = nodes(tree).find(n => n.type === "FlatList");
+    return { ...tree, props: { ...tree.props, children: [list.props.ListHeaderComponent, tree.props.children] } };
+  };
   render();
   focus();
   await new Promise(setImmediate);
@@ -172,7 +188,7 @@ test("skin swatches retain saved IDs, inclusive depth/undertone labels, and acce
     previous = luminance;
   }
   const Editor = load("../src/components/AppearanceEditor.tsx", {
-    "react-native": native, "../avatar/appearance": appearance, "../theme/theme": theme, "./LifeCard": "LifeCard",
+    "react-native": native, "../avatar/appearance": appearance, "../theme/theme": theme, "./LifeCard": "LifeCard", "./ui/Primitives": { UiPressable: "Pressable" },
   });
   const changes = [];
   const tree = Editor({ appearance: appearance.DEFAULT_APPEARANCE, onChange: patch => changes.push(patch), dirty: false, saving: false });
@@ -269,7 +285,7 @@ test("network save errors stay visible beside Save, preserve the draft, and perm
 
 test("hair picker exposes all 20 names, checked state, and 44-point targets", () => {
   const Editor = load("../src/components/AppearanceEditor.tsx", {
-    "react-native": native, "../avatar/appearance": appearance, "../theme/theme": theme, "./LifeCard": "LifeCard",
+    "react-native": native, "../avatar/appearance": appearance, "../theme/theme": theme, "./LifeCard": "LifeCard", "./ui/Primitives": { UiPressable: "Pressable" },
   });
   for (const hairId of appearance.HAIR_STYLE_IDS) {
     const changes = [];

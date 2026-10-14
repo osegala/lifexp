@@ -391,19 +391,21 @@ test("all GIRL trousers cover legs with or without boots, preserving exposed ank
 
 test("Avatar screen previews drafts and saves all five fields with one PATCH", () => {
   const screen = read("../app/(tabs)/avatar.tsx");
-  assert.match(screen, /skinColorId=\{avatar\?\.skinColorId\}/);
-  assert.match(screen, /hairColorId=\{avatar\?\.hairColorId\}/);
-  assert.match(screen, /eyeColorId=\{avatar\?\.eyeColorId\}/);
+  const content = read("../src/components/AvatarContent.tsx");
+  assert.match(screen, /<AvatarContent avatar=\{avatar\}/);
+  assert.match(content, /skinColorId=\{avatar\.skinColorId\}/);
+  assert.match(content, /hairColorId=\{avatar\.hairColorId\}/);
+  assert.match(content, /eyeColorId=\{avatar\.eyeColorId\}/);
   assert.match(screen, /api\.patch<AvatarAppearance>\(apiRoutes\.me, draftAppearance\)/);
   assert.match(screen, /setLocalAppearance\(user\.id, persisted\)/);
   assert.doesNotMatch(screen, /api\.patch[\s\S]{0,120}onSelect/);
 });
 
 test("Avatar screen keeps appearance controls in an on-demand modal", () => {
-  const screen = read("../app/(tabs)/avatar.tsx");
-  assert.match(screen, /<Text style=\{styles\.editAppearanceText\}>Edit Appearance<\/Text>/);
-  assert.match(screen, /<Modal[\s\S]*?visible=\{editingAppearance\}[\s\S]*?<AppearanceEditor/);
-  assert.ok(screen.indexOf("<Modal") < screen.indexOf("<AppearanceEditor"));
+  const content = read("../src/components/AvatarContent.tsx");
+  assert.match(content, /title="Edit Appearance" onPress=\{props\.onEditAppearance\}/);
+  assert.match(content, /<Modal[\s\S]*?visible=\{props\.editingAppearance\}[\s\S]*?<AppearanceEditor/);
+  assert.ok(content.indexOf("<Modal") < content.indexOf("<AppearanceEditor"));
 });
 
 test("first-run onboarding reuses the complete appearance editor and persists one appearance model", () => {
