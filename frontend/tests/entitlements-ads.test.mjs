@@ -111,7 +111,14 @@ test("route and feedback guards exclude authentication, onboarding, editors, per
   for (const [path, placement] of [["../app/(tabs)/dashboard.tsx", "HOME"], ["../app/(tabs)/shop.tsx", "SHOP"]]) {
     const source = readFileSync(new URL(path, import.meta.url), "utf8");
     assert.equal(source.match(/<BannerAdPlacement /g).length, 1);
-    assert.match(source, new RegExp(`<BannerAdPlacement placement="${placement}" />${placement === "SHOP" ? "\\s*<RewardedAdButton[\\s\\S]*?/>": ""}\\s*</ScrollView>`));
+    if (placement === "HOME") {
+      assert.match(source, /ad=\{<BannerAdPlacement placement="HOME" \/>\}/);
+      assert.match(readFileSync(new URL("../src/components/HomeContent.tsx", import.meta.url), "utf8"), /\{props\.ad\}\s*<\/ScreenShell>/);
+    } else {
+      assert.match(source, /banner=\{<BannerAdPlacement placement="SHOP" \/>\}/);
+      assert.match(source, /rewarded=\{<RewardedAdButton/);
+      assert.match(readFileSync(new URL("../src/components/ShopContent.tsx", import.meta.url), "utf8"), /ListFooterComponent=\{<View[^>]*>\{props\.banner\}\{props\.rewarded\}<\/View>\}/);
+    }
   }
 });
 

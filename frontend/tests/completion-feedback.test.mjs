@@ -132,7 +132,7 @@ function nodes(tree) {
 const text = tree => typeof tree === "string" || typeof tree === "number" ? String(tree) : Array.isArray(tree)
   ? tree.map(text).join("") : tree?.props ? text(tree.props.children) : "";
 const native = { ...Object.fromEntries(["ActivityIndicator", "Pressable", "ScrollView", "Text", "View"].map(name => [name, name])),
-  StyleSheet: { create: value => value }, Alert: { alert() {} },
+  StyleSheet: { create: value => value }, Platform: { select: value => value.default }, Alert: { alert() {} },
   AppState: { currentState: "active", addEventListener: () => ({ remove() {} }) } };
 const tick = () => new Promise(setImmediate);
 
@@ -197,19 +197,42 @@ test("quest celebrations use only awarded flags and first-day activity, not coun
 async function dashboard(readGoals) {
   const h = hooks();
   let focus, appState, removed = false, refreshKey = 0;
+  const HomeContent = load("../src/components/HomeContent.tsx", {
+    react: h.react, "react-native": native, "../theme/theme": theme,
+    "@expo/vector-icons/MaterialCommunityIcons": "Icon",
+    "../avatar/assetRegistry": { getEquippedSceneSource() {} }, "../tasks/scheduling": scheduling,
+    "./AvatarRenderer": "Avatar", "./LifeButton": "Button", "./QuestProgress": "Quests", "./XPBar": "XPBar",
+    "./ui/Indicators": { BadgePill: "Badge", ResourceCluster: "Resources",
+      ResourcePill: ({ value }) => require("react/jsx-runtime").jsx("Text", { children: value }) },
+    "./ui/Primitives": Object.fromEntries(["EmptyState", "ListRowCard", "ScreenShell", "SectionHeader", "SurfaceCard", "UiPressable", "UiText"].map(x => [x, x])),
+  });
   const Screen = load("../app/(tabs)/dashboard.tsx", {
     react: h.react, "react-native": { ...native, AppState: { currentState: "active",
       addEventListener: (_, fn) => { appState = fn; return { remove: () => { removed = true; } }; } } },
     "expo-router": { router: {}, useFocusEffect: fn => { focus = fn; } },
     "@expo/vector-icons/MaterialCommunityIcons": "Icon",
-    "../../src/api/client": { apiError, api: { get: async route => ({ data: route === "goals" ? await readGoals() : { summary: { earned: 0, total: 0 } } }) } },
-    "../../src/api/routes": { apiRoutes: { goals: "goals", achievements: "achievements" } },
+    "../../src/api/client": { apiError, api: { get: async route => ({ data: route === "goals" ? await readGoals()
+      : route === "tasks" ? { tasks: [], time: {}, summary: {} } : { summary: { earned: 0, total: 0 }, achievements: [] } }) } },
+    "../../src/api/routes": { apiRoutes: { goals: "goals", achievements: "achievements", tasks: "tasks" } },
+    "../../src/components/HomeContent": HomeContent,
+    "../../src/avatar/appearance": {}, "../../src/avatar/localAppearance": {}, "../../src/home/avatar": {},
     "../../src/components/LifeCard": "LifeCard", "../../src/components/XPBar": "XPBar", "../../src/components/QuestProgress": "Quests",
     "../../src/ads/Ads": { BannerAdPlacement: "Banner" },
     "../../src/context/AuthContext": { useAuth: () => ({ user: {}, refreshUser: async () => true, dashboardRefreshKey: refreshKey }) },
     "../../src/theme/theme": theme
   });
-  const render = () => h.render(Screen);
+  const render = () => {
+    const content = h.render(Screen);
+    const tree = HomeContent(content.props);
+    // Expand the display-only balance pill; leave Quests as the tested seam.
+    function expand(node) {
+      if (Array.isArray(node)) return node.map(expand);
+      if (!node?.props) return node;
+      if (typeof node.type === "function" && "resource" in node.props) return expand(node.type(node.props));
+      return { ...node, props: { ...node.props, children: expand(node.props.children) } };
+    }
+    return expand(tree);
+  };
   render(); let cleanup = focus(); await tick();
   return { render, state: value => appState(value), dispose: () => cleanup(), removed: () => removed,
     refocus: async () => { cleanup(); refreshKey++; render(); cleanup = focus(); await tick(); } };
@@ -258,7 +281,15 @@ async function tasksScreen(post, { refreshUser = async () => {}, readWorld = asy
   const h = hooks(), events = [], calls = [], buildingEvents = [];
   let focus, refreshes = 0;
   const tasks = [task("one"), task("two")];
+  const Content = load("../src/components/TasksContent.tsx", {
+    react: h.react, "react-native": native, "@expo/vector-icons/MaterialCommunityIcons": "Icon",
+    "../theme/theme": theme, "../tasks/scheduling": scheduling, "./LifeButton": "LifeButton",
+    "./ui/Indicators": { BadgePill: "Badge" },
+    "./ui/Primitives": { UiPressable: "Pressable", UiText: "Text", ScreenShell: "ScrollView", SurfaceCard: "Card",
+      FilterChip: "FilterChip", SectionHeader: "SectionHeader", EmptyState: "EmptyState" },
+  });
   const Screen = load("../app/(tabs)/tasks.tsx", {
+    "../../src/components/TasksContent": "TasksContent",
     "../../src/tasks/saveTask": { saveTask: () => assert.fail("completion must not create tasks") },
     react: h.react, "react-native": native,
     "@expo/vector-icons/MaterialCommunityIcons": "Icon",
@@ -282,11 +313,11 @@ async function tasksScreen(post, { refreshUser = async () => {}, readWorld = asy
       useBuildingFeedback: () => ({ enqueue: batch => buildingEvents.push(batch) }) },
     "../../src/theme/theme": theme,
   });
-  const render = () => h.render(Screen);
+  const render = () => h.render(() => Content(Screen().props));
   render(); const cleanup = focus(); await tick(); cleanup();
   const button = id => nodes(render()).find(n => n.props.accessibilityLabel === `Complete Task ${id}`);
   return { render, button, events, buildingEvents, calls, refreshes: () => refreshes,
-    showAll: () => nodes(render()).find(n => n.props.accessibilityLabel === "All tasks").props.onPress() };
+    showAll: () => nodes(render()).find(n => n.type === "FilterChip" && n.props.label === "All").props.onPress() };
 }
 
 test("task action waits for server success, guards same-tick taps, and survives refresh failure", async () => {
@@ -299,7 +330,7 @@ test("task action waits for server success, guards same-tick taps, and survives 
   await tick(); // The authoritative before-world read precedes POST.
   assert.deepEqual(ui.calls, [{ route: "tasks/one/complete", body: {} }]);
   assert.equal(ui.events.length, 0);
-  assert.equal(ui.button("one").props.children.props.name, "check");
+  assert.equal(ui.button("one").props.children.props.name, "checkbox-blank-outline");
   const data = response(); resolve(data); await tick();
   assert.deepEqual(ui.events, [data]);
   assert.equal(ui.button("one"), undefined, "completed task no longer appears in Today");
@@ -315,7 +346,7 @@ test("failed and already-completed requests never emit success or optimistic rew
     ui.button("one").props.onPress(); await tick();
     assert.equal(ui.events.length, 0);
     assert.equal(ui.buildingEvents.length, 0);
-    assert.equal(ui.button("one").props.children.props.name, "check");
+    assert.equal(ui.button("one").props.children.props.name, "checkbox-blank-outline");
     assert.equal(ui.button("one").props.disabled, false);
     assert.ok(nodes(ui.render()).some(n => n.props.accessibilityRole === "alert"));
   }
@@ -508,6 +539,7 @@ test("task success compares ordered authoritative snapshots, including multiple 
 function buildingUI(h, { reduced = false, announced = [], animations = [], values = [] } = {}, exportName = "default") {
   return load("../src/components/BuildingUpgradeFeedback.tsx", {
     react: h.react,
+    "./ui/Primitives": { UiPressable: "Pressable" },
     "react-native": { ...native, Image: "Image", Platform: { OS: "ios" }, Easing: { inOut: v => v, quad: 0 },
       AccessibilityInfo: { isReduceMotionEnabled: async () => reduced, addEventListener: () => ({ remove() {} }), announceForAccessibility: value => announced.push(value) },
       Animated: { View: "AnimatedView", Image: "AnimatedImage", Value: class {
