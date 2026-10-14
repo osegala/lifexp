@@ -31,7 +31,7 @@ function hooks() {
   useEffect: (fn, deps) => { const key = cursor++; if (!state[key] || deps.some((value, i) => value !== state[key][i])) { state[key] = deps; effects.push(fn); } } };
   return { react, render(fn) { cursor = 0; const result = fn(); while (effects.length) effects.shift()(); return result; } };
 }
-const native = { StyleSheet: { create: value => value }, ...Object.fromEntries(["View", "Text", "Switch", "Pressable"].map(name => [name, name])) };
+const native = { Platform: { select: options => options.default }, StyleSheet: { create: value => value }, ...Object.fromEntries(["View", "Text", "Switch", "Pressable"].map(name => [name, name])) };
 const nodes = tree => Array.isArray(tree) ? tree.flatMap(nodes) : tree?.props ? [tree, ...nodes(tree.props.children)] : [];
 const text = tree => typeof tree === "string" ? tree : Array.isArray(tree) ? tree.map(text).join("") : tree?.props ? text(tree.props.children) : "";
 
@@ -105,7 +105,7 @@ test("TaskEditor retains a created task ID when reminder save fails, avoiding du
   const h = hooks(), ids = []; let fail = true;
   const reminder = { choice: "15", clock: "", save: async () => { if (fail) throw new Error("offline"); }, reset() {} };
   const Editor = load("../src/components/TaskEditor.tsx", { react: h.react, "react-native": native, "../api/client": { apiError },
-    "../theme/theme": theme, "../tasks/scheduling": scheduling, "./LifeInput": "Input", "../notifications/model": model,
+    "../theme/theme": theme, "../tasks/scheduling": scheduling, "./LifeInput": "Input", "./ui/Primitives": { UiPressable: "Pressable" }, "../notifications/model": model,
     "../notifications/useTaskReminder": { useTaskReminder: () => reminder } }).default;
   const render = () => h.render(() => Editor({ disabled: false, time: { date: "2026-10-05", weekday: "MON", timeZone: "UTC" }, onSave: async (_input, id) => { ids.push(id); return "created"; } }));
   const node = label => nodes(render()).find(item => item.props.accessibilityLabel === label)
@@ -123,7 +123,7 @@ test("notification settings expose labeled controls, save only preferences and k
   const Settings = load("../src/components/NotificationSettings.tsx", { react: h.react, "react-native": native, "expo-router": { useFocusEffect: fn => { focus = fn; } },
     "../api/routes": { apiRoutes }, "../api/client": { apiError, api: { get: async () => ({ data: initial }), patch: async (route, value) => { if (fail) throw new Error("offline"); patches.push([route, value]); return { data: value }; } } },
     "../notifications/device": { enableDeviceNotifications: async () => "web", permissionMessage: { web: "Use the native app; preferences can be saved here." } }, "../notifications/model": model,
-    "../theme/theme": theme, "./LifeButton": "Button", "./LifeCard": "Card", "./LifeInput": "Input" }).default;
+    "../theme/theme": theme, "./LifeButton": "Button", "./LifeCard": "Card", "./LifeInput": "Input", "./ui/Primitives": { UiPressable: "Pressable" } }).default;
   const render = () => h.render(() => Settings({ timeZone: "UTC" })); render(); focus(); await tick();
   for (const label of ["Notifications enabled", "Task reminders", "Daily task summary", "Daily quest reminder", "Streak reminder", "Quiet hours"]) assert.ok(nodes(render()).find(item => item.type === "Switch" && item.props.accessibilityLabel === label));
   nodes(render()).find(item => item.props.accessibilityLabel === "Quiet hours").props.onValueChange(true);
