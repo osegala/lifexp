@@ -1,20 +1,14 @@
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert } from "react-native";
 
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
-import { getCosmeticPreviewCrop, getCosmeticPreviewSource } from "../../src/avatar/assetRegistry";
-import { catalogCosmeticReference } from "../../src/avatar/inventory";
-import CosmeticImage from "../../src/components/CosmeticImage";
-import LifeCard from "../../src/components/LifeCard";
+import ShopContent from "../../src/components/ShopContent";
 import { useAuth } from "../../src/context/AuthContext";
-import { colors, radius, spacing } from "../../src/theme/theme";
 import type { ShopItem, ShopResponse } from "../../src/types";
 import { useEntitlements } from "../../src/entitlements/useEntitlements";
 import { BannerAdPlacement, RewardedAdButton } from "../../src/ads/Ads";
-import LifeButton from "../../src/components/LifeButton";
 
 export default function ShopScreen() {
   const { refreshUser } = useAuth();
@@ -22,15 +16,20 @@ export default function ShopScreen() {
   const entitlement = useEntitlements();
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [purchaseError, setPurchaseError] = useState("");
 
   const loadShop = useCallback(async () => {
     try {
       setLoading(true);
       const shopResponse = await api.get<ShopResponse>(apiRoutes.shop);
       setShop(shopResponse.data);
+      setLoadError("");
       await refreshUser();
     } catch (error) {
-      Alert.alert("Shop", apiError(error, "Could not load the shop.").message);
+      const message = apiError(error, "Could not load the shop.").message;
+      setLoadError(message);
+      Alert.alert("Shop", message);
     } finally {
       setLoading(false);
     }
@@ -38,134 +37,27 @@ export default function ShopScreen() {
 
   useFocusEffect(useCallback(() => { void loadShop(); }, [loadShop]));
 
-  async function purchase(item: ShopItem) {
+  const purchase = useCallback(async (item: ShopItem) => {
     try {
       setBusyId(item.itemId);
+      setPurchaseError("");
       await api.post(apiRoutes.shopPurchase, { itemId: item.itemId });
       await loadShop();
     } catch (error) {
-      Alert.alert("Shop", apiError(error, "Could not purchase this item.").message);
+      const message = apiError(error, "Could not purchase this item.").message;
+      setPurchaseError(message);
+      Alert.alert("Shop", message);
     } finally {
       setBusyId(null);
     }
-  }
+  }, [loadShop]);
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <View style={styles.headerCopy}>
-          <Text accessibilityRole="header" style={styles.title}>Shop</Text>
-          <Text style={styles.muted}>Catalog prices and unlock requirements are set by Evrenthia.</Text>
-        </View>
-        <View style={styles.coinBadge}>
-          <MaterialCommunityIcons name="gold" color={colors.accent} size={22} />
-          <Text style={styles.coinText}>{shop?.player.coins ?? 0}</Text>
-        </View>
-      </View>
-
-      <LifeCard compact>
-        <Text style={styles.cardTitle}>Evrenthia Premium</Text>
-        <Text style={styles.muted}>
-          {entitlement.loading ? "Checking your plan…" : entitlement.premium
-            ? "Premium · Ad-free"
-            : "View Premium for subscription options."}
-        </Text>
-        <LifeButton title="View Premium" variant="secondary" onPress={() => router.push("/premium")} />
-      </LifeCard>
-
-      {loading && !shop ? <ActivityIndicator color={colors.primary} /> : null}
-      {(shop?.items ?? []).map((item) => (
-        <ShopItemRow key={item.itemId} item={item} busy={busyId === item.itemId} onPurchase={() => void purchase(item)} />
-      ))}
-      <BannerAdPlacement placement="SHOP" />
-      <RewardedAdButton onReward={result => {
-        setShop(current => current ? { ...current, player: { ...current.player, coins: result.coins } } : current);
-        void refreshUser();
-      }} />
-    </ScrollView>
-  );
+  return <ShopContent shop={shop} entitlement={entitlement} loading={loading} busyId={busyId}
+    loadError={loadError} purchaseError={purchaseError} onPurchase={purchase} onRetry={() => void loadShop()}
+    onPremium={() => router.push("/premium")}
+    banner={<BannerAdPlacement placement="SHOP" />}
+    rewarded={<RewardedAdButton onReward={result => {
+      setShop(current => current ? { ...current, player: { ...current.player, coins: result.coins } } : current);
+      void refreshUser();
+    }} />} />;
 }
-
-function ShopItemRow({ item, busy, onPurchase }: { item: ShopItem; busy: boolean; onPurchase: () => void }) {
-  const cosmetic = catalogCosmeticReference(item);
-  const preview = cosmetic ? getCosmeticPreviewSource(cosmetic) : undefined;
-  const label = item.owned
-    ? "Owned"
-    : item.status === "LOCKED"
-      ? "Locked"
-      : item.status === "NOT_ENOUGH_COINS"
-        ? "Need coins"
-        : busy ? "Buying…" : "Buy";
-  const requirement = item.achievementRequirement;
-  const progressUnit = requirement?.type === "TASKS_COMPLETED"
-    ? "tasks"
-    : requirement?.type === "LEVEL_REACHED"
-      ? "levels"
-      : requirement?.type === "DAILY_GOALS_COMPLETED"
-        ? "daily goals"
-        : "progress";
-  const locked = item.status === "LOCKED";
-
-  return (
-    <LifeCard compact style={styles.item}>
-      <View style={styles.preview}>
-        {preview && cosmetic ? <CosmeticImage source={preview} crop={getCosmeticPreviewCrop(cosmetic)} style={styles.image} />
-          : <MaterialCommunityIcons name="hanger" size={30} color={colors.mutedText} />}
-      </View>
-      <View style={styles.itemCopy}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        {locked ? (
-          <>
-            <Text style={styles.lockedText}>Locked</Text>
-            {item.requiresPremium && !item.premiumRequirementSatisfied ? <Text style={styles.muted}>Evrenthia Premium required</Text> : null}
-            {requirement ? (
-              <>
-                <Text style={styles.muted}>Complete &quot;{requirement.name}&quot;</Text>
-                <Text style={styles.muted}>{requirement.currentValue} / {requirement.requiredValue} {progressUnit}</Text>
-              </>
-            ) : !item.requiresPremium || item.premiumRequirementSatisfied ? (
-              <Text style={styles.muted}>Reach level {item.effectiveRequiredLevel}</Text>
-            ) : null}
-          </>
-        ) : (
-          <>
-            <Text style={styles.muted}>{item.effectivePrice} coins · {item.owned ? "Owned" : "Available"}</Text>
-            {requirement ? <Text style={styles.muted}>Unlocked by {requirement.name}</Text> : null}
-          </>
-        )}
-      </View>
-      {locked || item.owned ? (
-        <View style={[styles.statusBadge, locked && styles.disabled]}>
-          <Text style={styles.statusText}>{label}</Text>
-        </View>
-      ) : (
-        <Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${item.name}`} accessibilityState={{ disabled: !item.canPurchase || busy }} onPress={onPurchase} disabled={!item.canPurchase || busy} style={[styles.buyButton, (!item.canPurchase || busy) && styles.disabled]}>
-          <Text style={styles.buyText}>{label}</Text>
-        </Pressable>
-      )}
-    </LifeCard>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.md },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md },
-  headerCopy: { flex: 1 },
-  title: { color: colors.text, fontSize: 30, fontWeight: "700" },
-  muted: { color: colors.mutedText, marginTop: 3 },
-  coinBadge: { flexDirection: "row", gap: spacing.xs, alignItems: "center", backgroundColor: colors.card, borderRadius: radius.pill, padding: spacing.sm },
-  coinText: { color: colors.text, fontWeight: "800" },
-  cardTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  item: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.md },
-  preview: { width: 72, height: 72, alignItems: "center", justifyContent: "center", backgroundColor: colors.cardLight, borderRadius: radius.md, overflow: "hidden" },
-  image: { width: 68, height: 68 },
-  itemCopy: { flex: 1, minWidth: 100 },
-  itemName: { color: colors.text, fontSize: 17, fontWeight: "700" },
-  lockedText: { color: colors.danger, fontWeight: "800", marginTop: 3 },
-  buyButton: { minWidth: 82, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.primary },
-  statusBadge: { minWidth: 82, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.cardLight },
-  statusText: { color: colors.text, fontWeight: "800" },
-  buyText: { color: colors.background, fontWeight: "800" },
-  disabled: { opacity: 0.45 },
-});

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Image as CachedImage } from "expo-image";
 import {
   Image, ImageSourcePropType, StyleProp, StyleSheet, View, ViewStyle,
 } from "react-native";
@@ -10,14 +11,17 @@ type Props = {
   source: ImageSourcePropType;
   crop?: ImageCrop;
   style: StyleProp<ViewStyle>;
+  /** Shop previews only; layered avatar rendering and wardrobe defaults stay unchanged. */
+  cached?: boolean;
 };
 
-export default function CosmeticImage({ source, crop, style }: Props) {
+export default function CosmeticImage({ source, crop, style, cached = false }: Props) {
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   if (!crop) return (
     <View style={style}>
-      <Image source={source} style={styles.fullImage} resizeMode="contain" />
+      {cached ? <CachedImage source={source} style={styles.fullImage} contentFit="contain" cachePolicy="memory-disk" transition={0} />
+        : <Image source={source} style={styles.fullImage} resizeMode="contain" />}
     </View>
   );
 
@@ -34,11 +38,12 @@ export default function CosmeticImage({ source, crop, style }: Props) {
       }}
     >
       <View style={{ width: crop.width * scale, height: crop.height * scale, overflow: "hidden" }}>
-        <Image
+        {cached ? scale > 0 && <CachedImage source={source} style={[styles.image, croppedImageStyle(crop)]}
+          contentFit="contain" cachePolicy="memory-disk" transition={0} /> : <Image
           source={source}
           style={[styles.image, croppedImageStyle(crop)]}
           resizeMode="stretch"
-        />
+        />}
       </View>
     </View>
   );
