@@ -32,9 +32,10 @@ import { buildPathNetwork } from "../../src/base/pathNetwork";
 import { buildingUpgradeAnnouncement, confirmedBuildingUpgrade, worldToBaseProgress } from "../../src/base/buildingProgress";
 import type { BuildingUpgrade } from "../../src/base/buildingProgress";
 import BuildingUpgradeFeedback, { BuildingTierArtwork, useBuildingUpgradePresentation } from "../../src/components/BuildingUpgradeFeedback";
+import { BaseBuildingPanel, BaseResources } from "../../src/components/BasePanels";
 import { useBuildingFeedback } from "../../src/context/CompletionFeedbackContext";
 import { BASE_LAYOUT_STORAGE_KEY } from "../../src/storage/localAccountData";
-import { colors, radius, spacing } from "../../src/theme/theme";
+import { colors, radius, spacing, uiTheme as ui } from "../../src/theme/theme";
 import {
   BaseProgress,
   BuildingProgress,
@@ -132,15 +133,7 @@ const GARDEN_BASE_ANCHOR = {
   xRatio: 0.5,
   yRatio: 0.84,
 };
-const ACTION_BUTTONS: {
-  key: "upgrade" | "enter" | "description";
-  label: string;
-  icon: IconName;
-}[] = [
-  { key: "upgrade", label: "Upgrade", icon: "arrow-up-bold-hexagon-outline" },
-  { key: "enter", label: "Enter", icon: "door-open" },
-  { key: "description", label: "Info", icon: "information-outline" },
-];
+type BuildingAction = "upgrade" | "enter" | "description";
 
 const BUILDING_META: Record<
   BuildingType,
@@ -832,6 +825,8 @@ export default function BaseScreen() {
   const [mapCamera, setMapCamera] = useState<MapCamera>(DEFAULT_MAP_CAMERA);
   const [mapSize, setMapSize] = useState({ width: 1, height: MAP_HEIGHT });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [upgradeError, setUpgradeError] = useState("");
   // Never consume off-screen, before XP feedback finishes, or against stale map artwork.
   const celebration = focused && !loading && pending?.upgrades.every(upgrade =>
     base?.buildings.some(building => building.buildingId === upgrade.buildingId && building.visualTier >= upgrade.newTier))
@@ -1015,6 +1010,7 @@ export default function BaseScreen() {
       setLoading(true);
       const response = await api.get<WorldResponse>(apiRoutes.world);
       const nextBase = worldToBaseProgress(response.data);
+      setLoadError("");
       setBase(nextBase);
       setSelectedBuilding((current) => {
         if (!current) {
@@ -1031,7 +1027,9 @@ export default function BaseScreen() {
       });
       return nextBase;
     } catch (error) {
-      Alert.alert("World", apiError(error, "Could not load your world.").message);
+      const message = apiError(error, "Could not load your world.").message;
+      setLoadError(message);
+      Alert.alert("World", message);
       return null;
     } finally {
       setLoading(false);
@@ -1193,14 +1191,14 @@ export default function BaseScreen() {
   if (loading && !base) {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={ui.colors.primary} accessibilityLabel="Loading world" />
         <Text style={styles.loadingText}>Building your kingdom...</Text>
       </View>
     );
   }
 
   async function handleBuildingAction(
-    action: (typeof ACTION_BUTTONS)[number]["key"],
+    action: BuildingAction,
   ) {
     if (!selectedBuilding) {
       return;
@@ -1225,6 +1223,7 @@ export default function BaseScreen() {
 
       try {
         upgrading.current = true;
+        setUpgradeError("");
         const response = await api.post<UpgradeBuildingResponse>(
           apiRoutes.upgradeBuilding(selectedBuilding.buildingId),
           {},
@@ -1239,7 +1238,9 @@ export default function BaseScreen() {
           setSelectedBuilding(upgradedBuilding);
         }
       } catch (error) {
-        Alert.alert("Upgrade unavailable", apiError(error, "This building cannot be upgraded yet.").message);
+        const message = apiError(error, "This building cannot be upgraded yet.").message;
+        setUpgradeError(message);
+        Alert.alert("Upgrade unavailable", message);
       } finally {
         upgrading.current = false;
       }
@@ -1252,6 +1253,7 @@ export default function BaseScreen() {
   function clearSelectedBuilding() {
     setSelectedBuilding(null);
     setDescriptionOpen(false);
+    setUpgradeError("");
   }
 
   return (
@@ -1336,6 +1338,7 @@ export default function BaseScreen() {
             <BuildingNode
               key={building.type}
               building={building}
+              selected={selectedBuilding?.type === building.type}
               upgrade={celebration?.upgrades.find(upgrade => upgrade.buildingId === building.buildingId && upgrade.newTier === building.visualTier)}
               upgradeMotion={upgradeMotion}
               layout={buildingLayouts[building.type]}
@@ -1348,6 +1351,7 @@ export default function BaseScreen() {
                 ).y,
               )}
               onPress={() => {
+                setUpgradeError("");
                 setSelectedBuilding((current) => {
                   if (current?.type === building.type) {
                     setDescriptionOpen(false);
@@ -1367,33 +1371,24 @@ export default function BaseScreen() {
               }}
             />
           ))}
-
-          {selectedBuilding && (
-            <BuildingActionTray
-              building={selectedBuilding}
-              descriptionOpen={descriptionOpen}
-              layout={buildingLayouts[selectedBuilding.type]}
-              onAction={handleBuildingAction}
-            />
-          )}
         </View>
       </MapViewport>
 
-      <View pointerEvents="none" style={styles.worldPointsBadge}>
-        <MaterialCommunityIcons name="star-four-points" color={colors.accent} size={18} />
-        <Text style={styles.worldPointsText}>{base?.worldPoints ?? 0} World Points</Text>
-      </View>
+      <BaseResources worldPoints={base?.worldPoints} loading={loading} error={loadError} onRetry={() => void loadBase()} />
+      {selectedBuilding && <BaseBuildingPanel building={selectedBuilding} description={BUILDING_META[selectedBuilding.type].description}
+        descriptionOpen={descriptionOpen} error={upgradeError} onAction={handleBuildingAction} onClose={clearSelectedBuilding} />}
 
       {Platform.OS === "web" && <Text role="status" aria-live="polite" aria-atomic style={styles.announcement}>
         {celebration ? buildingUpgradeAnnouncement(celebration) : ""}
       </Text>}
-      {celebration && <BuildingUpgradeFeedback batch={celebration} motion={upgradeMotion} onDone={finishBuildings} />}
+      {celebration && <BuildingUpgradeFeedback batch={celebration} motion={upgradeMotion} onDone={finishBuildings} tone="parchment" style={styles.upgradeFeedback} />}
     </View>
   );
 }
 
 function BuildingNode({
   building,
+  selected,
   upgrade,
   upgradeMotion,
   layout,
@@ -1406,6 +1401,7 @@ function BuildingNode({
   onDragEnd,
 }: {
   building: BuildingProgress;
+  selected: boolean;
   upgrade?: BuildingUpgrade;
   upgradeMotion: ReturnType<typeof useBuildingUpgradePresentation>;
   layout: BuildingMapLayout;
@@ -1427,6 +1423,7 @@ function BuildingNode({
   const dragTranslation = useRef(new Animated.ValueXY()).current;
   const collisionPolygon = getCollisionFootprintPolygon(building.type, layout);
   const grabAreaStyle = polygonBoundsStyle(collisionPolygon, layout);
+  const [keyboardFocused, setKeyboardFocused] = useState(false);
   const buildingGesture = useMemo(() => {
     const dragGesture = Gesture.Pan()
       .minDistance(1)
@@ -1521,7 +1518,16 @@ function BuildingNode({
       <GestureDetector gesture={buildingGesture}>
         <View
           pointerEvents="box-only"
-          style={[styles.buildingGrabArea, grabAreaStyle]}
+          accessible accessibilityRole="button"
+          accessibilityState={{ selected }} aria-pressed={selected}
+          accessibilityLabel={`${building.type}, level ${building.level}, tier ${building.visualTier}. Select building`}
+          accessibilityHint="Opens building actions; drag to move the building"
+          accessibilityActions={[{ name: "activate", label: "Select building" }]}
+          onAccessibilityTap={onPress}
+          onAccessibilityAction={event => { if (event.nativeEvent.actionName === "activate") onPress(); }}
+          {...(Platform.OS === "web" ? { tabIndex: 0 } : {})}
+          onFocus={() => setKeyboardFocused(true)} onBlur={() => setKeyboardFocused(false)}
+          style={[styles.buildingGrabArea, grabAreaStyle, keyboardFocused && styles.buildingFocus]}
         >
           <View style={styles.buildingGrabHitbox} />
         </View>
@@ -1530,135 +1536,16 @@ function BuildingNode({
   );
 }
 
-function BuildingActionTray({
-  building,
-  descriptionOpen,
-  layout,
-  onAction,
-}: {
-  building: BuildingProgress;
-  descriptionOpen: boolean;
-  layout: BuildingMapLayout;
-  onAction: (action: (typeof ACTION_BUTTONS)[number]["key"]) => void;
-}) {
-  const meta = BUILDING_META[building.type];
-  const imageSource = getBuildingImageSource(
-    building.type,
-    building.visualTier,
-  );
-  const trayWidth = 320;
-  const buildingCenterX = layout.x + layout.width / 2;
-  const buildingBottomY = layout.y + layout.height;
-  const estimatedTrayHeight = descriptionOpen ? 230 : 150;
-  const trayStyle: ViewStyle = {
-    left: clamp(
-      buildingCenterX - trayWidth / 2,
-      12,
-      MAP_WIDTH - trayWidth - 12,
-    ),
-    top: clamp(buildingBottomY + 8, 12, MAP_HEIGHT - estimatedTrayHeight),
-    width: trayWidth,
-  };
-
-  return (
-    <View pointerEvents="box-none" style={[styles.actionOverlay, trayStyle]}>
-      <View style={styles.selectedBanner}>
-        {imageSource ? (
-          <Image
-            source={imageSource}
-            style={styles.bannerImage}
-            resizeMode="contain"
-          />
-        ) : (
-          <MaterialCommunityIcons
-            name={meta.icon}
-            size={22}
-            color={meta.color}
-          />
-        )}
-        <View style={styles.bannerCopy}>
-          <Text style={styles.bannerTitle}>{building.type}</Text>
-          <Text style={styles.bannerMeta}>
-            Lv. {building.level} / Tier {building.visualTier}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.actionRow}>
-        {ACTION_BUTTONS.map((action) => (
-          <Pressable
-            key={action.key}
-            onPress={() => onAction(action.key)}
-            style={[
-              styles.actionButton,
-              action.key === "enter" &&
-                styles.actionButtonDisabled,
-            ]}
-          >
-            {imageSource && (
-              <Image
-                source={imageSource}
-                style={styles.actionButtonWatermark}
-                resizeMode="contain"
-              />
-            )}
-            <MaterialCommunityIcons
-              name={action.icon}
-              size={24}
-              color={
-                action.key === "enter"
-                  ? colors.mutedText
-                  : colors.text
-              }
-            />
-            <Text style={styles.actionButtonText}>{action.label}</Text>
-            {action.key === "upgrade" && building.upgradeAvailable && (
-              <Text style={styles.actionButtonReadyText}>Ready</Text>
-            )}
-          </Pressable>
-        ))}
-      </View>
-
-      {descriptionOpen && (
-        <View style={styles.descriptionPanel}>
-          <Text style={styles.descriptionTitle}>{building.type}</Text>
-          <Text style={styles.descriptionText}>{meta.description}</Text>
-          <Text style={styles.descriptionMeta}>
-            Upgrades cost World Points earned from daily and weekly goals.
-            {building.upgradeCost == null ? " Maximum level reached." : ` Next cost: ${building.upgradeCost}.`}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  worldPointsBadge: {
-    position: "absolute",
-    top: spacing.md,
-    right: spacing.md,
-    zIndex: 1000,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  worldPointsText: { color: colors.text, fontWeight: "800" },
+  container: { flex: 1, backgroundColor: ui.colors.background },
   loadingScreen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: ui.colors.background,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.md,
   },
-  loadingText: { color: colors.mutedText, fontWeight: "500" },
+  loadingText: { ...ui.type.body, color: ui.colors.secondaryText },
   mapGround: {
     flex: 1,
     backgroundColor: "#223226",
@@ -1734,6 +1621,8 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  buildingFocus: { outlineWidth: 2, outlineOffset: 3, outlineColor: ui.colors.focus, outlineStyle: "solid" },
+  upgradeFeedback: { top: ui.spacing.md * 2 + ui.size.target, bottom: undefined },
   buildingNode: {
     width: "100%",
     height: "100%",
@@ -1747,109 +1636,6 @@ const styles = StyleSheet.create({
   buildingNodeArt: {
     borderColor: "transparent",
     backgroundColor: "transparent",
-  },
-  actionOverlay: {
-    position: "absolute",
-    gap: spacing.sm,
-    alignItems: "center",
-    zIndex: 100000,
-    elevation: 1000,
-  },
-  selectedBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    maxWidth: 420,
-    width: "100%",
-    minHeight: 62,
-    borderRadius: radius.md,
-    backgroundColor: `${colors.background}D9`,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    overflow: "hidden",
-  },
-  bannerImage: {
-    width: 54,
-    height: 46,
-  },
-  bannerCopy: {
-    flex: 1,
-  },
-  bannerTitle: {
-    color: colors.text,
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  bannerMeta: {
-    color: colors.mutedText,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  actionRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: spacing.sm,
-    maxWidth: 420,
-    width: "100%",
-  },
-  actionButton: {
-    flex: 1,
-    minHeight: 72,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    overflow: "hidden",
-  },
-  actionButtonDisabled: {
-    opacity: 0.55,
-  },
-  actionButtonWatermark: {
-    position: "absolute",
-    width: 70,
-    height: 58,
-    opacity: 0.12,
-  },
-  actionButtonText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  actionButtonReadyText: {
-    color: colors.accent,
-    fontSize: 10,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  descriptionPanel: {
-    maxWidth: 420,
-    width: "100%",
-    borderRadius: radius.md,
-    backgroundColor: `${colors.background}E8`,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-  },
-  descriptionTitle: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  descriptionText: {
-    color: colors.mutedText,
-    lineHeight: 20,
-    marginTop: spacing.xs,
-  },
-  descriptionMeta: {
-    color: colors.accent,
-    fontWeight: "700",
-    lineHeight: 20,
-    marginTop: spacing.sm,
   },
   announcement: { position: "absolute", width: 1, height: 1, overflow: "hidden", opacity: 0 },
 });
