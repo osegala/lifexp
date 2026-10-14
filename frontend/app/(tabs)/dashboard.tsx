@@ -1,33 +1,80 @@
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { BannerAdPlacement } from "../../src/ads/Ads";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-
+import { useCallback, useRef, useState } from "react";
+import { Alert, AppState } from "react-native";
+import { BannerAdPlacement } from "../../src/ads/Ads";
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
-import LifeCard from "../../src/components/LifeCard";
-import XPBar from "../../src/components/XPBar";
-import QuestProgress from "../../src/components/QuestProgress";
+import { loadPreferredAppearance, type AvatarAppearance } from "../../src/avatar/appearance";
+import { getLocalAppearance, setLocalAppearance } from "../../src/avatar/localAppearance";
+import HomeContent from "../../src/components/HomeContent";
 import { useAuth } from "../../src/context/AuthContext";
-import { colors, spacing } from "../../src/theme/theme";
-import type { AchievementsResponse, GoalsResponse } from "../../src/types";
+import { homeAvatarFromInventory, type HomeAvatar } from "../../src/home/avatar";
+import type { AchievementsResponse, GoalsResponse, TasksResponse } from "../../src/types";
+import type { InventoryResponse } from "../../src/types/avatar";
 
 export default function DashboardScreen() {
   const { user, refreshUser } = useAuth();
+  const userId = user?.id;
   const [goals, setGoals] = useState<GoalsResponse | null>(null);
   const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [questError, setQuestError] = useState(false);
+  const [tasks, setTasks] = useState<TasksResponse | null>(null);
+  const [scene, setScene] = useState<HomeAvatar | null>(null);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [avatarLoading, setAvatarLoading] = useState(true);
+  const [taskError, setTaskError] = useState("");
+  const [avatarError, setAvatarError] = useState("");
+  const [progressError, setProgressError] = useState("");
+  const refreshHome = useRef<() => void>(() => {});
 
   useFocusEffect(useCallback(() => {
     let active = true;
     let refreshing = false;
+    let refreshingTasks = false;
+    let refreshingAvatar = false;
+    let loadingDashboard = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    async function refreshTasks() {
+      if (!active || refreshingTasks) return;
+      refreshingTasks = true;
+      setTasksLoading(true);
+      try {
+        const response = await api.get<TasksResponse>(apiRoutes.tasks);
+        if (active) { setTasks(response.data); setTaskError(""); }
+      } catch (error) {
+        if (active) setTaskError(apiError(error, "Could not refresh tasks. Any saved schedule shown below is the last confirmed one.").message);
+      } finally {
+        refreshingTasks = false;
+        if (active) setTasksLoading(false);
+      }
+    }
+    async function refreshAvatar() {
+      if (!active || refreshingAvatar || userId == null) return;
+      refreshingAvatar = true;
+      setAvatarLoading(true);
+      try {
+        const [inventory, appearance] = await Promise.all([
+          api.get<InventoryResponse>(apiRoutes.inventory),
+          loadPreferredAppearance(
+            async () => (await api.get<AvatarAppearance>(apiRoutes.me)).data,
+            () => getLocalAppearance(userId),
+            value => setLocalAppearance(userId, value),
+          ),
+        ]);
+        if (active) { setScene(homeAvatarFromInventory(inventory.data, appearance)); setAvatarError(""); }
+      } catch (error) {
+        if (active) setAvatarError(apiError(error, "Could not refresh your character. Your equipment has not changed.").message);
+      } finally {
+        refreshingAvatar = false;
+        if (active) setAvatarLoading(false);
+      }
+    }
     async function refreshGoals() {
       if (!active || refreshing) return;
       refreshing = true;
       clearTimeout(timer);
+      void refreshTasks(); // Use the server schedule across focus, resume and local midnight.
       let delay = 60_000;
       try {
         const result = await api.get<GoalsResponse>(apiRoutes.goals);
@@ -51,105 +98,45 @@ export default function DashboardScreen() {
       }
     }
     async function loadDashboard() {
+      if (!active || loadingDashboard) return;
+      loadingDashboard = true;
       try {
         setLoading(true);
-        if (!await refreshUser()) return;
-        const [, achievementsResponse] = await Promise.all([
-          refreshGoals(), api.get<AchievementsResponse>(apiRoutes.achievements),
-        ]);
-        if (active) {
-          setAchievementData(achievementsResponse.data);
+        if (!await refreshUser()) {
+          if (active) {
+            setProgressError("Could not refresh your profile. Refresh Home to try again.");
+            setTasksLoading(false);
+            setAvatarLoading(false);
+          }
+          return;
         }
+        if (!active) return;
+        const [, achievementsResponse] = await Promise.all([
+          refreshGoals(), api.get<AchievementsResponse>(apiRoutes.achievements), refreshAvatar(),
+        ]);
+        if (active) { setAchievementData(achievementsResponse.data); setProgressError(""); }
       } catch (error) {
-        Alert.alert("Home", apiError(error, "Could not load your progress.").message);
+        const message = apiError(error, "Could not load your progress.").message;
+        if (active) { setProgressError(message); Alert.alert("Home", message); }
       } finally {
+        loadingDashboard = false;
         if (active) setLoading(false);
       }
     }
+    refreshHome.current = () => { void loadDashboard(); };
     void loadDashboard();
     const subscription = AppState.addEventListener("change", state => {
-      if (state === "active") void refreshGoals();
+      if (state === "active") { void refreshGoals(); void refreshAvatar(); }
       else clearTimeout(timer);
     });
-    return () => { active = false; clearTimeout(timer); subscription.remove(); };
-  }, [refreshUser]));
+    return () => { active = false; refreshHome.current = () => {}; clearTimeout(timer); subscription.remove(); };
+  }, [refreshUser, userId]));
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text accessibilityRole="header" style={styles.title}>Home</Text>
-        <Pressable onPress={() => router.navigate("/(tabs)/profile")} style={styles.profileButton}>
-          <MaterialCommunityIcons name="account-cog" color={colors.primary} size={22} />
-          <Text style={styles.profileButtonText}>Profile</Text>
-        </Pressable>
-      </View>
-
-      <LifeCard>
-        <Text style={styles.heroTitle}>{user?.username ?? "Adventurer"}</Text>
-        <Text style={styles.heroMeta}>
-          Level {user?.level ?? 1} · {user?.xpIntoLevel ?? 0} / {user?.xpForNextLevel ?? 100} XP
-        </Text>
-        <View style={styles.progress}><XPBar progress={(user?.progressPercent ?? 0) / 100} /></View>
-      </LifeCard>
-
-      {loading && !goals ? <ActivityIndicator color={colors.primary} /> : null}
-
-      {questError && <Text accessibilityRole="alert" style={styles.muted}>
-        {goals ? "Could not refresh quests. Showing last confirmed progress; retrying shortly." : "Could not load quests. Retrying shortly."}
-      </Text>}
-      {goals ? <QuestProgress goals={goals} /> : !loading && !questError
-        ? <Text style={styles.muted}>Quest status is unavailable.</Text> : null}
-
-      <LifeCard compact>
-        <View style={styles.row}>
-          <Text style={styles.cardTitle}>World Points</Text>
-          <Text style={styles.value}>{goals?.player.worldPoints ?? "—"}</Text>
-        </View>
-        <Text style={styles.muted}>Quest rewards are granted automatically when tasks are completed.</Text>
-      </LifeCard>
-
-      <LifeCard compact>
-        <View style={styles.row}>
-          <Text style={styles.cardTitle}>Achievements</Text>
-          <Text style={styles.value}>{achievementData?.summary.earned ?? 0}/{achievementData?.summary.total ?? 0}</Text>
-        </View>
-        {(achievementData?.achievements ?? []).slice(0, 3).map((achievement) => (
-          <View key={achievement.achievementId} style={styles.achievement}>
-            <MaterialCommunityIcons
-              name={achievement.earned ? "trophy" : "lock-outline"}
-              color={achievement.earned ? colors.accent : colors.mutedText}
-              size={22}
-            />
-            <View style={styles.achievementCopy}>
-              <Text style={styles.achievementName}>{achievement.name}</Text>
-              <Text style={styles.muted}>{achievement.currentValue}/{achievement.requiredValue} · {achievement.description}</Text>
-              {(achievement.rewards ?? []).length ? (
-                <Text style={styles.muted}>Rewards: {(achievement.rewards ?? []).map((reward) => reward.name).join(", ")}</Text>
-              ) : null}
-            </View>
-          </View>
-        ))}
-      </LifeCard>
-      <BannerAdPlacement placement="HOME" />
-    </ScrollView>
-  );
+  return <HomeContent user={user} goals={goals} achievements={achievementData} tasks={tasks} scene={scene}
+    loading={loading} tasksLoading={tasksLoading} avatarLoading={avatarLoading} questError={questError}
+    progressError={progressError} taskError={taskError} avatarError={avatarError}
+    onRetry={() => refreshHome.current()}
+    onProfile={() => router.navigate("/(tabs)/profile")}
+    onTasks={() => router.navigate("/(tabs)/tasks")}
+    ad={<BannerAdPlacement placement="HOME" />} />;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.lg },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { color: colors.text, fontSize: 30, fontWeight: "700" },
-  profileButton: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.sm },
-  profileButtonText: { color: colors.text, fontWeight: "600" },
-  heroTitle: { color: colors.text, fontSize: 25, fontWeight: "800" },
-  heroMeta: { color: colors.accent, fontSize: 16, marginTop: spacing.xs },
-  progress: { marginTop: spacing.md },
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md },
-  cardTitle: { color: colors.text, fontSize: 18, fontWeight: "700", marginBottom: spacing.sm },
-  value: { color: colors.accent, fontSize: 20, fontWeight: "800" },
-  muted: { color: colors.mutedText, marginTop: spacing.sm, lineHeight: 19 },
-  achievement: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
-  achievementCopy: { flex: 1 },
-  achievementName: { color: colors.text, fontWeight: "700" },
-});
