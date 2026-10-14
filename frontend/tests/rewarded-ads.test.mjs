@@ -190,10 +190,11 @@ test("real Shop replaces balance with the authoritative total, including duplica
     "expo-router": { useFocusEffect() {}, router: {} }, "@expo/vector-icons/MaterialCommunityIcons": "Icon",
     "../../src/api/client": {}, "../../src/api/routes": {}, "../../src/avatar/assetRegistry": {}, "../../src/avatar/inventory": {},
     "../../src/components/CosmeticImage": "Image", "../../src/components/LifeCard": "Card", "../../src/components/LifeButton": "Button",
+    "../../src/components/ShopContent": "ShopContent",
     "../../src/context/AuthContext": { useAuth: () => ({ refreshUser: () => { refreshes++; } }) }, "../../src/theme/theme": theme,
     "../../src/entitlements/useEntitlements": { useEntitlements: () => model.FREE_ENTITLEMENTS }, "../../src/ads/Ads": { BannerAdPlacement: "Banner", RewardedAdButton: "Reward" },
   }).default;
-  const onReward = nodes(Screen()).find(n => n.type === "Reward").props.onReward;
+  const onReward = Screen().props.rewarded.props.onReward;
   onReward({ ...status(1), duplicate: false }); assert.equal(shop.player.coins, 50);
   onReward({ ...status(1), duplicate: true }); assert.equal(shop.player.coins, 50); assert.equal(refreshes, 2);
 });

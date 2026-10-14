@@ -88,7 +88,7 @@ test("task creation renders every task size, defaults to NORMAL, and submits no 
 });
 
 test("dashboard and profile XP bars use backend per-level progression", () => {
-  const dashboard = read("app/(tabs)/dashboard.tsx");
+  const dashboard = read("src/components/HomeContent.tsx");
   const profile = read("app/(tabs)/profile.tsx");
 
   assert.match(dashboard, /user\?\.xpIntoLevel/);
@@ -113,14 +113,14 @@ test("shop uses read-only entitlements and the catalog-backed purchase route", (
 });
 
 test("shop explains achievement locks and exposes no purchase control while locked", () => {
-  const shop = read("app/(tabs)/shop.tsx");
-  const dashboard = read("app/(tabs)/dashboard.tsx");
+  const shop = read("src/components/ShopItemCard.tsx");
+  const dashboard = read("src/components/HomeContent.tsx");
 
   assert.match(shop, /item\.achievementRequirement/);
   assert.match(shop, /Complete &quot;\{requirement\.name\}&quot;/);
   assert.match(shop, /requirement\.currentValue\} \/ \{requirement\.requiredValue/);
-  assert.match(shop, /locked \|\| item\.owned \? \(/);
-  assert.match(shop, /item\.effectivePrice\} coins · \{item\.owned \? "Owned" : "Available"\}/);
+  assert.match(shop, /locked \|\| item\.owned \? null : <UiPressable/);
+  assert.match(shop, /item\.owned \? <BadgePill label="Owned"[\s\S]*?resource="coins" value=\{item\.effectivePrice\}/);
   assert.match(dashboard, /Rewards: \{\(achievement\.rewards \?\? \[\]\)\.map/);
 });
 

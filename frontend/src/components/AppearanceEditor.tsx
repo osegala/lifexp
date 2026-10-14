@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   EYE_COLORS,
@@ -7,10 +7,12 @@ import {
   SKIN_COLORS,
 } from "../avatar/appearance";
 import type { AppearanceColor, AvatarAppearance, BodyType } from "../avatar/appearance";
-import { colors, radius, spacing } from "../theme/theme";
+import { colors, radius, spacing, uiTheme as ui } from "../theme/theme";
 import LifeCard from "./LifeCard";
+import { UiPressable } from "./ui/Primitives";
 
 type Props = {
+  tone?: "legacy" | "parchment";
   appearance: AvatarAppearance;
   dirty: boolean;
   saving: boolean;
@@ -28,22 +30,26 @@ export default function AppearanceEditor({
   onChange,
   onSave,
   showSaveButton = true,
+  tone = "legacy",
 }: Props) {
+  const styles = tone === "parchment" ? parchmentStyles : legacyStyles;
+  const Action = tone === "parchment" ? UiPressable : Pressable;
   return (
-    <LifeCard style={styles.card}>
+    <LifeCard tone={tone} style={styles.card}>
       <View style={styles.headingRow}>
         <View style={styles.headingCopy}>
-          <Text accessibilityRole="header" style={styles.title}>Appearance</Text>
+          <Text accessibilityRole="header" aria-level={2} style={styles.title}>Appearance</Text>
           <Text style={styles.subtitle}>Shape your hero, then save all appearance choices together.</Text>
         </View>
         {dirty && <View style={styles.unsavedBadge}><Text style={styles.unsavedText}>UNSAVED</Text></View>}
       </View>
 
       <Text style={styles.label}>Body</Text>
-      <View style={styles.bodyRow}>
+      <View style={styles.bodyRow} accessibilityRole={tone === "parchment" ? "radiogroup" : undefined} accessibilityLabel={tone === "parchment" ? "Body" : undefined}>
         {(["BOY", "GIRL"] as const).map((bodyType) => (
           <BodyChoice
             key={bodyType}
+            tone={tone}
             bodyType={bodyType}
             selected={appearance.bodyType === bodyType}
             onPress={() => onChange({ bodyType })}
@@ -59,7 +65,7 @@ export default function AppearanceEditor({
         {HAIR_STYLE_IDS.map((hairId) => {
           const selected = appearance.hairId === hairId;
           return (
-            <Pressable
+            <Action
               key={hairId}
               accessibilityRole="radio"
               accessibilityLabel={`Hair style: ${hairStyleName(hairId)}`}
@@ -75,19 +81,19 @@ export default function AppearanceEditor({
               <Text style={[styles.hairStyleText, selected && styles.hairStyleTextSelected]}>
                 {hairStyleName(hairId)}
               </Text>
-            </Pressable>
+            </Action>
           );
         })}
       </View>
 
       <Text style={styles.label}>Skin tone</Text>
-      <Swatches label="Skin tone" options={SKIN_COLORS} selectedId={appearance.skinColorId} onSelect={(skinColorId) => onChange({ skinColorId })} />
+      <Swatches tone={tone} label="Skin tone" options={SKIN_COLORS} selectedId={appearance.skinColorId} onSelect={(skinColorId) => onChange({ skinColorId })} />
 
       <Text style={styles.label}>Hair color</Text>
-      <Swatches label="Hair color" options={HAIR_COLORS} selectedId={appearance.hairColorId} onSelect={(hairColorId) => onChange({ hairColorId })} />
+      <Swatches tone={tone} label="Hair color" options={HAIR_COLORS} selectedId={appearance.hairColorId} onSelect={(hairColorId) => onChange({ hairColorId })} />
 
       <Text style={styles.label}>Eye color</Text>
-      <Swatches label="Eye color" options={EYE_COLORS} selectedId={appearance.eyeColorId} onSelect={(eyeColorId) => onChange({ eyeColorId })} />
+      <Swatches tone={tone} label="Eye color" options={EYE_COLORS} selectedId={appearance.eyeColorId} onSelect={(eyeColorId) => onChange({ eyeColorId })} />
 
       {!!saveError && (
         <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.saveError}>
@@ -96,9 +102,10 @@ export default function AppearanceEditor({
       )}
 
       {showSaveButton && (
-        <Pressable
+        <Action
           accessibilityRole="button"
           accessibilityLabel="Save appearance"
+          accessibilityState={{ disabled: !dirty || saving, busy: saving }}
           disabled={!dirty || saving}
           onPress={onSave}
           style={({ pressed }) => [
@@ -107,12 +114,12 @@ export default function AppearanceEditor({
             pressed && dirty && !saving && styles.pressed,
           ]}
         >
-          {saving ? <ActivityIndicator size="small" color={colors.background} /> : (
+          {saving ? <ActivityIndicator size="small" color={tone === "parchment" ? ui.colors.disabledText : colors.background} /> : (
             <Text style={[styles.saveText, !dirty && styles.saveTextDisabled]}>
               {dirty ? "Save Appearance" : "Appearance Saved"}
             </Text>
           )}
-        </Pressable>
+        </Action>
       )}
     </LifeCard>
   );
@@ -123,14 +130,18 @@ function hairStyleName(hairId: string) {
     `${separator ? " " : ""}${letter.toUpperCase()}`) ?? hairId;
 }
 
-function BodyChoice({ bodyType, selected, onPress }: {
+function BodyChoice({ bodyType, selected, onPress, tone = "legacy" }: {
+  tone?: Props["tone"];
   bodyType: BodyType;
   selected: boolean;
   onPress: () => void;
 }) {
+  const styles = tone === "parchment" ? parchmentStyles : legacyStyles;
+  const Action = tone === "parchment" ? UiPressable : Pressable;
   return (
-    <Pressable
+    <Action
       accessibilityRole="radio"
+      accessibilityLabel={tone === "parchment" ? `Body: ${bodyType === "BOY" ? "Boy" : "Girl"}` : undefined}
       accessibilityState={{ checked: selected }}
       aria-checked={selected}
       onPress={onPress}
@@ -139,16 +150,19 @@ function BodyChoice({ bodyType, selected, onPress }: {
       <Text style={[styles.bodyChoiceText, selected && styles.bodyChoiceTextSelected]}>
         {bodyType === "BOY" ? "Boy" : "Girl"}
       </Text>
-    </Pressable>
+    </Action>
   );
 }
 
-function Swatches({ label, options, selectedId, onSelect }: {
+function Swatches({ label, options, selectedId, onSelect, tone = "legacy" }: {
+  tone?: Props["tone"];
   label: string;
   options: readonly AppearanceColor[];
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
+  const styles = tone === "parchment" ? parchmentStyles : legacyStyles;
+  const Action = tone === "parchment" ? UiPressable : Pressable;
   return (
     <View>
       <Text accessibilityLiveRegion="polite" aria-live="polite" style={styles.selectedColor}>
@@ -158,7 +172,7 @@ function Swatches({ label, options, selectedId, onSelect }: {
         {options.map((option) => {
           const selected = option.id === selectedId;
           return (
-            <Pressable
+            <Action
               key={option.id}
               accessibilityRole="radio"
               accessibilityLabel={`${label}: ${option.name}`}
@@ -173,7 +187,7 @@ function Swatches({ label, options, selectedId, onSelect }: {
             >
               <View style={[styles.swatch, { backgroundColor: option.color }]} />
               {selected && <Text style={styles.swatchCheck}>✓</Text>}
-            </Pressable>
+            </Action>
           );
         })}
       </View>
@@ -181,7 +195,7 @@ function Swatches({ label, options, selectedId, onSelect }: {
   );
 }
 
-const styles = StyleSheet.create({
+const legacyStyles = StyleSheet.create({
   card: { gap: spacing.md },
   headingRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md },
   headingCopy: { flex: 1 },
@@ -212,4 +226,38 @@ const styles = StyleSheet.create({
   saveText: { color: colors.background, fontSize: 13, fontWeight: "900" },
   saveTextDisabled: { color: colors.mutedText },
   pressed: { opacity: 0.76 },
+});
+
+const parchmentStyles = StyleSheet.create({
+  ...legacyStyles,
+  card: { gap: ui.spacing.md },
+  title: { ...ui.type.section, color: ui.colors.text, fontFamily: Platform.select(ui.font.display) },
+  subtitle: { ...ui.type.caption, color: ui.colors.secondaryText, marginTop: ui.spacing.xs },
+  headingRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: ui.spacing.sm },
+  unsavedBadge: { borderRadius: ui.radius.pill, backgroundColor: ui.colors.warningSurface, paddingHorizontal: ui.spacing.sm, paddingVertical: ui.spacing.xs },
+  unsavedText: { ...ui.type.caption, color: ui.colors.warning },
+  label: { ...ui.type.label, color: ui.colors.text, marginTop: ui.spacing.xs },
+  bodyRow: { flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.sm },
+  bodyChoice: { flex: 1, minWidth: ui.size.target, minHeight: ui.size.target, alignItems: "center", justifyContent: "center",
+    borderRadius: ui.radius.md, borderWidth: 1, borderColor: ui.colors.controlBorder, backgroundColor: ui.colors.surface, padding: ui.spacing.sm },
+  bodyChoiceSelected: { borderColor: ui.colors.primary, backgroundColor: ui.colors.primary },
+  bodyChoiceText: { ...ui.type.label, color: ui.colors.secondaryText },
+  bodyChoiceTextSelected: { color: ui.colors.onPrimary },
+  hairStyles: { flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.sm },
+  hairStyle: { minHeight: ui.size.target, minWidth: ui.size.target, justifyContent: "center", borderRadius: ui.radius.md,
+    borderWidth: 1, borderColor: ui.colors.controlBorder, backgroundColor: ui.colors.surface, paddingHorizontal: ui.spacing.sm, paddingVertical: ui.spacing.sm, maxWidth: "100%" },
+  hairStyleSelected: { borderColor: ui.colors.primary, backgroundColor: ui.colors.primary },
+  hairStyleText: { ...ui.type.label, color: ui.colors.secondaryText, flexShrink: 1 },
+  hairStyleTextSelected: { color: ui.colors.onPrimary },
+  swatches: { flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.sm },
+  selectedColor: { ...ui.type.caption, color: ui.colors.secondaryText, marginBottom: ui.spacing.sm },
+  swatchShell: { width: ui.size.target, height: ui.size.target, borderRadius: ui.radius.pill, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: ui.colors.controlBorder },
+  swatchSelected: { borderColor: ui.colors.primary, backgroundColor: ui.colors.successSurface },
+  swatch: { ...legacyStyles.swatch, borderColor: ui.colors.controlBorder },
+  swatchCheck: { ...legacyStyles.swatchCheck, color: ui.colors.onPrimary, backgroundColor: ui.colors.primary },
+  saveButton: { minHeight: ui.size.target, alignItems: "center", justifyContent: "center", borderRadius: ui.radius.md, backgroundColor: ui.colors.primary, padding: ui.spacing.sm },
+  saveButtonDisabled: { backgroundColor: ui.colors.disabled },
+  saveError: { ...ui.type.body, color: ui.colors.danger },
+  saveText: { ...ui.type.label, color: ui.colors.onPrimary },
+  saveTextDisabled: { color: ui.colors.disabledText },
 });

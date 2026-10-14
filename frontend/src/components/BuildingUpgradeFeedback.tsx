@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import type { StyleProp, ViewStyle } from "react-native";
 import { getBuildingImageSource } from "../base/buildingAssetRegistry";
 import { buildingUpgradeAnnouncement } from "../base/buildingProgress";
 import type { BuildingUpgrade, BuildingUpgradeBatch } from "../base/buildingProgress";
 import type { BuildingType } from "../types/progression";
-import { colors, radius, spacing } from "../theme/theme";
+import { colors, radius, spacing, uiTheme as ui } from "../theme/theme";
+import { UiPressable } from "./ui/Primitives";
 
 /** Only pass a batch while World is focused and its confirmed new artwork is loaded. */
 export function useBuildingUpgradePresentation(batch: BuildingUpgradeBatch | undefined, onDone: (id: string) => void) {
@@ -53,21 +55,23 @@ export function BuildingTierArtwork({ type, tier, upgrade, motion }: {
   </View>;
 }
 
-export default function BuildingUpgradeFeedback({ batch, motion, onDone }: {
+export default function BuildingUpgradeFeedback({ batch, motion, onDone, tone = "legacy", style }: {
   batch: BuildingUpgradeBatch; motion: Motion; onDone: (id: string) => void;
+  tone?: "legacy" | "parchment"; style?: StyleProp<ViewStyle>;
 }) {
-  return <View pointerEvents="box-none" style={styles.overlay}>
-    <View style={styles.card}>
+  const Action = tone === "parchment" ? UiPressable : Pressable;
+  return <View pointerEvents="box-none" style={[styles.overlay, style]}>
+    <View style={[styles.card, tone === "parchment" && styles.parchmentCard]}>
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>✦ KINGDOM UPGRADED</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Dismiss building upgrade" style={styles.dismiss}
-          onPress={() => onDone(batch.id)}><Text style={styles.dismissText}>×</Text></Pressable>
+        <Text style={[styles.eyebrow, tone === "parchment" && styles.parchmentText]}>✦ KINGDOM UPGRADED</Text>
+        <Action accessibilityRole="button" accessibilityLabel="Dismiss building upgrade" style={styles.dismiss}
+          onPress={() => onDone(batch.id)}><Text style={[styles.dismissText, tone === "parchment" && styles.parchmentText]}>×</Text></Action>
       </View>
       {batch.upgrades.map(upgrade => <View key={upgrade.buildingId} style={styles.row}>
         <View style={styles.thumbnail} accessible={false}>
           <BuildingTierArtwork type={upgrade.buildingName} tier={upgrade.newTier} upgrade={upgrade} motion={motion} />
         </View>
-        <Text style={styles.message}>{upgrade.buildingName} reached Tier {upgrade.newTier}</Text>
+        <Text style={[styles.message, tone === "parchment" && styles.parchmentText]}>{upgrade.buildingName} reached Tier {upgrade.newTier}</Text>
       </View>)}
     </View>
   </View>;
@@ -86,4 +90,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   thumbnail: { width: 48, height: 48 },
   message: { flex: 1, color: colors.text, fontSize: 15, fontWeight: "700" },
+  parchmentCard: { backgroundColor: ui.colors.surface, borderColor: ui.colors.border, borderRadius: ui.radius.md },
+  parchmentText: { color: ui.colors.text },
 });

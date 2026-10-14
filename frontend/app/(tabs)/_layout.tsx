@@ -1,25 +1,28 @@
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, useWindowDimensions } from "react-native";
 import { Redirect, Tabs } from "expo-router";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { colors } from "../../src/theme/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { tabAppearance, TabIcon } from "../../src/navigation/tabAppearance";
+import { uiTheme as ui } from "../../src/theme/theme";
 import { useAuth } from "../../src/context/AuthContext";
 import { CompletionFeedbackProvider } from "../../src/context/CompletionFeedbackContext";
 import { AdProvider } from "../../src/ads/Ads";
 
 export default function TabLayout() {
   const { token, user, loading } = useAuth();
+  const { bottom } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
 
   if (loading) {
     return (
       <View
         style={{
           flex: 1,
-          backgroundColor: colors.background,
+          backgroundColor: ui.colors.background,
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={ui.colors.primary} accessibilityLabel="Loading your account" />
       </View>
     );
   }
@@ -34,20 +37,15 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.mutedText,
+        ...tabAppearance(bottom, fontScale),
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="view-dashboard" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon tab="dashboard" color={color} focused={focused} />
           ),
         }}
       />
@@ -55,8 +53,8 @@ export default function TabLayout() {
         name="tasks"
         options={{
           title: "Tasks",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="check-circle" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon tab="tasks" color={color} focused={focused} />
           ),
         }}
       />
@@ -64,8 +62,8 @@ export default function TabLayout() {
         name="base"
         options={{
           title: "Base",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="castle" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon tab="base" color={color} focused={focused} />
           ),
         }}
       />
@@ -73,8 +71,8 @@ export default function TabLayout() {
         name="avatar"
         options={{
           title: "Avatar",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account-circle" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon tab="avatar" color={color} focused={focused} />
           ),
         }}
       />
@@ -82,8 +80,8 @@ export default function TabLayout() {
         name="shop"
         options={{
           title: "Shop",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="storefront" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon tab="shop" color={color} focused={focused} />
           ),
         }}
       />

@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { apiError } from "../api/client";
-import { colors, radius, spacing } from "../theme/theme";
+import { colors, radius, spacing, uiTheme as ui } from "../theme/theme";
 import type { Task, TaskSize, TasksResponse } from "../types";
 import { DAY_NAMES, TASK_SIZE_OPTIONS, WEEKDAYS, type TaskInput } from "../tasks/scheduling";
 import LifeInput from "./LifeInput";
+import { UiPressable } from "./ui/Primitives";
 import { useTaskReminder } from "../notifications/useTaskReminder";
 import { REMINDER_OPTIONS, reminderTiming } from "../notifications/model";
 
@@ -15,7 +16,8 @@ const REPEAT_OPTIONS: { value: RepeatChoice; label: string }[] = [
   { value: "CUSTOM", label: "Custom weekdays" },
 ];
 
-export default function TaskEditor({ task, time, disabled, onSave, onCancel, onReminderNotice, suggestions, onBusyChange }: {
+export default function TaskEditor({ task, time, disabled, onSave, onCancel, onReminderNotice, suggestions, onBusyChange, tone = "legacy" }: {
+  tone?: "legacy" | "parchment";
   task?: Task;
   time?: TasksResponse["time"];
   disabled: boolean;
@@ -25,6 +27,9 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel, onR
   suggestions?: readonly string[];
   onBusyChange?: (busy: boolean) => void;
 }) {
+  const styles = tone === "parchment" ? parchmentStyles : legacyStyles;
+  const Action = tone === "parchment" ? UiPressable : Pressable;
+  const inputAppearance = tone === "parchment" ? { style: parchmentStyles.input, placeholderTextColor: ui.colors.subduedText } : {};
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
   const [taskSize, setTaskSize] = useState<TaskSize>(task?.taskSize ?? "NORMAL");
@@ -93,72 +98,77 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel, onR
   }
 
   return <View style={styles.form}>
-    <Text accessibilityRole="header" style={styles.heading}>{task ? "Edit task" : "Add a task"}</Text>
-    {suggestions && <View style={styles.options}>{suggestions.map(suggestion => <Pressable key={suggestion}
+    <Text accessibilityRole="header" aria-level={2} style={styles.heading}>{task ? "Edit task" : "Add a task"}</Text>
+    {suggestions && <View style={styles.options}>{suggestions.map(suggestion => <Action key={suggestion}
       accessibilityRole="button" accessibilityLabel={`Use suggestion: ${suggestion}`} accessibilityState={{ disabled: locked }}
       disabled={locked} onPress={() => setTitle(suggestion)} style={styles.chip}>
       <Text style={styles.chipText}>{suggestion}</Text>
-    </Pressable>)}</View>}
+    </Action>)}</View>}
     <Text style={styles.label}>Task title</Text>
-    <LifeInput accessibilityLabel="Task title" placeholder="What will you do?" maxLength={200} value={title} onChangeText={setTitle} editable={!locked} />
-    <LifeInput accessibilityLabel="Description (optional)" placeholder="Description (optional)" maxLength={2000} value={description} onChangeText={setDescription} editable={!locked} />
+    <LifeInput {...inputAppearance} accessibilityLabel="Task title" placeholder="What will you do?" maxLength={200} value={title} onChangeText={setTitle} editable={!locked} />
+    {tone === "parchment" && <Text style={styles.label}>Description (optional)</Text>}
+    <LifeInput {...inputAppearance} accessibilityLabel="Description (optional)" placeholder="Description (optional)" maxLength={2000} value={description} onChangeText={setDescription} editable={!locked} />
     <Text style={styles.label}>Task size</Text>
-    <View style={styles.options}>{TASK_SIZE_OPTIONS.map(option => <Pressable key={option.value} accessibilityRole="button"
+    <View style={styles.options}>{TASK_SIZE_OPTIONS.map(option => <Action key={option.value} accessibilityRole="button"
       accessibilityLabel={`${option.label}, ${option.xp} XP`} accessibilityState={{ selected: taskSize === option.value, disabled: locked }}
+      aria-pressed={tone === "parchment" ? taskSize === option.value : undefined}
       disabled={locked} onPress={() => setTaskSize(option.value)} style={[styles.sizeChip, taskSize === option.value && styles.selected]}>
       <Text style={[styles.chipText, taskSize === option.value && styles.selectedText]}>{option.label}</Text>
       <Text style={[styles.reward, taskSize === option.value && styles.selectedText]}>+{option.xp} XP</Text>
-    </Pressable>)}</View>
-    <Pressable accessibilityRole="button" accessibilityLabel="Schedule options" accessibilityState={{ expanded: scheduleOpen, disabled: locked }}
+    </Action>)}</View>
+    <Action accessibilityRole="button" accessibilityLabel="Schedule options" accessibilityState={{ expanded: scheduleOpen, disabled: locked }}
       disabled={locked} onPress={() => setScheduleOpen(value => !value)} style={styles.chip}>
       <Text style={styles.chipText}>Schedule · {REPEAT_OPTIONS.find(option => option.value === repeat)?.label}{dueTime ? ` · ${dueTime}` : ""} {scheduleOpen ? "−" : "+"}</Text>
-    </Pressable>
+    </Action>
     {scheduleOpen && <>
     <Text style={styles.label}>Repeat</Text>
-    <View style={styles.options}>{REPEAT_OPTIONS.map(option => <Pressable key={option.value} accessibilityRole="button"
+    <View style={styles.options}>{REPEAT_OPTIONS.map(option => <Action key={option.value} accessibilityRole="button"
       accessibilityLabel={`Repeat: ${option.label}`} accessibilityState={{ selected: repeat === option.value, disabled: locked }} disabled={locked}
+      aria-pressed={tone === "parchment" ? repeat === option.value : undefined}
       onPress={() => selectRepeat(option.value)} style={[styles.chip, repeat === option.value && styles.selected]}>
       <Text style={[styles.chipText, repeat === option.value && styles.selectedText]}>{option.label}</Text>
-    </Pressable>)}</View>
-    {(repeat === "WEEKLY" || repeat === "CUSTOM") && <View style={styles.options}>{WEEKDAYS.map((day, index) => <Pressable key={day}
+    </Action>)}</View>
+    {(repeat === "WEEKLY" || repeat === "CUSTOM") && <View style={styles.options}>{WEEKDAYS.map((day, index) => <Action key={day}
       accessibilityRole="checkbox" accessibilityLabel={DAY_NAMES[index]} accessibilityState={{ checked: days.includes(day), disabled: locked }} disabled={locked}
+      aria-checked={tone === "parchment" ? days.includes(day) : undefined}
       onPress={() => setDays(current => repeat === "WEEKLY" ? [day] : current.includes(day) ? current.filter(value => value !== day) : [...current, day])}
       style={[styles.chip, days.includes(day) && styles.selected]}>
       <Text style={[styles.chipText, days.includes(day) && styles.selectedText]}>{DAY_NAMES[index].slice(0, 3)}</Text>
-    </Pressable>)}</View>}
+    </Action>)}</View>}
     <Text style={styles.label}>{repeat === "NONE" ? "Due date (optional)" : repeat === "MONTHLY" ? "Start date" : "Start date (optional)"}</Text>
-    <LifeInput accessibilityLabel={repeat === "NONE" ? "Due date, YYYY-MM-DD, optional" : "Start date, YYYY-MM-DD"} placeholder={time?.date ?? "YYYY-MM-DD"}
+    <LifeInput {...inputAppearance} accessibilityLabel={repeat === "NONE" ? "Due date, YYYY-MM-DD, optional" : "Start date, YYYY-MM-DD"} placeholder={time?.date ?? "YYYY-MM-DD"}
       value={startDate} onChangeText={setStartDate} autoCapitalize="none" autoCorrect={false} maxLength={10} editable={!locked} />
     <Text style={styles.hint}>YYYY-MM-DD.{repeat === "MONTHLY" ? " Shorter months use their last day, then return to the original day." : repeat !== "NONE" ? " Leave blank to start today." : " Leave blank for an unscheduled task."}</Text>
     <Text style={styles.label}>Due time (optional) · HH:mm</Text>
-    <LifeInput accessibilityLabel="Due time, 24-hour HH:mm, optional" placeholder="09:00" value={dueTime} onChangeText={setDueTime}
+    <LifeInput {...inputAppearance} accessibilityLabel="Due time, 24-hour HH:mm, optional" placeholder="09:00" value={dueTime} onChangeText={setDueTime}
       autoCapitalize="none" autoCorrect={false} maxLength={5} editable={!locked} />
     <Text style={styles.hint}>Times use {time?.timeZone ?? "your profile timezone"}. Complete anytime on a scheduled day.</Text>
     <Text style={styles.label}>Reminder</Text>
-    <View style={styles.options}>{REMINDER_OPTIONS.map(option => <Pressable key={option.value} accessibilityRole="button"
+    <View style={styles.options}>{REMINDER_OPTIONS.map(option => <Action key={option.value} accessibilityRole="button"
       accessibilityLabel={`Reminder: ${option.label}`} accessibilityState={{ selected: reminder.choice === option.value, disabled: locked || reminder.loading || !!reminder.error }}
+      aria-pressed={tone === "parchment" ? reminder.choice === option.value : undefined}
       disabled={locked || reminder.loading || !!reminder.error} onPress={() => reminder.setChoice(option.value)} style={[styles.chip, reminder.choice === option.value && styles.selected]}>
       <Text style={[styles.chipText, reminder.choice === option.value && styles.selectedText]}>{option.label}</Text>
-    </Pressable>)}</View>
+    </Action>)}</View>
     {reminder.choice === "CUSTOM" && <><Text style={styles.label}>Reminder time · HH:mm</Text>
-      <LifeInput accessibilityLabel="Reminder time, 24-hour HH:mm" value={reminder.clock} onChangeText={reminder.setClock} placeholder="08:45" maxLength={5} editable={!locked} /></>}
+      <LifeInput {...inputAppearance} accessibilityLabel="Reminder time, 24-hour HH:mm" value={reminder.clock} onChangeText={reminder.setClock} placeholder="08:45" maxLength={5} editable={!locked} /></>}
     <Text style={styles.hint}>Offsets follow the due time and repeat schedule. Without a due time, choose an explicit time. Quiet hours suppress reminders; they are not delayed. Notifications also require enabled preferences and device permission.</Text>
     </>}
     {reminder.loading && <Text style={styles.hint}>Loading saved reminder…</Text>}
     {!!reminder.error && <><Text accessibilityRole="alert" style={styles.error}>{reminder.error}</Text>
-      <Pressable accessibilityRole="button" onPress={reminder.retry} style={styles.chip}><Text style={styles.chipText}>Retry reminders</Text></Pressable></>}
+      <Action accessibilityRole="button" onPress={reminder.retry} style={styles.chip}><Text style={styles.chipText}>Retry reminders</Text></Action></>}
     {!!reminder.notice && <Text accessibilityLiveRegion="polite" style={styles.hint}>{reminder.notice}</Text>}
     {task && <Text style={styles.hint}>Changing the schedule starts a new task streak. Past completions and your best streak stay saved.</Text>}
     {!!error && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled: locked, busy: saving }} disabled={locked} onPress={() => void save()}
-      style={[styles.save, locked && styles.disabled]}><Text style={styles.saveText}>{saving ? "Saving…" : task ? "Save changes" : "Add task"}</Text></Pressable>
-    {onCancel && <Pressable accessibilityRole="button" accessibilityLabel="Cancel task editing" disabled={locked} onPress={onCancel} style={styles.chip}>
+    <Action accessibilityRole="button" accessibilityState={{ disabled: locked, busy: saving }} disabled={locked} onPress={() => void save()}
+      style={[styles.save, locked && styles.disabled]}><Text style={[styles.saveText, tone === "parchment" && locked && parchmentStyles.disabledText]}>{saving ? "Saving…" : task ? "Save changes" : "Add task"}</Text></Action>
+    {onCancel && <Action accessibilityRole="button" accessibilityLabel="Cancel task editing" disabled={locked} onPress={onCancel} style={styles.chip}>
       <Text style={styles.chipText}>Cancel</Text>
-    </Pressable>}
+    </Action>}
   </View>;
 }
 
-const styles = StyleSheet.create({
+const legacyStyles = StyleSheet.create({
   form: { gap: spacing.sm },
   heading: { color: colors.text, fontSize: 18, fontWeight: "700" },
   label: { color: colors.text, fontWeight: "700" },
@@ -174,4 +184,31 @@ const styles = StyleSheet.create({
   save: { minHeight: 48, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   saveText: { color: colors.background, fontSize: 16, fontWeight: "700" },
   disabled: { opacity: 0.6 },
+});
+
+const parchmentStyles = StyleSheet.create({
+  ...legacyStyles,
+  form: { gap: ui.spacing.sm },
+  heading: { ...ui.type.section, color: ui.colors.text, fontFamily: Platform.select(ui.font.display), marginBottom: ui.spacing.sm },
+  label: { ...ui.type.label, color: ui.colors.text, marginTop: ui.spacing.sm },
+  options: { flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.sm },
+  chip: { minHeight: ui.size.target, minWidth: ui.size.target, justifyContent: "center", alignItems: "center", borderWidth: 1,
+    borderColor: ui.colors.controlBorder, backgroundColor: ui.colors.surface, borderRadius: ui.radius.md,
+    paddingHorizontal: ui.spacing.sm, paddingVertical: ui.spacing.sm },
+  sizeChip: { minWidth: "30%", minHeight: ui.size.target, flexGrow: 1, alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: ui.colors.controlBorder, borderRadius: ui.radius.md, padding: ui.spacing.sm },
+  selected: { backgroundColor: ui.colors.primary, borderColor: ui.colors.primary },
+  chipText: { ...ui.type.label, color: ui.colors.secondaryText, textAlign: "center", flexShrink: 1 },
+  reward: { ...ui.type.caption, color: ui.colors.secondaryText },
+  selectedText: { color: ui.colors.onPrimary },
+  hint: { ...ui.type.caption, color: ui.colors.secondaryText },
+  error: { ...ui.type.body, color: ui.colors.danger },
+  save: { minHeight: ui.size.target, padding: ui.spacing.sm, borderRadius: ui.radius.md, backgroundColor: ui.colors.primary,
+    alignItems: "center", justifyContent: "center", marginTop: ui.spacing.sm },
+  saveText: { ...ui.type.label, color: ui.colors.onPrimary, textAlign: "center" },
+  disabled: { opacity: 1, backgroundColor: ui.colors.disabled },
+  disabledText: { color: ui.colors.disabledText },
+  input: { minHeight: ui.size.target, backgroundColor: ui.colors.elevated, color: ui.colors.text,
+    borderWidth: 1, borderColor: ui.colors.controlBorder, borderRadius: ui.radius.md, padding: ui.spacing.md,
+    ...ui.type.body, fontFamily: Platform.select(ui.font.body) },
 });
