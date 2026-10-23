@@ -115,7 +115,10 @@ function describe(file) {
   let id = "—";
   let intentionalUnregistered = false;
 
-  if (parts[0] === "avatar" && parts[1] === "v2") {
+  if (parts[0] === "ui") {
+    type = "UI materials";
+    id = basename;
+  } else if (parts[0] === "avatar" && parts[1] === "v2") {
     const group = parts[2];
     const avatarTypes = {
       body: "base character/body assets",

@@ -347,7 +347,39 @@ node scripts/set-dev-entitlement.mjs --table Evrenthia-Dev --user-sub <sub> --pl
 
 Add `--write` only when an intentional development-table update is wanted. Use `--plan FREE` to reset the same stable `USER#<sub> / ENTITLEMENTS` record. The script requires explicit table, user, plan, region, and profile values, defaults to a dry run, refuses table names without a clear `dev` or `development` segment, and stores no credentials.
 
-A future trusted billing ingestion service should validate Apple App Store Server Notifications or Google Play purchase notifications, then update the same `ENTITLEMENTS` item. No public webhook, receipt-validation endpoint, or client-controlled premium mutation is included yet.
+`POST /billing/sync` and the authorized RevenueCat webhook re-fetch provider state before updating the same `ENTITLEMENTS` item. The client cannot submit entitlement or environment overrides.
+
+### Temporary TestFlight billing against PROD
+
+`RevenueCatSandboxInProdEnabled` is a deployment-only string parameter, defaulting to `"false"`, passed only to BillingFunction as `REVENUECAT_SANDBOX_IN_PROD_ENABLED`. Sandbox is allowed for `EnvironmentName=dev`, or for exactly `EnvironmentName=prod` with the exact flag `"true"`. Missing, false, or malformed flags leave PROD sandbox verification unavailable (`BILLING_UNAVAILABLE`); unknown environments cannot opt in. Production RevenueCat verification is unaffected by the flag.
+
+Use these settings only for temporary pre-release TestFlight/sandbox verification against PROD:
+
+```text
+EnvironmentName=prod
+RevenueCatEnvironment=sandbox
+RevenueCatSandboxInProdEnabled=true
+```
+
+Before public App Store production billing, switch to:
+
+```text
+RevenueCatEnvironment=production
+RevenueCatSandboxInProdEnabled=false
+```
+
+Supply the existing server secret, webhook authorization, internal project/entitlement IDs, and product allowlist through approved deployment configuration. `RevenueCatEntitlementId` is the internal ID whose lookup key is `premium`. Configure the iOS product with scalar SAM overrides; CloudFormation constructs the `REVENUECAT_PRODUCTS` JSON read by BillingFunction:
+
+```text
+RevenueCatProductId=prod13ca64f713
+RevenueCatAppId=app1cdc79444d
+RevenueCatStoreIdentifier=evrenthia_premium_monthly
+RevenueCatStore=app_store
+```
+
+Do not commit secrets or internal IDs. Keep `DevRewardedAdsEnabled=false`, `AdMobSsvEnabled=false`, and `AdMobLiveEnabled=false` for PROD.
+
+This opt-in applies to the whole backend environment; it does not detect TestFlight or trust a client flag. All customer, entitlement, app/product/store, expiry, webhook authorization, and event-ordering checks still apply. Sandbox verification writes normal entitlement records; changing the flag does not retroactively clear them. Review test entitlements before public release.
 
 ## Preferences, devices, and reminders
 

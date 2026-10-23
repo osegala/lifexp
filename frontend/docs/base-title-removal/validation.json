@@ -1,0 +1,16 @@
+{
+  "changedSourceFiles": [
+    "frontend/src/components/BasePanels.tsx"
+  ],
+  "allOtherInitiallyDirtyFilesUnchanged": true,
+  "commands": {
+    "npm test": "278 passed, 0 failed",
+    "npx tsc --noEmit": "passed",
+    "npm run lint": "passed, 0 warnings",
+    "git diff --check": "passed"
+  },
+  "resourceSafeAreaExpression": "insets.top + ui.spacing.sm (unchanged)",
+  "mapAndNavigationUnchanged": true,
+  "nativeRuntimeReviewed": false,
+  "buildDeployCommitPushPerformed": false
+}

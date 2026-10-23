@@ -1,0 +1,104 @@
+{
+  "controllers": [
+    {
+      "file": "app/(tabs)/avatar.tsx",
+      "apiCallsIdentical": true,
+      "behaviorOutsidePresentationIdentical": true
+    },
+    {
+      "file": "app/(tabs)/base.tsx",
+      "apiCallsIdentical": true,
+      "behaviorOutsidePresentationIdentical": true
+    },
+    {
+      "file": "app/(tabs)/dashboard.tsx",
+      "apiCallsIdentical": true,
+      "behaviorOutsidePresentationIdentical": true
+    },
+    {
+      "file": "app/(tabs)/profile.tsx",
+      "apiCallsIdentical": true,
+      "behaviorOutsidePresentationIdentical": true
+    },
+    {
+      "file": "app/(tabs)/shop.tsx",
+      "apiCallsIdentical": true,
+      "behaviorOutsidePresentationIdentical": true
+    },
+    {
+      "file": "app/(tabs)/tasks.tsx",
+      "apiCallsIdentical": true,
+      "behaviorOutsidePresentationIdentical": true
+    },
+    {
+      "file": "app/premium.tsx",
+      "apiCallsIdentical": true,
+      "behaviorOutsidePresentationIdentical": true
+    },
+    {
+      "file": "src/ads/Ads.tsx",
+      "apiCallsIdentical": true,
+      "behaviorOutsidePresentationIdentical": true
+    },
+    {
+      "file": "src/components/TaskEditor.tsx",
+      "apiCallsIdentical": true,
+      "behaviorOutsidePresentationIdentical": true
+    },
+    {
+      "file": "src/components/NotificationSettings.tsx",
+      "apiCallsIdentical": true,
+      "behaviorOutsidePresentationIdentical": true
+    }
+  ],
+  "modules": [
+    {
+      "file": "src/api/client.ts",
+      "unchanged": true
+    },
+    {
+      "file": "src/api/routes.ts",
+      "unchanged": true
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "unchanged": true
+    },
+    {
+      "file": "src/context/CompletionFeedbackContext.tsx",
+      "unchanged": true
+    },
+    {
+      "file": "src/feedback/completion.ts",
+      "unchanged": true
+    },
+    {
+      "file": "src/base/buildingProgress.ts",
+      "unchanged": true
+    },
+    {
+      "file": "src/billing/client.ts",
+      "unchanged": true
+    },
+    {
+      "file": "src/billing/provider.ts",
+      "unchanged": true
+    },
+    {
+      "file": "src/entitlements/model.ts",
+      "unchanged": true
+    },
+    {
+      "file": "src/notifications/device.ts",
+      "unchanged": true
+    },
+    {
+      "file": "src/notifications/model.ts",
+      "unchanged": true
+    },
+    {
+      "file": "src/tasks/scheduling.ts",
+      "unchanged": true
+    }
+  ]
+}

@@ -6,6 +6,10 @@ export type BuildingType =
   | "Garden"
   | "Hall of Achievements";
 
+/** Local map placement only; it grants no building ownership or progression. */
+export type BuildingLayout = { x: number; y: number; width: number; height: number };
+export type BuildingLayouts = Record<BuildingType, BuildingLayout>;
+
 export type BuildingProgress = {
   buildingId: string;
   type: BuildingType;

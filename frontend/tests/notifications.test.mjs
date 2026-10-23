@@ -1,3 +1,5 @@
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
+import * as dateFormat from "../src/utils/dateFormat.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -16,7 +18,11 @@ function load(path, imports) {
     module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } }).outputText;
   new Function("require", "exports", source)(id => {
-    if (id === "react/jsx-runtime") return require(id);
+    if (id === "react/jsx-runtime") return noticeJsxRuntime;
+    const notice = noticeImport(id, imports); if (notice !== undefined) return notice;
+    if (id === "./ui/FantasyMaterial") return "FantasyMaterial";
+    if (id === "../utils/dateFormat") return dateFormat;
+    if (id === "./ScheduleInput") return "Input";
     if (!(id in imports)) throw new Error(`Missing ${id}`);
     return imports[id];
   }, exports);
@@ -110,7 +116,7 @@ test("TaskEditor retains a created task ID when reminder save fails, avoiding du
   const render = () => h.render(() => Editor({ disabled: false, time: { date: "2026-10-05", weekday: "MON", timeZone: "UTC" }, onSave: async (_input, id) => { ids.push(id); return "created"; } }));
   const node = label => nodes(render()).find(item => item.props.accessibilityLabel === label)
     ?? nodes(render()).find(item => item.type === "Pressable" && text(item) === label);
-  node("Task title").props.onChangeText("Read"); node("Schedule options").props.onPress(); node("Due time, 24-hour HH:mm, optional").props.onChangeText("09:00");
+  node("Task title").props.onChangeText("Read"); node("Schedule options").props.onPress(); node("Due time, optional").props.onChangeText("09:00");
   const pressSave = () => nodes(render()).find(item => item.type === "Pressable" && text(item) === "Add task").props.onPress();
   pressSave(); await tick(); assert.match(text(render()), /will not create another task/); fail = false; pressSave(); await tick(); assert.deepEqual(ids, [undefined, "created"]);
   for (const option of model.REMINDER_OPTIONS) { node("Schedule options").props.onPress(); const choice = node(`Reminder: ${option.label}`); assert.equal(choice.props.accessibilityRole, "button"); node("Schedule options").props.onPress(); }

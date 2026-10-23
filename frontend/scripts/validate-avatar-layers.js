@@ -8,7 +8,7 @@ const CANVAS_HEIGHT = 1254;
 const avatarRoot = path.resolve(__dirname, "../assets/avatar/v2");
 const registryPath = path.resolve(__dirname, "../src/avatar/assetRegistry.ts");
 const framedClothingSources = [...fs.readFileSync(registryPath, "utf8")
-  .matchAll(/(?:trousersAsset|bootsAsset|hatAsset|framedHair)\(\s*require\("([^"]+)"\)/g)]
+  .matchAll(/(?:trousersAsset|bootsAsset|hatAsset|framedHair|premiumTopAsset)\(\s*require\("([^"]+)"\)/g)]
   .map(([, source]) => path.resolve(path.dirname(registryPath), source));
 
 const sharedCanvasSprites = [
@@ -26,7 +26,7 @@ for (const limb of ["left-arm", "right-arm", "left-leg", "right-leg"]) {
 }
 for (const [, source] of fs.readFileSync(registryPath, "utf8")
   .matchAll(/dressAsset\(\s*require\("([^"]+)"\)/g)) {
-  sourceSizes.set(path.relative(avatarRoot, path.resolve(path.dirname(registryPath), source)), [1086, 1448]);
+  sourceSizes.set(path.relative(avatarRoot, path.resolve(path.dirname(registryPath), source)), source.includes("/premium-") ? [1254, 1254] : [1086, 1448]);
 }
 
 const appearancePairs = [];

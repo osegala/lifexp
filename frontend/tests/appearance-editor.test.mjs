@@ -1,9 +1,11 @@
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
 import ts from "typescript";
 
+import * as tray from "../src/avatar/tray.ts";
 import * as appearance from "../src/avatar/appearance.ts";
 import * as inventory from "../src/avatar/inventory.ts";
 import * as theme from "../src/theme/theme.ts";
@@ -11,12 +13,15 @@ import { apiError } from "../src/api/errors.ts";
 import { validateProfilePatch } from "../../backend/functions/update-me/logic.mjs";
 import { APPEARANCE_VALUES } from "../../backend/layers/api-shared/nodejs/appearance.mjs";
 
+import { memoryCache, deferred, profile as cacheProfile, inventory as emptyInventory } from "./cache-test-support.mjs";
+import { SupersededCacheRead } from "../src/cache/PlayerCache.ts";
+
 const require = createRequire(import.meta.url);
 const native = Object.fromEntries(["ActivityIndicator", "Image", "Modal", "Pressable", "ScrollView", "Text", "View"].map(name => [name, name]));
 native.StyleSheet = { create: value => value, absoluteFill: { position: "absolute" } };
 native.FlatList = "FlatList";
 native.Platform = { select: options => options.default };
-native.useWindowDimensions = () => ({ width: 375, height: 812 });
+native.useWindowDimensions = () => ({ width: 375, height: 812, fontScale: 1 });
 // Match React Native Web: an Alert cannot be used to close a dirty editor.
 native.Alert = { alert() {} };
 
@@ -26,7 +31,9 @@ function load(path, imports) {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true },
   }).outputText;
   new Function("exports", "require", "__DEV__", code)(exports, id => {
-    if (id === "react/jsx-runtime") return require(id);
+    if (id === "react/jsx-runtime") return noticeJsxRuntime;
+    const notice = noticeImport(id, imports); if (notice !== undefined) return notice;
+    if (id === "./ui/FantasyMaterial") return "FantasyMaterial";
     if (!(id in imports)) throw new Error(`Unmocked import: ${id}`);
     return imports[id];
   }, false);
@@ -47,17 +54,18 @@ const Editor = load("../src/components/AppearanceEditor.tsx", {
   "react-native": native, "../avatar/appearance": appearance, "../theme/theme": theme, "./LifeCard": "LifeCard", "./ui/Primitives": { UiPressable: "Pressable" },
 });
 
-async function screen({ validatePatch = () => {} } = {}) {
+async function screen({ validatePatch = () => {}, player = memoryCache().cache, read, post } = {}) {
   let index = 0, focus;
   const state = [], patches = [], cached = [];
-  let profile = { ...appearance.DEFAULT_APPEARANCE, bodyType: "GIRL" };
+  let profile = { ...cacheProfile, ...appearance.DEFAULT_APPEARANCE, bodyType: "GIRL" };
   const api = {
-    get: async route => ({ data: route === "me" ? profile : route === "shop" ? { items: [] }
-      : { items: [], equipped: {} } }),
+    get: async route => ({ data: read ? await read(route) : route === "me" ? profile : route === "shop" ? { player: { coins: 0, level: 1 }, items: [] }
+      : emptyInventory }),
+    post: async (route, body) => ({ data: await post?.(route, body) }),
     patch: async (route, value) => {
       patches.push({ route, value });
       validatePatch(value);
-      profile = { ...value };
+      profile = { ...profile, ...value };
       return { data: profile };
     },
   };
@@ -65,18 +73,20 @@ async function screen({ validatePatch = () => {} } = {}) {
     "react": {
       useState: initial => {
         const key = index++;
-        if (!(key in state)) state[key] = initial;
+        if (!(key in state)) state[key] = typeof initial === "function" ? initial() : initial;
         return [state[key], value => { state[key] = typeof value === "function" ? value(state[key]) : value; }];
       },
+      useRef: initial => { const key = index++; if (!(key in state)) state[key] = { current: initial }; return state[key]; },
       useCallback: fn => fn,
       useMemo: fn => fn(),
     },
     "react-native": native,
     "expo-router": { useFocusEffect: fn => { focus = fn; } },
     "@expo/vector-icons/MaterialCommunityIcons": "Icon",
-    "../../src/api/client": { api, apiError },
-    "../../src/api/routes": { apiRoutes: { me: "me", shop: "shop", inventory: "inventory" } },
-    "../../src/avatar/assetRegistry": { getCosmeticAssetIds: () => [], getEquippedSceneSource: () => undefined },
+    "../../src/cache/playerData": { playerCache: player }, "../../src/cache/PlayerCache": { SupersededCacheRead },
+    "../../src/avatar/prefetch": { prefetchAvatarAssets: async () => {} }, "../../src/api/client": { api, apiError },
+    "../../src/api/routes": { apiRoutes: { me: "me", shop: "shop", inventory: "inventory", inventoryEquip: "inventory/equip", inventoryUnequip: "inventory/unequip" } },
+    "../../src/avatar/assetRegistry": { getCosmeticAssetIds: () => [], getEquippedSceneSource: () => undefined, getCosmeticAssetMetadata: () => undefined },
     "../../src/avatar/inventory": inventory,
     "../../src/avatar/localAppearance": {
       getLocalAppearance: async () => profile,
@@ -93,7 +103,9 @@ async function screen({ validatePatch = () => {} } = {}) {
     "../../src/config/environment": { environment: { environment: "dev" } },
   });
   const Content = load("../src/components/AvatarContent.tsx", {
-    react: { useMemo: fn => fn() }, "react-native": native, "../theme/theme": theme,
+    react: { useMemo: fn => fn(), useState: value => [value, () => {}], useEffect() {}, useRef: current => ({ current }) },
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 20, bottom: 0 }) },
+    "../avatar/prefetch": { prefetchWardrobeThumbnails: async () => {} }, "../avatar/tray": tray, "./ui/ExpandableTray": "Tray", "./ui/PageBackground": "Background", "react-native": native, "../theme/theme": theme,
     "@expo/vector-icons/MaterialCommunityIcons": "Icon",
     "../avatar/assetRegistry": { getEquippedSceneSource: () => undefined },
     "./AvatarRenderer": "AvatarRenderer", "./AppearanceEditor": "AppearanceEditor", "./WardrobeCard": "WardrobeCard", "./LifeButton": "Button",
@@ -106,12 +118,13 @@ async function screen({ validatePatch = () => {} } = {}) {
     const list = nodes(tree).find(n => n.type === "FlatList");
     return { ...tree, props: { ...tree.props, children: [list.props.ListHeaderComponent, tree.props.children] } };
   };
-  render();
+  const view = () => { index = 0; return Component().props; };
+  const initial = view(); render();
   focus();
   await new Promise(setImmediate);
   const editor = () => nodes(render()).find(node => node.type === "AppearanceEditor")?.props;
   return {
-    render, patches, cached,
+    render, view, initial, patches, cached,
     editor,
     editorTree: () => Editor(editor()),
     pressSave: () => {
@@ -304,4 +317,47 @@ test("hair picker exposes all 20 names, checked state, and 44-point targets", ()
     }
     assert.deepEqual(changes, appearance.HAIR_STYLE_IDS.map(hairId => ({ hairId })));
   }
+});
+
+test("cold Avatar immediately restores body, hair, clothing, scene, pet, aura and wardrobe while refresh is offline", async () => {
+  const first = memoryCache();
+  const slots = { tunic: "outfit", background: "scene", pet: "pet", aura: "aura" };
+  const items = Object.entries(slots).map(([category, itemId]) => ({ itemId, category, name: itemId,
+    assetKey: category === "tunic" ? "forest-tunic.png" : `avatar-v2/${category}s/${itemId}`, equipped: true }));
+  first.cache.set("test-user", "profile", { ...cacheProfile, ...appearance.DEFAULT_APPEARANCE, bodyType: "GIRL" });
+  first.cache.set("test-user", "inventory", { equipped: { ...emptyInventory.equipped, ...slots }, items });
+  await new Promise(setImmediate);
+  const player = memoryCache("test", first.values).cache; await player.hydrateUser("test-user");
+  const pending = deferred(); const ui = await screen({ player, read: () => pending.promise });
+  for (const snapshot of [ui.initial, ui.view()]) {
+    assert.equal(snapshot.loading, false); assert.equal(snapshot.avatar.bodyType, "GIRL");
+    assert.equal(snapshot.avatar.equippedHairId, appearance.DEFAULT_APPEARANCE.hairId);
+    assert.equal(snapshot.avatar.equippedTopId, "outfit"); assert.equal(snapshot.avatar.equippedBackgroundId, "scene");
+    assert.equal(snapshot.avatar.equippedPetId, "pet"); assert.equal(snapshot.avatar.equippedAuraId, "aura");
+    assert.ok(snapshot.cosmetics.length >= 4);
+  }
+  pending.reject(Error("offline")); await new Promise(setImmediate);
+  assert.equal(ui.view().avatar.equippedTopId, "outfit"); assert.equal(ui.view().loading, false);
+});
+
+test("an older inventory refresh cannot undo a newly confirmed equip or persist the previous outfit", async () => {
+  const first = memoryCache(), old = deferred(), posts = []; let reads = 0;
+  const profile = { ...cacheProfile, ...appearance.DEFAULT_APPEARANCE, bodyType: "GIRL" };
+  const inventory = { equipped: { ...emptyInventory.equipped, tunic: "old-top" }, items: ["old-top", "new-top"].map(itemId => ({
+    itemId, name: itemId, category: "tunic", assetKey: "forest-tunic.png", equipped: itemId === "old-top" })) };
+  const fresh = { ...inventory, equipped: { ...inventory.equipped, tunic: "new-top" },
+    items: inventory.items.map(item => ({ ...item, equipped: item.itemId === "new-top" })) };
+  first.cache.set("test-user", "profile", profile); first.cache.set("test-user", "inventory", inventory);
+  const ui = await screen({ player: first.cache, read: route => route === "inventory"
+    ? ++reads === 1 ? old.promise : Promise.resolve(fresh)
+    : Promise.resolve(route === "me" ? profile : { player: { coins: 481, level: 2 }, items: [] }),
+    post: async (route, body) => { posts.push([route, body]); return {}; } });
+  assert.equal(ui.initial.avatar.equippedTopId, "old-top");
+  await ui.view().onEquip({ id: "new-top", type: "TOP", equipped: false, unlocked: true });
+  old.resolve(inventory); await new Promise(setImmediate);
+  assert.deepEqual(posts, [["inventory/equip", { itemId: "new-top" }]]);
+  assert.equal(ui.view().avatar.equippedTopId, "new-top");
+  assert.equal(first.cache.peek("test-user", "inventory").equipped.tunic, "new-top");
+  const restarted = memoryCache("test", first.values).cache; await restarted.hydrateUser("test-user");
+  assert.equal(restarted.peek("test-user", "inventory").equipped.tunic, "new-top");
 });

@@ -8,9 +8,13 @@ import { BillingClient } from "../billing/client";
 import { billingProvider } from "../billing/provider";
 import { apiRoutes } from "../api/routes";
 import type { AxiosRequestConfig } from "axios";
+import { getDeviceTimeZone } from "../utils/timeZone";
+import { playerCache } from "../cache/playerData";
+import { prefetchCachedAvatar } from "../avatar/prefetch";
 
 function useSessionValue() {
-  const [session] = useState(() => new AuthSession(api, cognitoAuth));
+  const [session] = useState(() => new AuthSession(api, cognitoAuth, undefined, playerCache,
+    userId => prefetchCachedAvatar(playerCache, userId)));
   const [billing] = useState(() => new BillingClient(billingProvider, async userId => {
     await api.post(apiRoutes.billingSync, {}, { expectedUserId: userId } as AxiosRequestConfig);
     if (String(session.getSnapshot().user?.id) !== userId) throw new Error("Account changed");
@@ -43,9 +47,18 @@ function useSessionValue() {
     const subscription = AppState.addEventListener("change", state => {
       if (state === "active") retry();
     });
+    // A zone can also change while the app stays open (for example, travel).
+    // Check locally; only a changed zone causes a profile/network refresh.
+    const timer = setInterval(() => {
+      const current = session.getSnapshot();
+      if (AppState.currentState !== "active" || current.loading || !current.user) return;
+      const detected = getDeviceTimeZone();
+      if (detected && detected !== current.user.timeZone) void session.refreshUser();
+    }, 60_000);
     if (Platform.OS === "web") window.addEventListener("online", retry);
     return () => {
       subscription.remove();
+      clearInterval(timer);
       if (Platform.OS === "web") window.removeEventListener("online", retry);
     };
   }, [session]);

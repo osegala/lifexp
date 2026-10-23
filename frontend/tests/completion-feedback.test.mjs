@@ -1,3 +1,5 @@
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
+import * as dateFormat from "../src/utils/dateFormat.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -8,11 +10,14 @@ import * as buildings from "../src/base/buildingProgress.ts";
 import * as theme from "../src/theme/theme.ts";
 import * as scheduling from "../src/tasks/scheduling.ts";
 import { apiError } from "../src/api/errors.ts";
+import { memoryCache, tasks as cacheTasks, achievements as cacheAchievements, profile as cacheProfile, inventory as cacheInventory } from "./cache-test-support.mjs";
+import * as appearance from "../src/avatar/appearance.ts";
+import { SupersededCacheRead } from "../src/cache/PlayerCache.ts";
 import { levelInfo } from "../../backend/layers/api-shared/nodejs/leveling.mjs";
 
 const { completionEvent, completionFrame, completionAnnouncement, completionQueue, EMPTY_COMPLETION_QUEUE } = feedback;
 const task = id => ({ taskId: id, title: `Task ${id}`, taskSize: "NORMAL", xpReward: 35, coinReward: 4,
-  repeatType: "NONE", repeatDays: [], active: true, archived: false, completedToday: false, isScheduledToday: true, isDueToday: true });
+  repeatType: "NONE", repeatDays: [], completed: false, currentStreak: 0, bestStreak: 0, active: true, archived: false, completedToday: false, isScheduledToday: true, isDueToday: true });
 function response(id = "one", previousXp = 40, xp = 47) {
   const before = levelInfo(previousXp), after = levelInfo(previousXp + xp);
   return {
@@ -104,7 +109,10 @@ function load(path, imports, exportName = "default") {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true },
   }).outputText;
   new Function("exports", "require", code)(exports, id => {
-    if (id === "react/jsx-runtime") return require(id);
+    if (id === "react/jsx-runtime") return noticeJsxRuntime;
+    const notice = noticeImport(id, imports); if (notice !== undefined) return notice;
+    if (id === "../utils/dateFormat") return dateFormat;
+    if (id === "./ScheduleInput") return "Input";
     if (!(id in imports)) throw new Error(`Unmocked import: ${id}`);
     return imports[id];
   });
@@ -137,7 +145,7 @@ const native = { ...Object.fromEntries(["ActivityIndicator", "Pressable", "Scrol
 const tick = () => new Promise(setImmediate);
 
 function goals(daily = 2, weekly = 9, days = 7) {
-  const goal = (current, target, worldPoints) => ({ current, target, progressPercent: Math.min(100, current / target * 100),
+  const goal = (current, target, worldPoints) => ({ current, target, remaining: Math.max(0, target - current), progressPercent: Math.min(100, current / target * 100),
     completed: current >= target, reward: { worldPoints, granted: current >= target,
       ...(current >= target ? { earnedWorldPoints: worldPoints } : {}) } });
   return { date: "2026-10-05", week: "2026-W41", timeZone: "America/New_York", refreshAfterMs: 60_000,
@@ -147,6 +155,7 @@ function goals(daily = 2, weekly = 9, days = 7) {
 
 test("quest cards render server progress, preview/granted states, activity streak and accessible labels without color/motion", () => {
   const Quests = load("../src/components/QuestProgress.tsx", { "react-native": native,
+    "./ui/Indicators": { BadgePill: ({ label }) => require("react/jsx-runtime").jsx("Text", { children: label }) },
     "../theme/theme": theme, "./LifeCard": "LifeCard", "./XPBar": "XPBar" });
   function expand(tree) {
     if (Array.isArray(tree)) return tree.map(expand);
@@ -159,7 +168,7 @@ test("quest cards render server progress, preview/granted states, activity strea
     assert.match(text(tree), new RegExp(`${daily} / 3`));
     assert.match(text(tree), new RegExp(`${weekly} / 15`));
     assert.match(text(tree), new RegExp(`${days} ${days === 1 ? "day" : "days"}`));
-    assert.match(text(tree), /America\/New_York/);
+    assert.match(text(tree), /Monday, Oct 5/);
     assert.match(text(tree), daily < 3 ? /Reward: \+32 World Points/ : /✓ Complete.*\+32 World Points earned/);
     assert.match(text(tree), weekly < 15 ? /Reward: \+113 World Points/ : /✓ Complete.*\+113 World Points earned/);
     assert.ok(nodes(tree).some(node => node.props.accessibilityLabel?.includes(`Daily Quest, ${daily} of 3 tasks completed.`)));
@@ -199,6 +208,8 @@ async function dashboard(readGoals) {
   let focus, appState, removed = false, refreshKey = 0;
   const HomeContent = load("../src/components/HomeContent.tsx", {
     react: h.react, "react-native": native, "../theme/theme": theme,
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }) },
+    "react-native-svg": { __esModule: true, default: "Svg", Defs: "Defs", LinearGradient: "LinearGradient", Rect: "Rect", Stop: "Stop" },
     "@expo/vector-icons/MaterialCommunityIcons": "Icon",
     "../avatar/assetRegistry": { getEquippedSceneSource() {} }, "../tasks/scheduling": scheduling,
     "./AvatarRenderer": "Avatar", "./LifeButton": "Button", "./QuestProgress": "Quests", "./XPBar": "XPBar",
@@ -212,13 +223,16 @@ async function dashboard(readGoals) {
     "expo-router": { router: {}, useFocusEffect: fn => { focus = fn; } },
     "@expo/vector-icons/MaterialCommunityIcons": "Icon",
     "../../src/api/client": { apiError, api: { get: async route => ({ data: route === "goals" ? await readGoals()
-      : route === "tasks" ? { tasks: [], time: {}, summary: {} } : { summary: { earned: 0, total: 0 }, achievements: [] } }) } },
-    "../../src/api/routes": { apiRoutes: { goals: "goals", achievements: "achievements", tasks: "tasks" } },
+      : route === "tasks" ? { ...cacheTasks, tasks: [] } : route === "me" ? cacheProfile : route === "inventory" ? cacheInventory : cacheAchievements }) } },
+    "../../src/api/routes": { apiRoutes: { goals: "goals", achievements: "achievements", tasks: "tasks", me: "me", inventory: "inventory" } },
     "../../src/components/HomeContent": HomeContent,
-    "../../src/avatar/appearance": {}, "../../src/avatar/localAppearance": {}, "../../src/home/avatar": {},
+    "../../src/cache/playerData": { playerCache: memoryCache().cache }, "../../src/cache/PlayerCache": { SupersededCacheRead },
+    "../../src/avatar/prefetch": { prefetchAvatarAssets: async () => {} },
+    "../../src/avatar/appearance": appearance, "../../src/avatar/localAppearance": { getLocalAppearance: async () => appearance.DEFAULT_APPEARANCE, setLocalAppearance: async () => {} },
+    "../../src/home/avatar": { homeAvatarFromInventory: (_inventory, appearance) => ({ avatar: { bodyType: appearance.bodyType }, cosmetics: [] }) },
     "../../src/components/LifeCard": "LifeCard", "../../src/components/XPBar": "XPBar", "../../src/components/QuestProgress": "Quests",
     "../../src/ads/Ads": { BannerAdPlacement: "Banner" },
-    "../../src/context/AuthContext": { useAuth: () => ({ user: {}, refreshUser: async () => true, dashboardRefreshKey: refreshKey }) },
+    "../../src/context/AuthContext": { useAuth: () => ({ user: { id: "test-user" }, refreshUser: async () => true, dashboardRefreshKey: refreshKey }) },
     "../../src/theme/theme": theme
   });
   const render = () => {
@@ -290,12 +304,13 @@ async function tasksScreen(post, { refreshUser = async () => {}, readWorld = asy
   });
   const Screen = load("../app/(tabs)/tasks.tsx", {
     "../../src/components/TasksContent": "TasksContent",
+    "../../src/cache/playerData": { playerCache: memoryCache().cache }, "../../src/cache/PlayerCache": { SupersededCacheRead },
     "../../src/tasks/saveTask": { saveTask: () => assert.fail("completion must not create tasks") },
     react: h.react, "react-native": native,
     "@expo/vector-icons/MaterialCommunityIcons": "Icon",
     "expo-router": { useFocusEffect: fn => { focus = fn; } },
     "../../src/api/client": { apiError, api: {
-      get: async route => ({ data: route === "world" ? await readWorld() : { tasks: [...tasks], time: {}, summary: {} } }),
+      get: async route => ({ data: route === "world" ? await readWorld() : { ...cacheTasks, tasks: [...tasks] } }),
       post: async (route, body) => {
         calls.push({ route, body });
         const data = await post(route);
@@ -308,7 +323,7 @@ async function tasksScreen(post, { refreshUser = async () => {}, readWorld = asy
     "../../src/feedback/completion": feedback,
     "../../src/components/LifeButton": "LifeButton", "../../src/components/LifeCard": "LifeCard", "../../src/components/LifeInput": "LifeInput",
     "../../src/components/TaskEditor": "TaskEditor", "../../src/tasks/scheduling": scheduling,
-    "../../src/context/AuthContext": { useAuth: () => ({ refreshUser, triggerDashboardRefresh: () => refreshes++ }) },
+    "../../src/context/AuthContext": { useAuth: () => ({ user: { id: "test-user" }, refreshUser, triggerDashboardRefresh: () => refreshes++ }) },
     "../../src/context/CompletionFeedbackContext": { useCompletionFeedback: () => event => events.push(event),
       useBuildingFeedback: () => ({ enqueue: batch => buildingEvents.push(batch) }) },
     "../../src/theme/theme": theme,
@@ -330,12 +345,12 @@ test("task action waits for server success, guards same-tick taps, and survives 
   await tick(); // The authoritative before-world read precedes POST.
   assert.deepEqual(ui.calls, [{ route: "tasks/one/complete", body: {} }]);
   assert.equal(ui.events.length, 0);
-  assert.equal(ui.button("one").props.children.props.name, "checkbox-blank-outline");
+  assert.equal(ui.button("one").props.accessibilityHint, "Confirm task completion");
   const data = response(); resolve(data); await tick();
   assert.deepEqual(ui.events, [data]);
   assert.equal(ui.button("one"), undefined, "completed task no longer appears in Today");
   ui.showAll();
-  assert.equal(ui.button("one").props.children.props.name, "check-circle");
+  assert.equal(ui.button("one").props.accessibilityHint, "Already completed");
   assert.equal(ui.button("one").props.disabled, true);
   assert.equal(ui.refreshes(), 1);
 });
@@ -346,7 +361,7 @@ test("failed and already-completed requests never emit success or optimistic rew
     ui.button("one").props.onPress(); await tick();
     assert.equal(ui.events.length, 0);
     assert.equal(ui.buildingEvents.length, 0);
-    assert.equal(ui.button("one").props.children.props.name, "checkbox-blank-outline");
+    assert.equal(ui.button("one").props.accessibilityHint, "Confirm task completion");
     assert.equal(ui.button("one").props.disabled, false);
     assert.ok(nodes(ui.render()).some(n => n.props.accessibilityRole === "alert"));
   }
@@ -390,7 +405,7 @@ test("reduced motion shows final server values, announces accessibly, and cleans
   assert.match(text(tree), /Weekly Quest Complete · \+113 World Points/);
   assert.match(text(tree), /8 Day Streak/);
   assert.match(text(tree), /412 World Points total/);
-  assert.equal(nodes(tree).find(n => n.type === "Scene").props.reducedMotion, true);
+  assert.equal(nodes(tree).find(n => n.type === "GameNotice").props.variant, "success");
   assert.deepEqual(announced, [completionAnnouncement(event)]);
   t.mock.timers.tick(5499); assert.deepEqual(done, []);
   t.mock.timers.tick(1); assert.deepEqual(done, [event.id]);

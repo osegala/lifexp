@@ -1,0 +1,208 @@
+[
+  {
+    "role": "screen-parchment",
+    "source": "ChatGPT Image Oct 20, 2026, 08_37_07 PM-1.png",
+    "sourceSize": [
+      941,
+      1672
+    ],
+    "sourceBytes": 2276451,
+    "crop": [
+      0,
+      0,
+      941,
+      1672
+    ],
+    "size": [
+      768,
+      1365
+    ],
+    "bytes": 1379502,
+    "density": null,
+    "capsLTRB": null
+  },
+  {
+    "role": "parchment-panel",
+    "source": "ChatGPT Image Oct 20, 2026, 08_37_09 PM-2.png",
+    "sourceSize": [
+      1448,
+      1086
+    ],
+    "sourceBytes": 1827952,
+    "crop": [
+      23,
+      136,
+      1425,
+      950
+    ],
+    "size": [
+      800,
+      464
+    ],
+    "bytes": 512332,
+    "density": 4,
+    "capsLTRB": [
+      64,
+      64,
+      64,
+      64
+    ]
+  },
+  {
+    "role": "bottom-nav-shell",
+    "source": "ChatGPT Image Oct 20, 2026, 08_37_11 PM-3.png",
+    "sourceSize": [
+      2172,
+      724
+    ],
+    "sourceBytes": 924132,
+    "crop": [
+      0,
+      460,
+      2172,
+      700
+    ],
+    "size": [
+      1086,
+      120
+    ],
+    "bytes": 182111,
+    "density": 3,
+    "capsLTRB": [
+      48,
+      12,
+      48,
+      32
+    ]
+  },
+  {
+    "role": "primary-button",
+    "source": "ChatGPT Image Oct 20, 2026, 08_37_13 PM-4.png",
+    "sourceSize": [
+      2172,
+      724
+    ],
+    "sourceBytes": 1850509,
+    "crop": [
+      65,
+      133,
+      2106,
+      608
+    ],
+    "size": [
+      800,
+      186
+    ],
+    "bytes": 218641,
+    "density": 3,
+    "capsLTRB": [
+      72,
+      40,
+      72,
+      40
+    ]
+  },
+  {
+    "role": "selected-tab",
+    "source": "ChatGPT Image Oct 20, 2026, 08_37_16 PM-5.png",
+    "sourceSize": [
+      1942,
+      809
+    ],
+    "sourceBytes": 1516877,
+    "crop": [
+      140,
+      166,
+      1802,
+      600
+    ],
+    "size": [
+      600,
+      157
+    ],
+    "bytes": 129186,
+    "density": 5,
+    "capsLTRB": [
+      70,
+      56,
+      70,
+      56
+    ]
+  },
+  {
+    "role": "resource-pill",
+    "source": "ChatGPT Image Oct 20, 2026, 08_37_17 PM-6.png",
+    "sourceSize": [
+      1983,
+      793
+    ],
+    "sourceBytes": 1182139,
+    "crop": [
+      166,
+      167,
+      1817,
+      599
+    ],
+    "size": [
+      500,
+      131
+    ],
+    "bytes": 92659,
+    "density": 5,
+    "capsLTRB": [
+      80,
+      48,
+      80,
+      48
+    ]
+  },
+  {
+    "role": "input-field",
+    "source": "ChatGPT Image Oct 20, 2026, 08_37_19 PM-7.png",
+    "sourceSize": [
+      2172,
+      724
+    ],
+    "sourceBytes": 959214,
+    "crop": [
+      119,
+      177,
+      2045,
+      528
+    ],
+    "size": [
+      800,
+      146
+    ],
+    "bytes": 136450,
+    "density": 4,
+    "capsLTRB": [
+      64,
+      40,
+      64,
+      40
+    ]
+  },
+  {
+    "role": "parchment-vignette",
+    "source": "ChatGPT Image Oct 20, 2026, 08_37_22 PM-8.png",
+    "sourceSize": [
+      941,
+      1672
+    ],
+    "sourceBytes": 1716028,
+    "crop": [
+      0,
+      0,
+      941,
+      1672
+    ],
+    "size": [
+      640,
+      1137
+    ],
+    "bytes": 721479,
+    "density": null,
+    "capsLTRB": null
+  }
+]

@@ -1,7 +1,7 @@
 import "react-native-get-random-values";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, ActivityIndicator, findNodeHandle, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { api, apiError } from "../src/api/client";
 import { apiRoutes } from "../src/api/routes";
 import { useAuth } from "../src/context/AuthContext";
@@ -15,7 +15,9 @@ import { saveTask } from "../src/tasks/saveTask";
 import type { TaskInput } from "../src/tasks/scheduling";
 import type { TasksResponse } from "../src/types";
 import { emptyProgress, finishOnboarding, progressKey, readProgress, saveStarterTask, STARTER_SUGGESTIONS, STEPS, type SetupProgress } from "../src/onboarding/progress";
-import { colors, radius, spacing } from "../src/theme/theme";
+import { uiTheme as ui } from "../src/theme/theme";
+import LifeButton from "../src/components/LifeButton";
+import { ScreenShell } from "../src/components/ui/Primitives";
 
 export default function OnboardingRoute() {
   const { user } = useAuth();
@@ -25,10 +27,8 @@ export default function OnboardingRoute() {
 function Action({ title, onPress, disabled, secondary = false }: {
   title: string; onPress: () => void; disabled?: boolean; secondary?: boolean;
 }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: !!disabled }}
-    disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.secondary, (disabled || pressed) && styles.dim]}>
-    <Text style={[styles.buttonText, secondary && styles.secondaryText]}>{title}</Text>
-  </Pressable>;
+  return <LifeButton tone="parchment" title={title} onPress={onPress} disabled={disabled}
+    variant={secondary ? "secondary" : "primary"} />;
 }
 
 export function Onboarding({ userId }: { userId: string | number }) {
@@ -109,12 +109,12 @@ export function Onboarding({ userId }: { userId: string | number }) {
   );
   const count = progress.taskIds.length;
 
-  return <ScrollView ref={scroll} style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+  return <ScreenShell scrollRef={scroll} keyboardSafe contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
     <View style={styles.panel}>
       <Text style={styles.brand}>EVRENTHIA · FIRST STEPS</Text>
       {loaded && <Text style={styles.hint}>Step {progress.step + 1} of {STEPS.length}</Text>}
       <Text ref={heading} tabIndex={-1} accessibilityRole="header" style={styles.title}>{loaded ? STEPS[progress.step] : "Getting your setup ready"}</Text>
-      {!loaded && (busy ? <ActivityIndicator accessibilityLabel="Loading setup" color={colors.accent} /> : <Action title="Retry setup" onPress={() => void load()} />)}
+      {!loaded && (busy ? <ActivityIndicator accessibilityLabel="Loading setup" color={ui.colors.primary} /> : <Action title="Retry setup" onPress={() => void load()} />)}
 
       {loaded && progress.step === 0 && <>
         <Text style={styles.body}>Turn everyday progress into an adventure.</Text>
@@ -124,7 +124,7 @@ export function Onboarding({ userId }: { userId: string | number }) {
       {loaded && progress.step === 1 && appearance && <>
         <Text style={styles.hint}>Choose your look. You can change it later from Avatar.</Text>
         <View style={styles.preview}><AvatarRenderer {...appearance} /></View>
-        <AppearanceEditor appearance={appearance} dirty={JSON.stringify(appearance) !== JSON.stringify(savedAppearance.current)} saving={locked} showSaveButton={false}
+        <AppearanceEditor tone="parchment" appearance={appearance} dirty={JSON.stringify(appearance) !== JSON.stringify(savedAppearance.current)} saving={locked} showSaveButton={false}
           onChange={patch => { if (!locked) setAppearance(current => current ? { ...current, ...patch } : current); }} onSave={() => void saveAvatar()} />
         <Action title={busy ? "Saving appearance…" : "Save appearance & continue"} disabled={locked} onPress={() => void saveAvatar()} />
         <Action title="Keep saved look / skip" secondary disabled={locked} onPress={() => { setAppearance(savedAppearance.current); void go(2); }} />
@@ -138,8 +138,8 @@ export function Onboarding({ userId }: { userId: string | number }) {
           <Action title="Retry interrupted task" disabled={locked} onPress={() => void run(async () => {
             await createTask(progress.pendingTask!.input); setResumeTask(false);
           })} />
-        </> : tasks ? <TaskEditor time={tasks.time} disabled={busy} suggestions={STARTER_SUGGESTIONS}
-          onBusyChange={setTaskBusy} onSave={createTask} /> : !taskLoadError && <ActivityIndicator accessibilityLabel="Loading task schedule" color={colors.accent} />}
+        </> : tasks ? <TaskEditor tone="parchment" time={tasks.time} disabled={busy} suggestions={STARTER_SUGGESTIONS}
+          onBusyChange={setTaskBusy} onSave={createTask} /> : !taskLoadError && <ActivityIndicator accessibilityLabel="Loading task schedule" color={ui.colors.primary} />}
         <Text style={styles.hint}>Only saved tasks are kept. You can always add more in Tasks.</Text>
         <Action title={count ? "Continue to reminders" : "Skip tasks for now"} disabled={locked} onPress={() => void go(3)} />
       </>}
@@ -147,7 +147,7 @@ export function Onboarding({ userId }: { userId: string | number }) {
         <Text style={styles.body}>A nudge when you need it.</Text>
         <Text style={styles.hint}>Evrenthia can remind you when tasks are due and when your streak is at risk. Save any changes below, or skip for now.</Text>
         {Platform.OS === "web" && <Text style={styles.hint}>Push notifications are available in the iOS/Android app. You can save preferences here and continue without enabling push.</Text>}
-        <NotificationSettings timeZone={user?.timeZone ?? "UTC"} />
+        <NotificationSettings tone="parchment" timeZone={user?.timeZone ?? "UTC"} />
         <Action title="Continue / skip reminders" disabled={locked} onPress={() => void go(4)} />
       </>}
       {loaded && progress.step === 4 && <>
@@ -171,23 +171,19 @@ export function Onboarding({ userId }: { userId: string | number }) {
       {loaded && progress.step > 0 && <Action title="Back" secondary disabled={locked} onPress={() => void go(progress.step - 1)} />}
       <Action title="Sign out" secondary disabled={locked} onPress={() => void run(logout)} />
     </View>
-  </ScrollView>;
+  </ScreenShell>;
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
-  content: { flexGrow: 1, padding: spacing.md, paddingBottom: spacing.xl, alignItems: "center" },
-  panel: { width: "100%", maxWidth: 680, gap: spacing.md },
-  brand: { color: colors.accent, fontSize: 12, fontWeight: "700", letterSpacing: 1 },
-  title: { color: colors.text, fontSize: 28, fontWeight: "700" },
-  body: { color: colors.text, fontSize: 18, fontWeight: "600", lineHeight: 26 },
-  hint: { color: colors.mutedText, fontSize: 15, lineHeight: 22 },
-  error: { color: colors.danger, fontSize: 15, lineHeight: 22 },
-  card: { backgroundColor: colors.card, padding: spacing.md, borderRadius: radius.md, gap: spacing.sm },
-  preview: { width: 240, maxWidth: "100%", alignSelf: "center" },
-  button: { minHeight: 48, minWidth: 48, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
-  secondary: { backgroundColor: colors.cardLight },
-  buttonText: { color: colors.background, textAlign: "center", fontSize: 16, fontWeight: "700" },
-  secondaryText: { color: colors.text },
-  dim: { opacity: 0.65 },
+  content: { flexGrow: 1, maxWidth: 680 },
+  panel: { width: "100%", gap: ui.spacing.md },
+  brand: { color: ui.colors.primary, fontSize: 12, fontWeight: "700", letterSpacing: 1 },
+  title: { ...ui.type.display, color: ui.colors.text, fontFamily: Platform.select(ui.font.display),
+    // Keep the browser focus indication on the step heading in the app palette.
+    ...(Platform.OS === "web" ? { outlineColor: ui.colors.focus, outlineWidth: 1, outlineOffset: 3 } : {}) },
+  body: { ...ui.type.section, color: ui.colors.text, fontFamily: Platform.select(ui.font.display) },
+  hint: { ...ui.type.caption, color: ui.colors.secondaryText },
+  error: { ...ui.type.caption, color: ui.colors.danger },
+  card: { backgroundColor: ui.colors.surface, borderWidth: 1, borderColor: ui.colors.border, padding: ui.spacing.md, borderRadius: ui.radius.md, gap: ui.spacing.sm },
+  preview: { width: 240, maxWidth: "100%", alignSelf: "center", borderRadius: ui.radius.lg, overflow: "hidden", backgroundColor: ui.colors.sky },
 });

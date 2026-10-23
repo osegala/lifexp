@@ -86,6 +86,96 @@ test("authenticated billing sync writes verified Premium, exact customer, app/pr
   assert.equal(f.items.get(`USER#${otherId}/ENTITLEMENTS`), undefined);
 });
 
+test("DEV sandbox remains available with the deployment flag missing, false or true", async () => {
+  for (const flag of [undefined, "false", "true"]) {
+    const f = fixture({ REVENUECAT_SANDBOX_IN_PROD_ENABLED: flag });
+    const result = await f.call();
+    assert.equal(result.status, 200); assert.equal(result.data.premium, true);
+    assert.equal(f.writes.length, 1);
+  }
+});
+
+test("PROD sandbox fails closed without the exact string true and has no provider calls or writes", async () => {
+  for (const flag of [undefined, "false", "TRUE", "True", "1", "yes", "", " true", "true ", true, 1, null]) {
+    const f = fixture({ ENVIRONMENT_NAME: "prod", REVENUECAT_SANDBOX_IN_PROD_ENABLED: flag });
+    for (const result of [await f.call(), await f.webhook()]) {
+      assert.equal(result.status, 503);
+      assert.equal(result.data.error.code, "BILLING_UNAVAILABLE");
+    }
+    assert.equal(f.calls.length, 0); assert.equal(f.writes.length, 0);
+  }
+});
+
+test("explicit PROD sandbox opt-in permits verified sync and authenticated idempotent webhooks", async () => {
+  const f = fixture({ ENVIRONMENT_NAME: "prod", REVENUECAT_SANDBOX_IN_PROD_ENABLED: "true" });
+  const result = await f.call();
+  assert.equal(result.status, 200); assert.equal(result.data.premium, true);
+  assert.equal(f.items.get(`USER#${userId}/ENTITLEMENTS`).source.S, "APPLE");
+  assert.ok(f.calls.some(c => c.url.endsWith("/subscriptions?environment=sandbox&limit=100")));
+  assert.equal((await f.webhook({}, "wrong")).status, 401);
+  assert.equal((await f.webhook({ environment: "PRODUCTION" })).status, 400);
+  assert.equal((await f.webhook({ app_id: "wrong" })).status, 400);
+  assert.equal((await f.webhook()).status, 200);
+  const calls = f.calls.length;
+  assert.equal((await f.webhook()).status, 200);
+  assert.equal(f.calls.length, calls); assert.equal(f.writes.length, 2);
+});
+
+test("sandbox opt-in cannot enable unknown or missing deployment environments", async () => {
+  for (const environment of [undefined, "", "staging", "production", "PROD", "DEV"]) {
+    const f = fixture({ ENVIRONMENT_NAME: environment, REVENUECAT_SANDBOX_IN_PROD_ENABLED: "true" });
+    const result = await f.call();
+    assert.equal(result.status, 503); assert.equal(result.data.error.code, "BILLING_UNAVAILABLE");
+    assert.equal(f.calls.length, 0); assert.equal(f.writes.length, 0);
+  }
+});
+
+test("PROD production verification ignores the sandbox flag and still rejects sandbox subscriptions", async () => {
+  for (const flag of [undefined, "false", "true", "TRUE", "True", "1", "yes", "", true]) {
+    const f = fixture({ ENVIRONMENT_NAME: "prod", REVENUECAT_ENVIRONMENT: "production", REVENUECAT_SANDBOX_IN_PROD_ENABLED: flag });
+    f.subscriptions[0].environment = "production";
+    const result = await f.call();
+    assert.equal(result.status, 200); assert.equal(result.data.premium, true);
+    assert.ok(f.calls.some(c => c.url.endsWith("/subscriptions?environment=production&limit=100")));
+    f.subscriptions[0].environment = "sandbox";
+    assert.equal((await f.call()).data.premium, false);
+  }
+});
+
+test("PROD sandbox opt-in never bypasses other RevenueCat configuration validation", async () => {
+  const product = JSON.parse(env.REVENUECAT_PRODUCTS)[0];
+  const invalidProducts = ["not-json", "null", "{}", "[]", JSON.stringify(Array(9).fill(product)), "[null]",
+    ...["id", "appId", "storeIdentifier", "store"].map(field => JSON.stringify([{ ...product, [field]: "" }])),
+    JSON.stringify([{ ...product, store: "unknown" }])];
+  const invalidConfig = [
+    ...["REVENUECAT_SECRET_API_KEY", "REVENUECAT_PROJECT_ID", "REVENUECAT_ENTITLEMENT_ID", "REVENUECAT_ENVIRONMENT"]
+      .flatMap(field => [{ [field]: undefined }, { [field]: "" }]),
+    { REVENUECAT_ENVIRONMENT: "SANDBOX" },
+    ...[undefined, ...invalidProducts].map(REVENUECAT_PRODUCTS => ({ REVENUECAT_PRODUCTS })),
+  ];
+  for (const options of invalidConfig) {
+    const f = fixture({ ENVIRONMENT_NAME: "prod", REVENUECAT_SANDBOX_IN_PROD_ENABLED: "true", ...options });
+    const result = await f.call();
+    assert.equal(result.status, 503); assert.equal(result.data.error.code, "BILLING_UNAVAILABLE");
+    assert.equal(f.calls.length, 0); assert.equal(f.writes.length, 0);
+  }
+});
+
+test("client body fields cannot enable sandbox in PROD", async () => {
+  const f = fixture({ ENVIRONMENT_NAME: "prod" });
+  for (const body of [
+    { REVENUECAT_SANDBOX_IN_PROD_ENABLED: "true" }, { RevenueCatSandboxInProdEnabled: "true" },
+    { sandboxInProdEnabled: true }, { environment: "sandbox" }, { testFlight: true },
+  ]) {
+    const result = await f.call(body);
+    assert.equal(result.status, 400); assert.equal(result.data.error.code, "VALIDATION_ERROR");
+  }
+  // Provider payload fields likewise cannot substitute for deployment configuration.
+  const webhook = await f.webhook({ REVENUECAT_SANDBOX_IN_PROD_ENABLED: "true" });
+  assert.equal(webhook.status, 503); assert.equal(webhook.data.error.code, "BILLING_UNAVAILABLE");
+  assert.equal(f.calls.length, 0); assert.equal(f.writes.length, 0);
+});
+
 test("FREE, expired, refunded/revoked, pending, wrong product and sandbox in production cannot grant Premium", async () => {
   for (const patch of [{ gives_access: false }, { current_period_ends_at: now - 1 }, { pending_payment: true, gives_access: false },
     { product_id: "unapproved" }, { environment: "production" }, { entitlements: { items: [] } }]) {

@@ -1,0 +1,22 @@
+{
+  "npm test": {
+    "exitCode": 0,
+    "passed": 282,
+    "failed": 0
+  },
+  "npx tsc --noEmit": {
+    "exitCode": 0
+  },
+  "npm run lint": {
+    "exitCode": 0,
+    "errors": 0,
+    "warnings": 0
+  },
+  "git diff --check": {
+    "exitCode": 0
+  },
+  "build": false,
+  "deploy": false,
+  "commit": false,
+  "push": false
+}

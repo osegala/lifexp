@@ -209,21 +209,30 @@ function dressAsset(
   bounds: ArtworkBounds,
   shoulderY: number,
   waistY: number,
+  canvas: readonly [number, number] = [1086, 1448],
+  width = 624.45,
 ): CosmeticAssetDefinition {
   const [left, top, right, bottom] = bounds;
   return {
     slot: "upperBody", previewSource: source,
-    previewCrop: { x: left - 4, y: top - 4, width: right - left + 8, height: bottom - top + 8, sourceWidth: 1086, sourceHeight: 1448 },
+    previewCrop: { x: left - 4, y: top - 4, width: right - left + 8, height: bottom - top + 8, sourceWidth: canvas[0], sourceHeight: canvas[1] },
     sprites: [
       { id: "collar", from: top - 4, to: shoulderY, y: 250, height: 45 },
       { id: "bodice", from: shoulderY, to: waistY, y: 295, height: 275 },
       { id: "skirt", from: waistY, to: bottom + 4, y: 570, height: 610 },
     ].map(({ id, from, to, y, height }) => ({
       id, layer: "upperBody", source, fullOutfit: true,
-      // Fit the shoulders/neck at 0.575x width; share it across bands to avoid seams.
-      frame: sourceFrame([1086, 1448], [0, from, 1086, to], [314.775, y, 624.45, height]),
+      // One shared horizontal fit across the existing collar/bodice/skirt bands.
+      frame: sourceFrame(canvas, [0, from, canvas[0], to], [627 - width / 2, y, width, height]),
     })),
   };
+}
+
+/** Full original canvas, fitted to the same collar/shoulder/hem anchors as the aligned tunics. */
+function premiumTopAsset(source: ImageSourcePropType, bounds: ArtworkBounds): CosmeticAssetDefinition {
+  return { slot: "upperBody", previewSource: source, previewCrop: artworkCrop(bounds),
+    sprites: [{ id: "tunic", layer: "upperBody", source,
+      frame: sourceFrame([1254, 1254], [0, 0, 1254, 1254], [376.2, 192, 501.6, 501.6]) }] };
 }
 
 function framedHair(
@@ -376,6 +385,41 @@ function fittedBoot(
  * sprites use the shared canvas, with source artwork placed by an optional frame.
  */
 const COSMETIC_ASSETS: Record<string, CosmeticAssetDefinition> = {
+  "avatar-v2/tops/premium-rose-bard-tunic": premiumTopAsset(require("../../assets/avatar/v2/tops/premium-rose-bard-tunic.png"), [249, 101, 1005, 1160]),
+  "avatar-v2/tops/premium-verdant-sovereign-tunic": premiumTopAsset(require("../../assets/avatar/v2/tops/premium-verdant-sovereign-tunic.png"), [236, 64, 1017, 1199]),
+  "avatar-v2/tops/premium-celestial-regent-tunic": premiumTopAsset(require("../../assets/avatar/v2/tops/premium-celestial-regent-tunic.png"), [214, 57, 1040, 1195]),
+  "avatar-v2/tops/premium-dawnfire-sovereign-tunic": premiumTopAsset(require("../../assets/avatar/v2/tops/premium-dawnfire-sovereign-tunic.png"), [236, 89, 1018, 1186]),
+  "avatar-v2/tops/premium-royal-wayfinder-tunic": premiumTopAsset(require("../../assets/avatar/v2/tops/premium-royal-wayfinder-tunic.png"), [241, 90, 1012, 1174]),
+  "avatar-v2/dresses/premium-rose-bard-dress": dressAsset(require("../../assets/avatar/v2/dresses/premium-rose-bard-dress.png"), [103, 36, 1151, 1224], 130, 390, [1254, 1254], 990.66),
+  "avatar-v2/dresses/premium-verdant-sovereign-dress": dressAsset(require("../../assets/avatar/v2/dresses/premium-verdant-sovereign-dress.png"), [127, 27, 1129, 1231], 120, 390, [1254, 1254], 990.66),
+  "avatar-v2/dresses/premium-celestial-regent-dress": dressAsset(require("../../assets/avatar/v2/dresses/premium-celestial-regent-dress.png"), [84, 8, 1171, 1249], 110, 390, [1254, 1254], 990.66),
+  "avatar-v2/dresses/premium-dawnfire-sovereign-dress": dressAsset(require("../../assets/avatar/v2/dresses/premium-dawnfire-sovereign-dress.png"), [89, 25, 1166, 1227], 120, 385, [1254, 1254], 990.66),
+  "avatar-v2/dresses/premium-royal-wayfinder-dress": dressAsset(require("../../assets/avatar/v2/dresses/premium-royal-wayfinder-dress.png"), [96, 35, 1157, 1227], 130, 435, [1254, 1254], 990.66),
+  "avatar-v2/bottoms/premium-rose-bard-trousers": trousersAsset(require("../../assets/avatar/v2/bottoms/premium-rose-bard-trousers.png"), [207, 107, 1047, 1132], [453, 170, 802, 170]),
+  "avatar-v2/bottoms/premium-verdant-sovereign-trousers": trousersAsset(require("../../assets/avatar/v2/bottoms/premium-verdant-sovereign-trousers.png"), [201, 96, 1056, 1153], [453, 170, 802, 170]),
+  "avatar-v2/bottoms/premium-celestial-regent-trousers": trousersAsset(require("../../assets/avatar/v2/bottoms/premium-celestial-regent-trousers.png"), [180, 65, 1074, 1182], [453, 170, 802, 170]),
+  "avatar-v2/bottoms/premium-dawnfire-sovereign-trousers": trousersAsset(require("../../assets/avatar/v2/bottoms/premium-dawnfire-sovereign-trousers.png"), [211, 90, 1051, 1168], [453, 170, 802, 170]),
+  "avatar-v2/bottoms/premium-royal-wayfinder-trousers": trousersAsset(require("../../assets/avatar/v2/bottoms/premium-royal-wayfinder-trousers.png"), [192, 54, 1088, 1170], [453, 170, 802, 170]),
+  "avatar-v2/hats/premium-rose-bard-hat": hatAsset(require("../../assets/avatar/v2/hats/premium-rose-bard-hat.png"), [13, 35, 1250, 1193], 730),
+  "avatar-v2/hats/premium-verdant-sovereign-hat": hatAsset(require("../../assets/avatar/v2/hats/premium-verdant-sovereign-hat.png"), [23, 159, 1246, 1133], 640),
+  "avatar-v2/hats/premium-celestial-regent-hat": hatAsset(require("../../assets/avatar/v2/hats/premium-celestial-regent-hat.png"), [40, 51, 1214, 1185], 560),
+  "avatar-v2/hats/premium-dawnfire-sovereign-hat": hatAsset(require("../../assets/avatar/v2/hats/premium-dawnfire-sovereign-hat.png"), [32, 81, 1223, 1194], 580),
+  "avatar-v2/hats/premium-royal-wayfinder-hat": hatAsset(require("../../assets/avatar/v2/hats/premium-royal-wayfinder-hat.png"), [25, 87, 1250, 1185], 700),
+  "avatar-v2/boots/premium-rose-bard-boots": bootsAsset(require("../../assets/avatar/v2/boots/premium-rose-bard-boots.png"), [177, 165, 627, 1106], [627, 165, 1078, 1106], [235, 580, 300], [674, 1018, 300]),
+  "avatar-v2/boots/premium-verdant-sovereign-boots": bootsAsset(require("../../assets/avatar/v2/boots/premium-verdant-sovereign-boots.png"), [90, 179, 627, 1063], [627, 179, 1165, 1063], [235, 580, 300], [674, 1018, 300]),
+  "avatar-v2/boots/premium-celestial-regent-boots": bootsAsset(require("../../assets/avatar/v2/boots/premium-celestial-regent-boots.png"), [95, 147, 627, 1119], [627, 147, 1162, 1119], [235, 580, 300], [674, 1018, 300]),
+  "avatar-v2/boots/premium-dawnfire-sovereign-boots": bootsAsset(require("../../assets/avatar/v2/boots/premium-dawnfire-sovereign-boots.png"), [74, 133, 627, 1149], [627, 133, 1180, 1149], [235, 580, 300], [674, 1018, 300]),
+  "avatar-v2/boots/premium-royal-wayfinder-boots": bootsAsset(require("../../assets/avatar/v2/boots/premium-royal-wayfinder-boots.png"), [112, 175, 627, 1103], [627, 175, 1142, 1103], [235, 580, 300], [674, 1018, 300]),
+  "avatar-v2/backgrounds/premium-rose-palace": { slot: "scene", previewSource: require("../../assets/avatar/v2/backgrounds/premium-rose-palace.png"), sceneSource: require("../../assets/avatar/v2/backgrounds/premium-rose-palace.png") },
+  "avatar-v2/backgrounds/premium-aurora-springs": { slot: "scene", previewSource: require("../../assets/avatar/v2/backgrounds/premium-aurora-springs.png"), sceneSource: require("../../assets/avatar/v2/backgrounds/premium-aurora-springs.png") },
+  "avatar-v2/backgrounds/premium-starwatch-terrace": { slot: "scene", previewSource: require("../../assets/avatar/v2/backgrounds/premium-starwatch-terrace.png"), sceneSource: require("../../assets/avatar/v2/backgrounds/premium-starwatch-terrace.png") },
+  "avatar-v2/auras/premium-astral-clockwork": { slot: "aura", previewSource: require("../../assets/avatar/v2/auras/premium-astral-clockwork.png"), sceneSource: require("../../assets/avatar/v2/auras/premium-astral-clockwork.png") },
+  "avatar-v2/auras/premium-lunar-veil": { slot: "aura", previewSource: require("../../assets/avatar/v2/auras/premium-lunar-veil.png"), sceneSource: require("../../assets/avatar/v2/auras/premium-lunar-veil.png") },
+  "avatar-v2/auras/premium-prismatic-crown": { slot: "aura", previewSource: require("../../assets/avatar/v2/auras/premium-prismatic-crown.png"), sceneSource: require("../../assets/avatar/v2/auras/premium-prismatic-crown.png") },
+  "avatar-v2/pets/premium-mooncrystal-fawn": { slot: "pet", previewSource: require("../../assets/avatar/v2/pets/premium-mooncrystal-fawn.png"), sceneSource: require("../../assets/avatar/v2/pets/premium-mooncrystal-fawn.png") },
+  "avatar-v2/pets/premium-lotus-otter": { slot: "pet", previewSource: require("../../assets/avatar/v2/pets/premium-lotus-otter.png"), sceneSource: require("../../assets/avatar/v2/pets/premium-lotus-otter.png") },
+  "avatar-v2/pets/premium-starlight-moth": { slot: "pet", previewSource: require("../../assets/avatar/v2/pets/premium-starlight-moth.png"), sceneSource: require("../../assets/avatar/v2/pets/premium-starlight-moth.png") },
+
   "avatar-v2/backgrounds/celestial-citadel": {
     slot: "scene",
     previewSource: CELESTIAL_CITADEL_BACKGROUND,

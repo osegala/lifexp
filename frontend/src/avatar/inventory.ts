@@ -85,6 +85,8 @@ export function wardrobeCosmetics(
       requiredLevel: item.effectiveRequiredLevel,
       owned: Boolean(owned),
       unlocked: Boolean(owned),
+      requiresPremium: item.requiresPremium === true,
+      claimable: !owned && item.requiresPremium === true && item.effectivePrice === 0 && item.canPurchase === true,
       equipped: owned?.equipped === true,
       slot: metadata?.slot,
       fullOutfit: metadata?.fullOutfit ?? false,
@@ -100,6 +102,9 @@ export function wardrobeCosmetics(
 
 function wardrobeRequirement(item: ShopItem, playerLevel: number, owned: boolean) {
   if (owned) return null;
+  if (item.requiresPremium) return item.premiumRequirementSatisfied
+    ? item.effectivePrice === 0 ? "Included with Premium · unlock to equip" : "Available in the Shop"
+    : "Evrenthia Premium required";
   const requirements = [];
   if (playerLevel < item.effectiveRequiredLevel) {
     requirements.push(`Reach level ${item.effectiveRequiredLevel}`);

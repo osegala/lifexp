@@ -235,10 +235,12 @@ test("dress replacements keep one shared sprite and require no renderer-specific
   assert.doesNotMatch(contract, /aligned\/boy|aligned\/girl|-front\.png|-back\.png/);
 });
 
-test("all ten dresses share the narrower centered fit without moving vertical anchors", () => {
+test("legacy dresses keep their centered fit and all dresses preserve the vertical anchors", () => {
   const registry = read("../src/avatar/assetRegistry.ts");
-  assert.equal((registry.match(/"avatar-v2\/dresses\/[^"]+": dressAsset\(/g) ?? []).length, 10);
-  const destination = registry.match(/\[([\d.]+), y, ([\d.]+), height\]/);
+  assert.equal((registry.match(/"avatar-v2\/dresses\/[^"]+": dressAsset\(/g) ?? []).length, 15);
+  const destination = ["", "314.775", "624.45"];
+  assert.match(registry, /width = 624\.45/);
+  assert.match(registry, /627 - width \/ 2, y, width, height/);
   assert.ok(destination);
   const [, x, width] = destination.map(Number);
   assert.equal(x + width / 2, 627);
@@ -327,7 +329,7 @@ test("GIRL upper-eye layers use the crown crop as well as the face crop", () => 
 
 test("all dresses retain the original GIRL body and exact finalized dress fit", () => {
   const { BASE_BODY_SPRITES, getBaseBodySprites, getCosmeticAssetIds, getEquippedCharacterSprites } = registry;
-  const ids = getCosmeticAssetIds("upperBody").filter(id => id.startsWith("avatar-v2/dresses/"));
+  const ids = getCosmeticAssetIds("upperBody").filter(id => id.startsWith("avatar-v2/dresses/") && !id.includes("/premium-"));
   assert.equal(ids.length, 10);
   for (const imageUrl of ids) {
     const sprites = getEquippedCharacterSprites([{ id: "top", type: "TOP", imageUrl }], "top", "TOP");
@@ -345,7 +347,7 @@ test("every GIRL tunic keeps clean torso joins and the original garment arm anch
   const { BASE_BODY_SPRITES, getBaseBodySprites, getCosmeticAssetIds, getEquippedCharacterSprites } = registry;
   const bare = getBaseBodySprites("GIRL", []);
   const tops = getCosmeticAssetIds("upperBody").filter(id => id.startsWith("avatar-v2/tops/"));
-  assert.equal(tops.length, 11);
+  assert.equal(tops.length, 16);
   for (const imageUrl of tops) {
     const sprites = getEquippedCharacterSprites([{ id: "top", type: "TOP", imageUrl }], "top", "TOP");
     const body = getBaseBodySprites("GIRL", sprites);
@@ -366,8 +368,8 @@ test("all GIRL trousers cover legs with or without boots, preserving exposed ank
   const { BASE_BODY_SPRITES, getBaseBodySprites, getCosmeticAssetIds, getEquippedCharacterSprites, resolveSpriteSet, DEFAULT_CHARACTER_SPRITES } = registry;
   const bottoms = getCosmeticAssetIds("bottoms");
   const boots = getCosmeticAssetIds("boots");
-  assert.equal(bottoms.length, 11);
-  assert.equal(boots.length, 11);
+  assert.equal(bottoms.length, 16);
+  assert.equal(boots.length, 16);
   for (const imageUrl of bottoms) {
     const pants = getEquippedCharacterSprites([{ id: "pants", type: "BOTTOM", imageUrl }], "pants", "BOTTOM");
     const expectedClip = imageUrl.endsWith("traveler-trousers") ? "M0 993H1254V1254H0Z" : "M0 1096H1254V1254H0Z";
@@ -396,14 +398,14 @@ test("Avatar screen previews drafts and saves all five fields with one PATCH", (
   assert.match(content, /skinColorId=\{avatar\.skinColorId\}/);
   assert.match(content, /hairColorId=\{avatar\.hairColorId\}/);
   assert.match(content, /eyeColorId=\{avatar\.eyeColorId\}/);
-  assert.match(screen, /api\.patch<AvatarAppearance>\(apiRoutes\.me, draftAppearance\)/);
+  assert.match(screen, /api\.patch<AvatarAppearance>\(apiRoutes\.me, draftAppearance,/);
   assert.match(screen, /setLocalAppearance\(user\.id, persisted\)/);
   assert.doesNotMatch(screen, /api\.patch[\s\S]{0,120}onSelect/);
 });
 
 test("Avatar screen keeps appearance controls in an on-demand modal", () => {
   const content = read("../src/components/AvatarContent.tsx");
-  assert.match(content, /title="Edit Appearance" onPress=\{props\.onEditAppearance\}/);
+  assert.match(content, /accessibilityLabel="Edit Appearance" onPress=\{props\.onEditAppearance\}/);
   assert.match(content, /<Modal[\s\S]*?visible=\{props\.editingAppearance\}[\s\S]*?<AppearanceEditor/);
   assert.ok(content.indexOf("<Modal") < content.indexOf("<AppearanceEditor"));
 });

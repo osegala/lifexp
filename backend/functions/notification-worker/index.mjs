@@ -4,6 +4,7 @@ import { preferencesFromItem } from "/opt/nodejs/preferences.mjs";
 import { planNotifications } from "/opt/nodejs/planning.mjs";
 import { advanceRequest, claimRequest, deliveryRecord, dueQueryRequest, releaseClaimRequest } from "./logic.mjs";
 import { createExpoProvider, deliveryMode } from "./push-provider.mjs";
+import { notificationMessage } from "./messages.mjs";
 
 const client = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
@@ -74,12 +75,13 @@ async function processDue(indexItem, now) {
             // not guaranteed delivery: Expo has no idempotency-key contract.
             const identity = `${daily ? event.type : config.reminderId?.S}#${event.occurrence}`;
             const id = createHash("sha256").update(identity).digest("hex");
+            const message = notificationMessage({ type: event.type, taskTitle: task?.title?.S, deliveryId: id, summaryBody: event.body });
             const item = deliveryRecord({ userPk: pk, deliveryId: id, attemptedAt: now.toISOString(),
                 localDate: event.date, type: event.type, config, status: reason ? "SKIPPED" : "PREPARED", errorCode: reason });
             // ONCE uses a constant date component too: timezone/edit changes
             // cannot rearm the same one-off reminder.
             item.SK = { S: `NOTIFICATION_DELIVERY#${event.occurrence}#${id}` };
-            item.message = { S: event.body };
+            item.message = { S: message.body };
             item.scheduledAt = { S: event.at };
             item.deliveryMode = { S: provider.mode };
             const guards = [unchanged(key("PROFILE"), profile, ["timeZone"]),
@@ -110,7 +112,7 @@ async function processDue(indexItem, now) {
                     || (!daily && (!freshConfig?.enabled?.BOOL || !freshTask || freshTask.archived?.BOOL || freshTask.updatedAt?.S !== task?.updatedAt?.S))) {
                     results.push({ status: "SKIPPED", errorCode: "STATE_CHANGED" }); continue;
                 }
-                const result = await provider.send({ token: device.pushToken.S, title: "Evrenthia", body: event.body,
+                const result = await provider.send({ token: device.pushToken.S, title: message.title, body: message.body,
                     data: { type: event.type, taskId: config.taskId?.S ?? null }, sound: preferences.soundEnabled });
                 results.push(result);
                 if (result.errorCode === "DeviceNotRegistered") {

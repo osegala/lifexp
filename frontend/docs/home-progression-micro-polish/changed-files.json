@@ -1,0 +1,10 @@
+{
+  "sourceAndTestFiles": [
+    "src/components/HomeContent.tsx",
+    "src/components/QuestProgress.tsx",
+    "src/components/ui/Indicators.tsx",
+    "tests/frontend-api-contract.test.mjs"
+  ],
+  "report": "docs/home-progression-micro-polish.md",
+  "artifacts": "docs/home-progression-micro-polish/"
+}

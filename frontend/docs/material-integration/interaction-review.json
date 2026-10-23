@@ -1,0 +1,235 @@
+{
+  "wardrobe": {
+    "dragResult": "Wardrobe, expanded. Tap to resize or drag vertically.",
+    "scroll": [
+      {
+        "bottom": 780,
+        "clientHeight": 380,
+        "scrollHeight": 1177,
+        "scrollTop": 796
+      }
+    ],
+    "finalFourColumns": {
+      "widths": [
+        390,
+        430
+      ],
+      "dragResult": "Wardrobe, expanded. Tap to resize or drag vertically.",
+      "scroll": {
+        "top": 412,
+        "clientHeight": 380,
+        "scrollHeight": 792
+      },
+      "result": "Final row reached above navigation; collapse succeeds."
+    }
+  },
+  "base": {
+    "selected": "true",
+    "infoExpanded": "true"
+  },
+  "shop": [
+    {
+      "category": "Outfits",
+      "selected": "true",
+      "previews": [
+        "Starter Tunic preview",
+        "Forest Tunic preview",
+        "Forestbound Tunic preview",
+        "Forestbound Dress preview",
+        "Starweaver Tunic preview",
+        "Starweaver Dress preview",
+        "Dawnkeeper Tunic preview",
+        "Dawnkeeper Dress preview",
+        "Royal Bloom Tunic preview",
+        "Celestial Acolyte Tunic preview",
+        "Harbor Scout Tunic preview",
+        "Verdant Warden Tunic preview",
+        "Frostbound Vest preview",
+        "Teal Wayfarer Tunic preview",
+        "Star Captain Tunic preview",
+        "Frostbound Dress preview",
+        "Teal Wayfarer Dress preview",
+        "Crimson Guard Dress preview",
+        "Royal Vanguard Dress preview",
+        "Royal Bard Dress preview"
+      ]
+    },
+    {
+      "category": "Hats",
+      "selected": "true",
+      "previews": [
+        "Forestbound Cap preview",
+        "Starweaver Hat preview",
+        "Dawnkeeper Headpiece preview",
+        "Azure Feather Cap preview",
+        "Royal Vanguard Hat preview",
+        "Crimson Guard Hat preview",
+        "Frostbound Hat preview",
+        "Teal Wayfarer Hat preview",
+        "Harbor Scout Hat preview",
+        "Verdant Warden Hat preview",
+        "Royal Bard Hat preview"
+      ]
+    },
+    {
+      "category": "Pets",
+      "selected": "true",
+      "previews": [
+        "Mossling preview",
+        "Emberfox preview",
+        "Moonwing preview",
+        "Sky Griffin preview",
+        "Starlight Cat preview",
+        "Tide Turtle preview",
+        "Crystal Hare preview",
+        "Ember Drake preview",
+        "Cloud Ram preview",
+        "Verdant Drake preview"
+      ]
+    },
+    {
+      "category": "Bottoms",
+      "selected": "true",
+      "previews": [
+        "Traveler Trousers preview",
+        "Starlight Trousers preview",
+        "Forest Ranger Trousers preview",
+        "Frostbound Trousers preview",
+        "Teal Wayfarer Trousers preview",
+        "Crimson Guard Trousers preview",
+        "Royal Vanguard Trousers preview",
+        "Royal Bard Trousers preview",
+        "Harbor Scout Trousers preview",
+        "Verdant Warden Trousers preview",
+        "Celestial Acolyte Trousers preview"
+      ]
+    },
+    {
+      "category": "Boots",
+      "selected": "true",
+      "previews": [
+        "Guild Boots preview",
+        "Starlight Boots preview",
+        "Forest Ranger Boots preview",
+        "Frostbound Boots preview",
+        "Crimson Guard Boots preview",
+        "Teal Wayfarer Boots preview",
+        "Royal Vanguard Boots preview",
+        "Harbor Scout Boots preview",
+        "Royal Bard Boots preview",
+        "Verdant Warden Boots preview",
+        "Celestial Acolyte Boots preview"
+      ]
+    },
+    {
+      "category": "Auras",
+      "selected": "true",
+      "previews": [
+        "Prismatic Radiance preview",
+        "Heartbloom preview",
+        "Crystal Halo preview",
+        "Tempest Surge preview",
+        "Astral Vortex preview",
+        "Seraphic Light preview",
+        "Frostveil preview",
+        "Phoenix Flame preview",
+        "Verdant Wisps preview",
+        "Arcane Constellation preview"
+      ]
+    },
+    {
+      "category": "Scenes",
+      "selected": "true",
+      "previews": [
+        "Celestial Citadel preview",
+        "Sunset Harbor preview",
+        "Grand Library preview",
+        "Festival Market preview",
+        "Desert Oasis preview",
+        "Snowy Village preview",
+        "Crystal Cavern preview",
+        "Royal Training Yard preview",
+        "Castle Garden preview",
+        "Moonlit Glade preview"
+      ]
+    }
+  ],
+  "shopOutfitsEnd": {
+    "previews": [
+      "Starter Tunic preview",
+      "Forest Tunic preview",
+      "Forestbound Tunic preview",
+      "Forestbound Dress preview",
+      "Starweaver Tunic preview",
+      "Starweaver Dress preview",
+      "Dawnkeeper Tunic preview",
+      "Dawnkeeper Dress preview",
+      "Royal Bloom Tunic preview",
+      "Celestial Acolyte Tunic preview",
+      "Harbor Scout Tunic preview",
+      "Verdant Warden Tunic preview",
+      "Frostbound Vest preview",
+      "Teal Wayfarer Tunic preview",
+      "Star Captain Tunic preview",
+      "Frostbound Dress preview",
+      "Teal Wayfarer Dress preview",
+      "Crimson Guard Dress preview",
+      "Royal Vanguard Dress preview",
+      "Royal Bard Dress preview",
+      "Harbor Scout Dress preview",
+      "Verdant Warden Dress preview"
+    ],
+    "scroll": [
+      {
+        "clientHeight": 780,
+        "rect": {
+          "bottom": 780,
+          "height": 780,
+          "left": 0,
+          "right": 390,
+          "top": 0,
+          "width": 390,
+          "x": 0,
+          "y": 0
+        },
+        "scrollHeight": 2978,
+        "scrollTop": 2198
+      }
+    ]
+  },
+  "homeEnd": {
+    "footer": [
+      {
+        "rect": {
+          "bottom": 748,
+          "height": 51,
+          "left": 16,
+          "right": 374,
+          "top": 697,
+          "width": 358,
+          "x": 16,
+          "y": 697
+        },
+        "text": "Home banner position · preview only · no ad request"
+      }
+    ],
+    "scroll": [
+      {
+        "clientHeight": 780,
+        "scrollHeight": 1883,
+        "scrollTop": 1103
+      }
+    ]
+  },
+  "auth": {
+    "keyboardPasswordType": "password",
+    "keyboardFocusOutline": "rgb(138, 100, 46) solid 1px",
+    "confirmationField": {
+      "autocomplete": "on",
+      "inputmode": "numeric",
+      "label": "Email confirmation code",
+      "position": "relative",
+      "z": "1"
+    }
+  }
+}

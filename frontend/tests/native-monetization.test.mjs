@@ -1,3 +1,4 @@
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -16,7 +17,7 @@ function load(path, imports) {
   const code = ts.transpileModule(readFileSync(new URL(path, import.meta.url), "utf8"), { compilerOptions: {
     module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } }).outputText;
-  new Function("require", "exports", code)(id => id === "react/jsx-runtime" ? require(id) : id in imports ? imports[id] : id === "./debug" ? adDiagnostics : (() => { throw new Error(`Missing ${id}`); })(), exports);
+  new Function("require", "exports", code)(id => { if (id === "react/jsx-runtime") return noticeJsxRuntime; const notice = noticeImport(id, imports); if (notice !== undefined) return notice; return id in imports ? imports[id] : id === "./debug" ? adDiagnostics : (() => { throw new Error(`Missing ${id}`); })(); }, exports);
   return exports;
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -402,9 +403,10 @@ test("Premium UI uses localized package prices, disables purchase during verific
   const billingState = { ready: true, busy: false, options, verificationPending: false };
   const Screen = load("../app/premium.tsx", {
     react: { useCallback: fn => fn }, "expo-router": { useFocusEffect() {}, router: {} },
-    "react-native": { ScrollView: "Scroll", Text: "Text", StyleSheet: { create: x => x } },
+    "react-native": { ScrollView: "Scroll", Text: "Text", Platform: { select: value => value.default }, StyleSheet: { create: x => x } },
     "../src/context/AuthContext": { useAuth: () => ({ billing: { provider: { available: true } }, billingState }) },
     "../src/entitlements/useEntitlements": { useEntitlements: () => ({ premium, confirmed: true, loading: false, refresh() {} }) },
+    "../src/components/ui/Primitives": { ScreenShell: "Scroll" },
     "../src/components/LifeCard": "Card", "../src/components/LifeButton": "Button", "../src/theme/theme": theme,
   }).default;
   assert.equal(nodes(Screen()).find(n => n.props.title === "Subscribe Monthly · €4,99").props.disabled, false);

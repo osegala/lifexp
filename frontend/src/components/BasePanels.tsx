@@ -1,26 +1,28 @@
+import GameNotice from "./ui/GameNotice";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { ActivityIndicator, Image, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getBuildingImageSource } from "../base/buildingAssetRegistry";
 import type { BuildingProgress } from "../types/progression";
 import { uiTheme as ui } from "../theme/theme";
 import { ResourcePill } from "./ui/Indicators";
 import { SurfaceCard, UiPressable, UiText } from "./ui/Primitives";
 
-export function BaseResources({ worldPoints, loading, error, onRetry }: {
-  worldPoints?: number; loading: boolean; error: string; onRetry: () => void;
+export function BaseResources({ coins, worldPoints, loading, error, onRetry }: {
+  coins?: number; worldPoints?: number; loading: boolean; error: string; onRetry: () => void;
 }) {
-  return <View pointerEvents="box-none" style={styles.resources}>
-    <SurfaceCard pointerEvents="none" style={styles.resourceCard}>
-      <UiText variant="section" accessibilityRole="header" aria-level={1}>Base</UiText>
-      <ResourcePill resource="worldPoints" value={worldPoints ?? "—"} />
-    </SurfaceCard>
-    {!!error && <SurfaceCard style={styles.errorCard}>
-      <UiText accessibilityRole="alert" style={styles.error}>{error}</UiText>
+  const insets = useSafeAreaInsets();
+  return <View pointerEvents="box-none" style={[styles.resources, { top: insets.top + ui.spacing.sm }]}>
+    <View pointerEvents="box-none" style={styles.hudRow}>
+      <View pointerEvents="none" style={styles.balances}><ResourcePill tone="hud" resource="coins" value={coins ?? "—"} />
+        <ResourcePill tone="hud" resource="worldPoints" value={worldPoints ?? "—"} /></View>
+    </View>
+    {!!error && <GameNotice title="World unavailable" message={error} variant="error" style={styles.errorCard}>
       <UiPressable accessibilityRole="button" accessibilityLabel="Retry loading world" disabled={loading}
         accessibilityState={{ disabled: loading }} onPress={onRetry} style={[styles.secondaryButton, loading && styles.unavailable]}>
         <UiText variant="label" style={loading && styles.disabledText}>Retry</UiText>
       </UiPressable>
-    </SurfaceCard>}
+    </GameNotice>}
     {loading && <View pointerEvents="none" style={styles.refresh} accessibilityLiveRegion="polite">
       <ActivityIndicator color={ui.colors.primary} accessibilityLabel="Refreshing world" />
       <UiText variant="caption">Refreshing world…</UiText>
@@ -49,7 +51,7 @@ export function BaseBuildingPanel({ building, description, descriptionOpen, erro
         {maxed ? "Maximum level reached" : building.upgradeAvailable ? "Ready to upgrade" : "More World Points needed"}
       </UiText>
       {building.upgradeCost != null && <UiText variant="label">Next upgrade · {building.upgradeCost} World Points</UiText>}
-      {!!error && <UiText accessibilityRole="alert" style={styles.error}>{error}</UiText>}
+      {!!error && <GameNotice title="Upgrade unavailable" message={error} variant="error" />}
       {descriptionOpen && <View style={styles.description}>
         <UiText>{description}</UiText>
         <UiText variant="caption" style={styles.secondary}>Upgrades cost World Points earned from daily and weekly goals.
@@ -77,7 +79,8 @@ export function BaseBuildingPanel({ building, description, descriptionOpen, erro
 
 const styles = StyleSheet.create({
   resources: { position: "absolute", top: ui.spacing.md, left: ui.spacing.md, right: ui.spacing.md, alignItems: "flex-end", gap: ui.spacing.sm, zIndex: 1000 },
-  resourceCard: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: ui.spacing.md, padding: ui.spacing.sm, width: "100%", maxWidth: 420 },
+  hudRow: { width: "100%", flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "flex-start", gap: ui.spacing.sm },
+  balances: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 4, maxWidth: "75%" },
   errorCard: { width: "100%", maxWidth: 420, gap: ui.spacing.sm, padding: ui.spacing.sm },
   error: { color: ui.colors.danger },
   refresh: { flexDirection: "row", alignItems: "center", gap: ui.spacing.sm, padding: ui.spacing.sm, borderRadius: ui.radius.md, backgroundColor: ui.colors.surface },

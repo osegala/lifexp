@@ -58,10 +58,10 @@ function PreviewHome({ navigation }: { navigation: { navigate: (name: string) =>
   const [showControls, setShowControls] = useState(true);
   const isLoading = state === "Loading", isError = state === "Error", isEmpty = state === "Empty";
   return <View style={{ flex: 1, backgroundColor: ui.colors.background }}>
-    <View style={{ padding: ui.spacing.sm, gap: ui.spacing.sm, borderBottomWidth: 1, borderBottomColor: ui.colors.border }}>
+    <View testID="home-review-controls" style={{ padding: ui.spacing.sm, gap: ui.spacing.sm, borderBottomWidth: 1, borderBottomColor: ui.colors.border }}>
       <UiText variant="caption">DEV Home review · fixture values, no account or ad network</UiText>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.xs }}>
-        {showControls && ["Normal", "Empty", "Loading", "Error", "Changed scene", "Missing scene", "No scene", "Long text", "Large text"].map(label =>
+        {showControls && ["Normal", "Quest complete", "Empty", "Loading", "Error", "Changed scene", "Missing scene", "No scene", "Long text", "Large text"].map(label =>
           <FilterChip key={label} label={label} selected={state === label} onPress={() => setState(label)} />)}
         <FilterChip label={showControls ? "Hide review controls" : "Show review controls"} onPress={() => setShowControls(value => !value)} />
       </View>
@@ -73,7 +73,11 @@ function PreviewHome({ navigation }: { navigation: { navigate: (name: string) =>
       [data-testid="home-review"] [aria-level="2"] { font-size: 42px !important; }
     `}</style>}
     <View testID="home-review" style={{ flex: 1 }}><HomeContent user={isLoading ? null : state === "Long text" ? { ...user, username: "A very long adventurer name that must wrap", coins: 1234567890 } : user}
-      goals={isLoading ? null : goals} achievements={isLoading ? null : achievements}
+      goals={isLoading ? null : state === "Quest complete" ? { ...goals,
+        daily: { tasks: { ...goals.daily.tasks, current: 8, remaining: 0, progressPercent: 100, completed: true,
+          reward: { ...goals.daily.tasks.reward, worldPoints: 25, earnedWorldPoints: 25, granted: true } } },
+        weekly: { tasks: goal(9, 15, 100) }, streak: { currentDays: 2, longestDays: 2, completedToday: true },
+      } : goals} achievements={isLoading ? null : achievements}
       tasks={isLoading ? null : isEmpty ? { ...tasks, tasks: [], summary: { ...tasks.summary, dueToday: 0 } }
         : state === "Long text" ? { ...tasks, tasks: tasks.tasks.map(task => ({ ...task, title: task.title + " with a longer description of today's intentions and plans" })) } : tasks}
       scene={isLoading ? null : state === "Changed scene" ? scenes.changed : state === "Missing scene" ? scenes.missing : state === "No scene" ? scenes.none : scenes.normal}

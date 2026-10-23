@@ -1,0 +1,32 @@
+{
+  "frontendTests": {
+    "command": "npm test",
+    "passed": 275,
+    "failed": 0
+  },
+  "typescript": {
+    "command": "npx tsc --noEmit",
+    "exitCode": 0
+  },
+  "lint": {
+    "command": "npm run lint",
+    "exitCode": 0,
+    "warnings": 0
+  },
+  "diff": {
+    "command": "git diff --check",
+    "exitCode": 0
+  },
+  "avatar": {
+    "command": "npm run validate:avatar-assets",
+    "spritesPassed": 143,
+    "exitCode": 0
+  },
+  "assets": {
+    "command": "npm run inventory:assets",
+    "assetsInventoried": 272,
+    "exitCode": 0
+  },
+  "nativeRuntimeReview": "Unavailable: no com.osegssteam.evrenthia build installed; simulator has Expo Go 54.0.7, project SDK 57.",
+  "sourceAndAssetFilesChanged": 39
+}

@@ -64,7 +64,7 @@ function PreviewTasks() {
     }, 800);
   }
   return <View style={{ flex: 1, backgroundColor: ui.colors.background }}>
-    <View style={{ padding: ui.spacing.sm, gap: ui.spacing.sm, borderBottomWidth: 1, borderBottomColor: ui.colors.border }}>
+    <View testID="tasks-review-controls" style={{ padding: ui.spacing.sm, gap: ui.spacing.sm, borderBottomWidth: 1, borderBottomColor: ui.colors.border }}>
       <UiText variant="caption">DEV Tasks review · fixtures only · no account or network</UiText>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.xs }}>
         {controls && ["Normal", "Empty", "Loading", "Error", "Long text", "Large text", "Save failure", "Completion failure"].map(label =>

@@ -1,3 +1,5 @@
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
+import * as dateFormat from "../src/utils/dateFormat.ts";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
@@ -9,6 +11,8 @@ import * as appearance from "../src/avatar/appearance.ts";
 import * as scheduling from "../src/tasks/scheduling.ts";
 import { apiRoutes } from "../src/api/routes.ts";
 import { apiError } from "../src/api/errors.ts";
+import { memoryCache, deferred, profile as cacheProfile, goals as cacheGoals, achievements as cacheAchievements } from "./cache-test-support.mjs";
+import { SupersededCacheRead } from "../src/cache/PlayerCache.ts";
 
 const require = createRequire(import.meta.url);
 const read = path => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -18,7 +22,10 @@ function load(path, imports) {
     module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } }).outputText;
   new Function("exports", "require", code)(exports, id => {
-    if (id === "react/jsx-runtime") return require(id);
+    if (id === "react/jsx-runtime") return noticeJsxRuntime;
+    const notice = noticeImport(id, imports); if (notice !== undefined) return notice;
+    if (id === "../utils/dateFormat") return dateFormat;
+    if (id === "./ScheduleInput") return "Input";
     assert.ok(id in imports, `Unexpected import: ${id}`);
     return imports[id];
   });
@@ -52,23 +59,26 @@ function inventory(background = "garden") {
       item("top", "forest-tunic.png", "tunic"), item("unselected", "unused")] };
 }
 const task = (taskId, title, dueTime, patch = {}) => ({ taskId, title, dueTime, active: true, archived: false,
-  isDueToday: true, completedToday: false, xpReward: 35, coinReward: 4, ...patch });
+  taskSize: "NORMAL", repeatType: "DAILY", repeatDays: [], completed: false, currentStreak: 0, bestStreak: 0,
+  isScheduledToday: true, isDueToday: true, completedToday: false, xpReward: 35, coinReward: 4, ...patch });
 const taskData = { tasks: [task("z", "Zulu", "18:00"), task("b", "Beta", "09:00"), task("a", "Alpha", "09:00"),
   task("future", "Future", "08:00", { isDueToday: false, nextScheduledDate: "2040-03-01" }),
   task("archived", "Archived", "08:00", { archived: true }), task("inactive", "Inactive", "08:00", { active: false }),
   task("done", "Completed", "08:00", { isDueToday: false, completedToday: true }),
   task("untimed", "Untimed", null)],
   time: { date: "2040-02-29", weekday: "Wednesday", timeZone: "Pacific/Auckland" },
-  summary: { dueToday: 4, completedToday: 1 } };
+  summary: { total: 8, active: 7, scheduledToday: 5, dueToday: 4, completedToday: 1 } };
 const user = { id: "account", username: "Actual name", coins: 739, level: 17, xpIntoLevel: 123, xpForNextLevel: 456, progressPercent: 27 };
-const goals = { date: taskData.time.date, timeZone: taskData.time.timeZone, player: { worldPoints: 881 }, refreshAfterMs: 60000 };
-const achievements = { achievements: [{ achievementId: "earned", name: "An earned achievement", earned: true,
+const goals = { ...cacheGoals, date: taskData.time.date, timeZone: taskData.time.timeZone, player: { worldPoints: 881 }, refreshAfterMs: 60000 };
+const achievements = { achievements: [{ ...cacheAchievements.achievements[0], achievementId: "earned", name: "An earned achievement", earned: true,
   currentValue: 7, requiredValue: 7, description: "Actual description", rewards: [{ name: "Actual reward" }] }],
-  summary: { earned: 1, total: 8 } };
+  summary: { ...cacheAchievements.summary, earned: 1, total: 8 } };
 function content() {
   const h = hooks(), sources = { garden: { uri: "garden.png" }, library: { uri: "library.png" } }, resolutions = [];
   const Home = load("../src/components/HomeContent.tsx", {
-    react: h.react, "react-native": native, "../theme/theme": theme, "../tasks/scheduling": scheduling,
+    react: h.react, "react-native": { ...native, Platform: { OS: "web" } }, "../theme/theme": theme, "../tasks/scheduling": scheduling,
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }) },
+    "react-native-svg": { __esModule: true, default: "Svg", Defs: "Defs", LinearGradient: "LinearGradient", Rect: "Rect", Stop: "Stop" },
     "@expo/vector-icons/MaterialCommunityIcons": "Icon",
     "../avatar/assetRegistry": { getEquippedSceneSource: (cosmetics, id, type) => {
       resolutions.push({ cosmetics, id, type }); return sources[id];
@@ -125,12 +135,14 @@ test("missing or failed scene assets keep the character and bounded stage, and a
   assert.equal(find(failed, "Image").length, 0);
   assert.equal(find(failed, "Avatar").length, 1);
   assert.match(text(failed), /Equipped background unavailable/);
-  assert.equal(failed.props.style.minHeight, 320);
+  assert.equal(failed.props.style.minHeight, 360);
   assert.equal(find(c.render({ scene: homeAvatarFromInventory(inventory("library"), appearance.DEFAULT_APPEARANCE) }).scene, "Image").length, 1);
   const missing = c.render({ scene: homeAvatarFromInventory(inventory("missing"), appearance.DEFAULT_APPEARANCE) }).scene;
   assert.match(text(missing), /Equipped background unavailable/);
   const none = c.render({ scene: homeAvatarFromInventory(inventory(null), appearance.DEFAULT_APPEARANCE) }).scene;
   assert.doesNotMatch(text(none), /unavailable/);
+  assert.equal(find(none, "Image")[0].props.source, "local-castle-garden.png");
+  assert.equal(find(none, "Avatar")[0].props.backgroundId, null, "visual fallback never equips an item");
 });
 
 test("Today uses canonical eligibility and ordering, previews three rows, and rows navigate without completing", () => {
@@ -142,7 +154,7 @@ test("Today uses canonical eligibility and ordering, previews three rows, and ro
   for (const row of rows) row.props.onPress();
   find(tree, "Button").find(x => x.props.title === "View all tasks").props.onPress();
   assert.equal(navigations, 4);
-  assert.ok(nodes(tree).some(x => x.props.subtitle?.includes(taskData.time.date)));
+  assert.equal(text(find(tree, "SectionHeader").find(n => n.props.title === "Today").props.trailing), dateFormat.formatDate(taskData.time.date));
   assert.doesNotMatch(read("../app/(tabs)/dashboard.tsx") + read("../src/components/HomeContent.tsx"),
     /api\.(post|patch|put|delete)|completeTask\(|useCompletionFeedback|new Date\(/);
 });
@@ -152,7 +164,7 @@ test("real currencies, XP, achievement rewards, Profile and final banner placeme
   const { tree } = c.render({ onProfile: () => profile++ });
   assert.deepEqual(find(tree, "Resource").map(x => [x.props.resource, x.props.value]), [["coins", 739], ["worldPoints", 881]]);
   assert.equal(find(tree, "XPBar")[0].props.progress, 0.27);
-  assert.ok(find(tree, "Badge").some(x => x.props.label === "Level 17"));
+  assert.match(text(tree), /Lv\.\s+17/);
   assert.match(text(tree), /123\s+\/\s+456\s+XP/);
   assert.match(text(tree), /Actual reward/);
   assert.equal(find(tree, "Quests")[0].props.goals, goals);
@@ -182,11 +194,11 @@ test("loading/errors never fabricate data or a clear schedule; stale content and
   assert.match(find(empty, "EmptyState")[0].props.description, /completed tasks are saved/);
 });
 
-async function controller() {
+async function controller({ player = memoryCache().cache, overrides = {}, autoFocus = true, currentUser = user } = {}) {
   const h = hooks(), calls = [], navigation = [], cache = [];
   let focus, appState, cleanup;
   const data = { [apiRoutes.tasks]: taskData, [apiRoutes.goals]: goals, [apiRoutes.achievements]: achievements,
-    [apiRoutes.inventory]: inventory(), [apiRoutes.me]: appearance.DEFAULT_APPEARANCE };
+    [apiRoutes.inventory]: inventory(), [apiRoutes.me]: { ...cacheProfile, ...appearance.DEFAULT_APPEARANCE }, ...overrides };
   const failures = new Set();
   let profileOk = true;
   const Screen = load("../app/(tabs)/dashboard.tsx", {
@@ -199,18 +211,20 @@ async function controller() {
       return { data: await data[route] };
     } } },
     "../../src/api/routes": { apiRoutes }, "../../src/avatar/appearance": appearance,
+    "../../src/cache/playerData": { playerCache: player }, "../../src/cache/PlayerCache": { SupersededCacheRead },
+    "../../src/avatar/prefetch": { prefetchAvatarAssets: async () => {} },
     "../../src/avatar/localAppearance": { getLocalAppearance: async () => appearance.DEFAULT_APPEARANCE, setLocalAppearance: async (...args) => cache.push(args) },
     "../../src/components/HomeContent": "HomeContent",
-    "../../src/context/AuthContext": { useAuth: () => ({ user, refreshUser: async () => profileOk }) },
+    "../../src/context/AuthContext": { useAuth: () => ({ user: currentUser, refreshUser: async () => profileOk }) },
     "../../src/home/avatar": { homeAvatarFromInventory },
   }).default;
   const render = () => h.render(Screen).props;
-  render(); cleanup = focus(); await tick();
-  return { render, calls, navigation, data, failures, cache,
+  const initial = render(); if (autoFocus) { cleanup = focus(); await tick(); }
+  return { render, initial, calls, navigation, data, failures, cache, focus: async () => { cleanup = focus(); await tick(); },
     setProfile: value => { profileOk = value; },
     foreground: async () => { appState("active"); await tick(); },
     retry: async () => { render().onRetry(); await tick(); },
-    refocus: async () => { cleanup(); render(); cleanup = focus(); await tick(); }, dispose: () => cleanup() };
+    refocus: async () => { cleanup?.(); render(); cleanup = focus(); await tick(); }, dispose: () => cleanup?.() };
 }
 
 test("Home refocus/resume reads equipped state again, retries retain snapshots, and navigation reaches existing routes", async t => {
@@ -239,12 +253,61 @@ test("Home refocus/resume reads equipped state again, retries retain snapshots, 
   assert.ok(c.calls.every(route => [apiRoutes.me, apiRoutes.inventory, apiRoutes.goals, apiRoutes.tasks, apiRoutes.achievements].includes(route)));
 });
 
+test("cold Home restores each cached section before refresh and keeps it visible through AWS failure", async t => {
+  const first = memoryCache();
+  for (const [resource, data] of Object.entries({ profile: { ...cacheProfile, ...appearance.DEFAULT_APPEARANCE },
+    inventory: inventory(), tasks: taskData, goals, achievements })) first.cache.set("account", resource, data);
+  await tick();
+  const { cache: player } = memoryCache("test", first.values); await player.hydrateUser("account");
+  const pending = deferred(), routes = [apiRoutes.tasks, apiRoutes.goals, apiRoutes.achievements, apiRoutes.inventory, apiRoutes.me];
+  const c = await controller({ player, autoFocus: false, overrides: Object.fromEntries(routes.map(route => [route, pending.promise])) }); t.after(c.dispose);
+  assert.equal(c.calls.length, 0);
+  assert.deepEqual(c.initial.tasks, taskData); assert.deepEqual(c.initial.goals, goals); assert.deepEqual(c.initial.achievements, achievements);
+  assert.equal(c.initial.scene.avatar.equippedBackgroundId, "garden");
+  assert.equal(c.initial.loading, false); assert.equal(c.initial.achievementsLoading, false);
+  assert.equal(c.initial.tasksLoading, false); assert.equal(c.initial.avatarLoading, false);
+  await c.focus();
+  assert.deepEqual(c.render().tasks, taskData); assert.equal(c.render().avatarLoading, false);
+  pending.reject(Error("offline")); await tick();
+  assert.deepEqual(c.render().tasks, taskData); assert.deepEqual(c.render().goals, goals); assert.deepEqual(c.render().achievements, achievements);
+  assert.equal(c.render().scene.avatar.equippedBackgroundId, "garden");
+  c.data[apiRoutes.tasks] = { ...taskData, tasks: [] };
+  c.data[apiRoutes.goals] = { ...goals, player: { worldPoints: 900 } };
+  c.data[apiRoutes.achievements] = { ...achievements, achievements: [] };
+  c.data[apiRoutes.inventory] = inventory("library"); c.data[apiRoutes.me] = { ...cacheProfile, ...appearance.DEFAULT_APPEARANCE };
+  await c.retry();
+  assert.equal(c.render().tasks.tasks.length, 0); assert.equal(c.render().goals.player.worldPoints, 900);
+  assert.equal(c.render().achievements.achievements.length, 0); assert.equal(c.render().scene.avatar.equippedBackgroundId, "library");
+  await tick(); const restarted = memoryCache("test", first.values).cache; await restarted.hydrateUser("account");
+  assert.equal(restarted.peek("account", "goals").player.worldPoints, 900);
+});
+
+test("Home loads only absent resources and never uses another account's disk state", async t => {
+  const first = memoryCache(); first.cache.set("account", "profile", cacheProfile); first.cache.set("account", "inventory", inventory()); await tick();
+  const player = memoryCache("test", first.values).cache; await player.hydrateUser("account");
+  const c = await controller({ player, autoFocus: false }); t.after(c.dispose);
+  assert.ok(c.initial.scene); assert.equal(c.initial.avatarLoading, false);
+  assert.equal(c.initial.tasks, null); assert.equal(c.initial.tasksLoading, true);
+  assert.equal(c.initial.goals, null); assert.equal(c.initial.loading, true);
+  assert.equal(c.initial.achievements, null); assert.equal(c.initial.achievementsLoading, true);
+  const other = await controller({ player, autoFocus: false, currentUser: { ...user, id: "bob" } }); t.after(other.dispose);
+  assert.equal(other.initial.scene, null); assert.equal(other.initial.tasks, null); assert.equal(other.initial.goals, null);
+});
+
+test("a slow avatar request does not delay successful task, quest or achievement sections", async t => {
+  const pending = deferred(), c = await controller({ overrides: { [apiRoutes.inventory]: pending.promise } }); t.after(c.dispose);
+  assert.deepEqual(c.render().tasks, taskData); assert.deepEqual(c.render().goals, goals);
+  assert.deepEqual(c.render().achievements, achievements); assert.equal(c.render().achievementsLoading, false);
+  assert.equal(c.render().scene, null); assert.equal(c.render().avatarLoading, true);
+  pending.resolve(inventory()); await tick(); assert.ok(c.render().scene);
+});
+
 test("profile refresh failure stays recoverable and blur ignores late task/equipment responses", async t => {
   const c = await controller(); t.after(c.dispose);
   c.setProfile(false); const last = c.render();
   await c.retry();
   assert.match(c.render().progressError, /Could not refresh your profile/);
-  assert.equal(c.render().scene, last.scene);
+  assert.deepEqual(c.render().scene, last.scene);
   assert.equal(c.render().tasksLoading, false);
   assert.equal(c.render().avatarLoading, false);
   c.setProfile(true);
@@ -252,5 +315,5 @@ test("profile refresh failure stays recoverable and blur ignores late task/equip
   c.data[apiRoutes.inventory] = new Promise(done => { resolve = done; });
   c.render().onRetry(); await tick(); c.dispose();
   resolve(inventory("library")); await tick();
-  assert.equal(c.render().scene, last.scene, "late reads cannot update a blurred screen");
+  assert.deepEqual(c.render().scene, last.scene, "late reads cannot update a blurred screen");
 });

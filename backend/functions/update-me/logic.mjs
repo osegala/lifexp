@@ -6,15 +6,31 @@ export class ProfilePatchError extends Error {
     }
 }
 
-export function isValidTimeZone(value) {
-    if (typeof value !== "string" || value.length < 1 || value.length > 100) return false;
+// Legacy North American abbreviations must gain regional daylight-saving rules.
+const LEGACY_TIME_ZONES = {
+    EST: "America/New_York", EDT: "America/New_York",
+    CST: "America/Chicago", CDT: "America/Chicago",
+    MST: "America/Denver", MDT: "America/Denver",
+    PST: "America/Los_Angeles", PDT: "America/Los_Angeles"
+};
+
+export function normalizeTimeZone(value) {
+    if (typeof value !== "string" || value.length < 1 || value.length > 100) return null;
+    const input = value.trim();
+    const zone = Object.hasOwn(LEGACY_TIME_ZONES, input.toUpperCase()) ? LEGACY_TIME_ZONES[input.toUpperCase()]
+        : /^(?:UTC|GMT)$/i.test(input) ? "UTC" : input;
+    if (zone !== "UTC" && !/^[A-Za-z_]+(?:\/[A-Za-z0-9_+\-]+)+$/.test(zone)) return null;
     try {
-        new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
-        return true;
+        // ICU versions disagree on canonical aliases (e.g. Kolkata/Calcutta).
+        // Keep the validated IANA identifier the device supplied.
+        new Intl.DateTimeFormat("en-US", { timeZone: zone }).format();
+        return zone;
     } catch {
-        return false;
+        return null;
     }
 }
+
+export function isValidTimeZone(value) { return !!normalizeTimeZone(value); }
 
 const APPEARANCE_ERROR_CODES = {
     bodyType: "INVALID_BODY_TYPE",
@@ -52,10 +68,11 @@ export function validateProfilePatch(body, appearanceValues = {}) {
         patch.displayName = body.displayName.trim();
     }
     if (Object.hasOwn(body, "timeZone")) {
-        if (!isValidTimeZone(body.timeZone)) {
+        const timeZone = normalizeTimeZone(body.timeZone);
+        if (!timeZone) {
             throw new ProfilePatchError("INVALID_TIME_ZONE", "timeZone must be a valid IANA time zone.");
         }
-        patch.timeZone = body.timeZone;
+        patch.timeZone = timeZone;
     }
     for (const field of appearanceFields) {
         if (!Object.hasOwn(body, field)) continue;

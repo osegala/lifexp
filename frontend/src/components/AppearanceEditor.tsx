@@ -1,3 +1,4 @@
+import GameNotice from "./ui/GameNotice";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -8,6 +9,7 @@ import {
 } from "../avatar/appearance";
 import type { AppearanceColor, AvatarAppearance, BodyType } from "../avatar/appearance";
 import { colors, radius, spacing, uiTheme as ui } from "../theme/theme";
+import { PrimaryButton } from "./ui/Buttons";
 import LifeCard from "./LifeCard";
 import { UiPressable } from "./ui/Primitives";
 
@@ -35,7 +37,7 @@ export default function AppearanceEditor({
   const styles = tone === "parchment" ? parchmentStyles : legacyStyles;
   const Action = tone === "parchment" ? UiPressable : Pressable;
   return (
-    <LifeCard tone={tone} style={styles.card}>
+    <LifeCard tone={tone} framed={tone === "parchment"} style={styles.card}>
       <View style={styles.headingRow}>
         <View style={styles.headingCopy}>
           <Text accessibilityRole="header" aria-level={2} style={styles.title}>Appearance</Text>
@@ -44,7 +46,7 @@ export default function AppearanceEditor({
         {dirty && <View style={styles.unsavedBadge}><Text style={styles.unsavedText}>UNSAVED</Text></View>}
       </View>
 
-      <Text style={styles.label}>Body</Text>
+      <View style={styles.controlGroup}><Text style={styles.label}>Body</Text>
       <View style={styles.bodyRow} accessibilityRole={tone === "parchment" ? "radiogroup" : undefined} accessibilityLabel={tone === "parchment" ? "Body" : undefined}>
         {(["BOY", "GIRL"] as const).map((bodyType) => (
           <BodyChoice
@@ -56,8 +58,9 @@ export default function AppearanceEditor({
           />
         ))}
       </View>
+      </View>
 
-      <Text style={styles.label}>Hair style</Text>
+      <View style={styles.controlGroup}><Text style={styles.label}>Hair style</Text>
       <Text accessibilityLiveRegion="polite" aria-live="polite" style={styles.selectedColor}>
         {hairStyleName(appearance.hairId)}
       </Text>
@@ -85,23 +88,27 @@ export default function AppearanceEditor({
           );
         })}
       </View>
+      </View>
 
-      <Text style={styles.label}>Skin tone</Text>
+      <View style={styles.controlGroup}><Text style={styles.label}>Skin tone</Text>
       <Swatches tone={tone} label="Skin tone" options={SKIN_COLORS} selectedId={appearance.skinColorId} onSelect={(skinColorId) => onChange({ skinColorId })} />
+      </View>
 
-      <Text style={styles.label}>Hair color</Text>
+      <View style={styles.controlGroup}><Text style={styles.label}>Hair color</Text>
       <Swatches tone={tone} label="Hair color" options={HAIR_COLORS} selectedId={appearance.hairColorId} onSelect={(hairColorId) => onChange({ hairColorId })} />
+      </View>
 
-      <Text style={styles.label}>Eye color</Text>
+      <View style={styles.controlGroup}><Text style={styles.label}>Eye color</Text>
       <Swatches tone={tone} label="Eye color" options={EYE_COLORS} selectedId={appearance.eyeColorId} onSelect={(eyeColorId) => onChange({ eyeColorId })} />
+      </View>
 
       {!!saveError && (
-        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.saveError}>
-          Appearance not saved. {saveError}
-        </Text>
+        <GameNotice title="Appearance not saved" message={saveError} variant="error" />
       )}
 
-      {showSaveButton && (
+      {showSaveButton && (tone === "parchment" ? <PrimaryButton
+        title={dirty ? "Save Appearance" : "Appearance Saved"} accessibilityLabel="Save appearance"
+        busy={saving} disabled={!dirty || saving} onPress={onSave} /> : (
         <Action
           accessibilityRole="button"
           accessibilityLabel="Save appearance"
@@ -114,13 +121,13 @@ export default function AppearanceEditor({
             pressed && dirty && !saving && styles.pressed,
           ]}
         >
-          {saving ? <ActivityIndicator size="small" color={tone === "parchment" ? ui.colors.disabledText : colors.background} /> : (
+          {saving ? <ActivityIndicator size="small" color={colors.background} /> : (
             <Text style={[styles.saveText, !dirty && styles.saveTextDisabled]}>
               {dirty ? "Save Appearance" : "Appearance Saved"}
             </Text>
           )}
         </Action>
-      )}
+      ))}
     </LifeCard>
   );
 }
@@ -197,6 +204,7 @@ function Swatches({ label, options, selectedId, onSelect, tone = "legacy" }: {
 
 const legacyStyles = StyleSheet.create({
   card: { gap: spacing.md },
+  controlGroup: { gap: spacing.md },
   headingRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md },
   headingCopy: { flex: 1 },
   title: { color: colors.text, fontSize: 24, fontWeight: "800" },
@@ -230,34 +238,36 @@ const legacyStyles = StyleSheet.create({
 
 const parchmentStyles = StyleSheet.create({
   ...legacyStyles,
-  card: { gap: ui.spacing.md },
+  card: { gap: ui.spacing.lg, padding: ui.spacing.md },
+  controlGroup: { gap: ui.spacing.sm },
   title: { ...ui.type.section, color: ui.colors.text, fontFamily: Platform.select(ui.font.display) },
   subtitle: { ...ui.type.caption, color: ui.colors.secondaryText, marginTop: ui.spacing.xs },
   headingRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: ui.spacing.sm },
   unsavedBadge: { borderRadius: ui.radius.pill, backgroundColor: ui.colors.warningSurface, paddingHorizontal: ui.spacing.sm, paddingVertical: ui.spacing.xs },
   unsavedText: { ...ui.type.caption, color: ui.colors.warning },
   label: { ...ui.type.label, color: ui.colors.text, marginTop: ui.spacing.xs },
-  bodyRow: { flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.sm },
+  bodyRow: { flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.xs, padding: ui.spacing.xs,
+    borderRadius: ui.radius.lg, borderWidth: 1, borderColor: ui.colors.border, backgroundColor: ui.colors.paperInset },
   bodyChoice: { flex: 1, minWidth: ui.size.target, minHeight: ui.size.target, alignItems: "center", justifyContent: "center",
     borderRadius: ui.radius.md, borderWidth: 1, borderColor: ui.colors.controlBorder, backgroundColor: ui.colors.surface, padding: ui.spacing.sm },
-  bodyChoiceSelected: { borderColor: ui.colors.primary, backgroundColor: ui.colors.primary },
+  bodyChoiceSelected: { borderColor: ui.colors.gold, backgroundColor: ui.colors.primary },
   bodyChoiceText: { ...ui.type.label, color: ui.colors.secondaryText },
   bodyChoiceTextSelected: { color: ui.colors.onPrimary },
   hairStyles: { flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.sm },
   hairStyle: { minHeight: ui.size.target, minWidth: ui.size.target, justifyContent: "center", borderRadius: ui.radius.md,
     borderWidth: 1, borderColor: ui.colors.controlBorder, backgroundColor: ui.colors.surface, paddingHorizontal: ui.spacing.sm, paddingVertical: ui.spacing.sm, maxWidth: "100%" },
-  hairStyleSelected: { borderColor: ui.colors.primary, backgroundColor: ui.colors.primary },
+  hairStyleSelected: { borderColor: ui.colors.gold, backgroundColor: ui.colors.primary },
   hairStyleText: { ...ui.type.label, color: ui.colors.secondaryText, flexShrink: 1 },
   hairStyleTextSelected: { color: ui.colors.onPrimary },
   swatches: { flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.sm },
-  selectedColor: { ...ui.type.caption, color: ui.colors.secondaryText, marginBottom: ui.spacing.sm },
+  selectedColor: { ...ui.type.caption, color: ui.colors.secondaryText },
   swatchShell: { width: ui.size.target, height: ui.size.target, borderRadius: ui.radius.pill, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: ui.colors.controlBorder },
   swatchSelected: { borderColor: ui.colors.primary, backgroundColor: ui.colors.successSurface },
   swatch: { ...legacyStyles.swatch, borderColor: ui.colors.controlBorder },
   swatchCheck: { ...legacyStyles.swatchCheck, color: ui.colors.onPrimary, backgroundColor: ui.colors.primary },
-  saveButton: { minHeight: ui.size.target, alignItems: "center", justifyContent: "center", borderRadius: ui.radius.md, backgroundColor: ui.colors.primary, padding: ui.spacing.sm },
-  saveButtonDisabled: { backgroundColor: ui.colors.disabled },
+  saveButton: { minHeight: 52, alignItems: "center", justifyContent: "center", borderRadius: ui.radius.md, backgroundColor: "transparent", padding: 12 },
+  saveButtonDisabled: { backgroundColor: "transparent" },
   saveError: { ...ui.type.body, color: ui.colors.danger },
   saveText: { ...ui.type.label, color: ui.colors.onPrimary },
-  saveTextDisabled: { color: ui.colors.disabledText },
+  saveTextDisabled: { color: ui.colors.text },
 });

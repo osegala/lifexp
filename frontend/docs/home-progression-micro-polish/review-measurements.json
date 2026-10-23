@@ -1,0 +1,122 @@
+{
+  "width390": {
+    "bars": [
+      {
+        "border": "1px solid rgb(139, 123, 101)",
+        "fill": "rgb(131, 188, 214)",
+        "height": 9,
+        "label": "Daily Quest progress",
+        "radius": "999px",
+        "track": "rgb(53, 66, 60)",
+        "width": "66.6667%"
+      },
+      {
+        "border": "1px solid rgb(139, 123, 101)",
+        "fill": "rgb(131, 188, 214)",
+        "height": 9,
+        "label": "Weekly Quest progress",
+        "radius": "999px",
+        "track": "rgb(53, 66, 60)",
+        "width": "53.3333%"
+      },
+      {
+        "border": "1px solid rgb(139, 123, 101)",
+        "fill": "rgb(131, 188, 214)",
+        "height": 9,
+        "label": "First Steps progress",
+        "radius": "999px",
+        "track": "rgb(53, 66, 60)",
+        "width": "100%"
+      },
+      {
+        "border": "1px solid rgb(139, 123, 101)",
+        "fill": "rgb(131, 188, 214)",
+        "height": 9,
+        "label": "Steady Progress progress",
+        "radius": "999px",
+        "track": "rgb(53, 66, 60)",
+        "width": "72%"
+      }
+    ],
+    "note": {
+      "color": "rgb(106, 104, 93)",
+      "fontSize": "12px",
+      "lineHeight": "17px",
+      "marginBottom": "-8px",
+      "marginTop": "-8px"
+    }
+  },
+  "width430": {
+    "badges": [
+      {
+        "background": "rgb(245, 232, 208)",
+        "fontSize": "12px",
+        "height": 22,
+        "label": "2/8"
+      },
+      {
+        "background": "rgba(228, 236, 222, 0.65)",
+        "fontSize": "12px",
+        "height": 22,
+        "label": "✓ Today counts"
+      },
+      {
+        "background": "rgba(228, 236, 222, 0.65)",
+        "fontSize": "12px",
+        "height": 22,
+        "label": "✓ Earned"
+      },
+      {
+        "background": "rgb(245, 232, 208)",
+        "fontSize": "12px",
+        "height": 22,
+        "label": "Locked"
+      }
+    ],
+    "bars": [
+      {
+        "border": "1px solid rgb(139, 123, 101)",
+        "fill": "rgb(131, 188, 214)",
+        "height": 9,
+        "label": "Daily Quest progress",
+        "radius": "999px",
+        "track": "rgb(53, 66, 60)",
+        "width": "66.6667%"
+      },
+      {
+        "border": "1px solid rgb(139, 123, 101)",
+        "fill": "rgb(131, 188, 214)",
+        "height": 9,
+        "label": "Weekly Quest progress",
+        "radius": "999px",
+        "track": "rgb(53, 66, 60)",
+        "width": "53.3333%"
+      },
+      {
+        "border": "1px solid rgb(139, 123, 101)",
+        "fill": "rgb(131, 188, 214)",
+        "height": 9,
+        "label": "First Steps progress",
+        "radius": "999px",
+        "track": "rgb(53, 66, 60)",
+        "width": "100%"
+      },
+      {
+        "border": "1px solid rgb(139, 123, 101)",
+        "fill": "rgb(131, 188, 214)",
+        "height": 9,
+        "label": "Steady Progress progress",
+        "radius": "999px",
+        "track": "rgb(53, 66, 60)",
+        "width": "72%"
+      }
+    ],
+    "note": {
+      "color": "rgb(106, 104, 93)",
+      "fontSize": "12px",
+      "gapAbove": 8,
+      "gapBelow": 8,
+      "lineHeight": "17px"
+    }
+  }
+}

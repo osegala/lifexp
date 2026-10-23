@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { memo } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import type { ShopItem } from "../types";
 import { getCosmeticPreviewCrop, getCosmeticPreviewSource } from "../avatar/assetRegistry";
 import { catalogCosmeticReference } from "../avatar/inventory";
@@ -10,13 +10,17 @@ import { BadgePill, ResourcePill } from "./ui/Indicators";
 import { SurfaceCard, UiPressable, UiText } from "./ui/Primitives";
 
 // Catalog flags, effective price and ownership are supplied by the server.
-export default memo(function ShopItemCard({ item, busy, onPurchase }: {
-  item: ShopItem; busy: boolean; onPurchase: (item: ShopItem) => void;
+export default memo(function ShopItemCard({ item, busy, onPurchase, onPremium, premiumAvailable }: {
+  item: ShopItem; busy: boolean; onPurchase: (item: ShopItem) => void; onPremium?: () => void; premiumAvailable?: boolean;
 }) {
   const cosmetic = catalogCosmeticReference(item);
   const preview = cosmetic ? getCosmeticPreviewSource(cosmetic) : undefined;
-  const locked = item.status === "LOCKED";
-  const label = item.owned ? "Owned" : locked ? "Locked" : item.status === "NOT_ENOUGH_COINS" ? "Need coins" : busy ? "Buying…" : "Buy";
+  // Live entitlement can deny a stale cached offer; it can never grant ownership
+  // or override the server's canPurchase flag.
+  const premiumLocked = !item.owned && item.requiresPremium && (!item.premiumRequirementSatisfied || premiumAvailable === false);
+  const locked = item.status === "LOCKED" || premiumLocked;
+  const included = item.requiresPremium && item.effectivePrice === 0;
+  const label = item.owned ? "Owned" : locked ? "Locked" : item.status === "NOT_ENOUGH_COINS" ? "Need coins" : busy ? included ? "Unlocking…" : "Buying…" : included ? "Unlock" : "Buy";
   const requirement = item.achievementRequirement;
   const progressUnit = requirement?.type === "TASKS_COMPLETED" ? "tasks" : requirement?.type === "LEVEL_REACHED" ? "levels"
     : requirement?.type === "DAILY_GOALS_COMPLETED" ? "daily goals" : "progress";
@@ -28,12 +32,15 @@ export default memo(function ShopItemCard({ item, busy, onPurchase }: {
     </View>
     <UiText variant="label" style={styles.name}>{item.name}</UiText>
     <View style={styles.badges}>
-      {item.owned ? <BadgePill label="Owned" tone="success" /> : <ResourcePill resource="coins" value={item.effectivePrice} />}
-      {item.requiresPremium && <BadgePill label="Premium" tone={item.owned || item.premiumRequirementSatisfied ? "neutral" : "locked"} />}
+      {item.owned ? <BadgePill label="Owned" tone="success" /> : included
+        ? !premiumLocked && <UiText variant="caption" style={styles.secondary}>Included with Premium</UiText> : <ResourcePill resource="coins" value={item.effectivePrice} />}
+      {item.requiresPremium && <View style={styles.premiumBadge}>
+        <MaterialCommunityIcons name="crown-outline" size={13} color={ui.colors.gold} accessible={false} />
+        <BadgePill label="Premium" tone="neutral" /></View>}
     </View>
     {locked && <View style={styles.requirement}>
       <BadgePill label="Locked" tone="locked" />
-      {item.requiresPremium && !item.premiumRequirementSatisfied && <UiText variant="caption" style={styles.secondary}>Evrenthia Premium required</UiText>}
+      {premiumLocked && <UiText variant="caption" style={styles.secondary}>Evrenthia Premium required</UiText>}
       {requirement ? <>
         <UiText variant="caption" style={styles.secondary}>Complete &quot;{requirement.name}&quot;</UiText>
         <UiText variant="caption" style={styles.secondary}>{requirement.currentValue} / {requirement.requiredValue} {progressUnit}</UiText>
@@ -41,24 +48,27 @@ export default memo(function ShopItemCard({ item, busy, onPurchase }: {
         <UiText variant="caption" style={styles.secondary}>Reach level {item.effectiveRequiredLevel}</UiText> : null}
     </View>}
     {!locked && requirement && <UiText variant="caption" style={styles.secondary}>Unlocked by {requirement.name}</UiText>}
+    {premiumLocked && onPremium && <UiPressable accessibilityRole="button" accessibilityLabel={`View Premium for ${item.name}`}
+      onPress={onPremium} style={styles.buy}><UiText variant="label" style={styles.buyText}>View Premium</UiText></UiPressable>}
     {locked || item.owned ? null : <UiPressable accessibilityRole="button" accessibilityLabel={`${label}: ${item.name}`}
       accessibilityHint={`${item.effectivePrice} coins`} accessibilityState={{ disabled, busy }} disabled={disabled}
-      onPress={() => onPurchase(item)} style={[styles.buy, disabled && styles.disabled]}>
+      onPress={() => onPurchase(item)} hitSlop={{ top: 5, bottom: 5 }} style={[styles.buy, disabled && styles.disabled]}>
       <UiText variant="label" style={[styles.buyText, disabled && styles.disabledText]}>{label}</UiText>
     </UiPressable>}
   </SurfaceCard>;
 });
 
 const styles = StyleSheet.create({
-  card: { flex: 1, padding: ui.spacing.sm, gap: ui.spacing.sm },
+  card: { flex: 1, padding: 6, gap: 4, borderRadius: 5, backgroundColor: ui.colors.paperInset },
   owned: { borderColor: ui.colors.success },
-  preview: { height: 160, backgroundColor: ui.colors.elevated, borderRadius: ui.radius.sm, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  preview: { height: 108, borderRadius: ui.radius.sm, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   image: { width: "100%", height: "100%" },
-  name: { color: ui.colors.text },
+  name: { color: ui.colors.text, fontFamily: Platform.select(ui.font.display), fontWeight: "400", textAlign: "center" },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.xs },
+  premiumBadge: { flexDirection: "row", alignItems: "center", gap: 2 },
   secondary: { color: ui.colors.secondaryText },
   requirement: { gap: ui.spacing.xs },
-  buy: { backgroundColor: ui.colors.primary, borderRadius: ui.radius.md, alignItems: "center", padding: ui.spacing.sm, marginTop: "auto" },
+  buy: { minHeight: 34, backgroundColor: ui.colors.primary, borderRadius: 4, alignItems: "center", padding: 4, marginTop: "auto" },
   buyText: { color: ui.colors.onPrimary, textAlign: "center" },
   disabled: { backgroundColor: ui.colors.disabled },
   disabledText: { color: ui.colors.disabledText },

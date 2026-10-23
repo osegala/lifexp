@@ -1,27 +1,32 @@
+import { showGameNotice } from "../../src/feedback/notices";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import { Alert, View, StyleSheet } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { useAuth } from "../../src/context/AuthContext";
-import LifeCard from "../../src/components/LifeCard";
+import { ScreenShell, SectionHeader, SurfaceCard, UiText } from "../../src/components/ui/Primitives";
+import { BadgePill } from "../../src/components/ui/Indicators";
 import NotificationSettings from "../../src/components/NotificationSettings";
-import LifeButton from "../../src/components/LifeButton";
+import { DestructiveButton, PrimaryButton, SecondaryButton } from "../../src/components/ui/Buttons";
 import XPBar from "../../src/components/XPBar";
-import { colors, spacing } from "../../src/theme/theme";
+import { uiTheme as ui } from "../../src/theme/theme";
 import LifeInput from "../../src/components/LifeInput";
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
 import { clearLocalAccountData } from "../../src/storage/localAccountData";
 import { disableCurrentDevice } from "../../src/notifications/device";
 import { useEntitlements } from "../../src/entitlements/useEntitlements";
+import { timeZoneLabel } from "../../src/utils/timeZone";
+import type { AxiosRequestConfig } from "axios";
+import { playerCache } from "../../src/cache/playerData";
+import type { ProfileResponse } from "../../src/auth/session";
 
 export default function ProfileScreen() {
   const { user, logout, clearDeletedAccountSession, refreshUser } = useAuth();
   const entitlement = useEntitlements();
   const [loggingOut, setLoggingOut] = useState(false);
   const [displayName, setDisplayName] = useState(user?.username ?? "");
-  const [timeZone, setTimeZone] = useState(user?.timeZone ?? "UTC");
   const [saving, setSaving] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const deletionPending = useRef(false);
@@ -35,21 +40,26 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (user) {
       setDisplayName(user.username);
-      setTimeZone(user.timeZone);
     }
   }, [user]);
 
   async function saveProfile() {
+    if (!user) return;
     try {
       setSaving(true);
-      await api.patch(apiRoutes.me, {
+      playerCache.invalidate(user.id, ["profile"]);
+      const accountCurrent = playerCache.accountCurrent(user.id);
+      const saved = await api.patch<Partial<ProfileResponse>>(apiRoutes.me, {
         displayName: displayName.trim(),
-        timeZone: timeZone.trim(),
-      });
+      }, { expectedUserId: String(user.id) } as AxiosRequestConfig);
+      if (!accountCurrent()) return;
+      playerCache.invalidate(user.id, ["profile"]);
+      const profile = playerCache.peek(user.id, "profile");
+      if (profile && typeof saved.data.displayName === "string") playerCache.set(user.id, "profile", { ...profile, displayName: saved.data.displayName });
       await refreshUser();
-      Alert.alert("Profile", "Profile settings saved.");
+      showGameNotice("Profile saved", "Profile settings saved.", "success");
     } catch (error) {
-      Alert.alert("Profile", apiError(error, "Could not save profile settings.").message);
+      showGameNotice("Profile", apiError(error, "Could not save profile settings.").message, "error");
     } finally {
       setSaving(false);
     }
@@ -62,7 +72,7 @@ export default function ProfileScreen() {
       await logout();
       router.replace({ pathname: "/login" });
     } catch {
-      Alert.alert("Could not sign out", "We could not disable device notifications or clear your sign-in. Reconnect and try again.");
+      showGameNotice("Could not sign out", "We could not disable device notifications or clear your sign-in. Reconnect and try again.", "error");
     } finally {
       setLoggingOut(false);
     }
@@ -81,7 +91,7 @@ export default function ProfileScreen() {
       ]);
       router.replace({ pathname: "/login" });
     } catch (error) {
-      Alert.alert("Account not deleted", apiError(error, "Could not delete your account. Please try again.").message);
+      showGameNotice("Account not deleted", apiError(error, "Could not delete your account. Please try again.").message, "error");
     } finally {
       deletionPending.current = false;
       setDeletingAccount(false);
@@ -106,222 +116,62 @@ export default function ProfileScreen() {
   const xpForNextLevel = user?.xpForNextLevel ?? 100;
   const xpProgress = Math.min(xpIntoLevel / xpForNextLevel, 1);
 
-  return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      alwaysBounceVertical={false}
-      bounces={false}
-      overScrollMode="never"
-    >
-      <View style={styles.header}>
-        <Text accessibilityRole="header" style={styles.title}>Profile</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back to Home"
-          onPress={() => router.navigate("/(tabs)/dashboard")}
-          style={({ pressed }) => [styles.homeButton, pressed && styles.buttonPressed]}
-        >
-          <MaterialCommunityIcons name="arrow-left" color={colors.primary} size={22} />
-          <Text style={styles.homeButtonText}>Home</Text>
-        </Pressable>
+  return <ScreenShell keyboardSafe>
+    <View style={styles.header}>
+      <UiText variant="display" accessibilityRole="header" aria-level={1}>Profile</UiText>
+      <SecondaryButton title="Home" accessibilityLabel="Back to Home" onPress={() => router.navigate("/(tabs)/dashboard")}
+        leading={<MaterialCommunityIcons name="arrow-left" color={ui.colors.primary} size={18} accessible={false} aria-hidden />} style={styles.back} />
+    </View>
+    <SurfaceCard framed style={styles.identity}>
+      <View style={styles.initial}><UiText variant="section" style={styles.onPrimary}>{(user?.username?.[0] ?? "H").toUpperCase()}</UiText></View>
+      <View style={styles.identityCopy}><UiText variant="section">{user?.username ?? "Hero"}</UiText>
+        <UiText variant="caption" style={styles.secondary}>{user?.email ?? "No email found"}</UiText></View>
+    </SurfaceCard>
+    <SurfaceCard framed style={styles.section}>
+      <SectionHeader title="Your progress" trailing={<BadgePill label={`Lv. ${level}`} />} />
+      <View style={styles.statRow}><UiText variant="caption" style={styles.secondary}>{totalXp} total XP</UiText><UiText variant="caption">{xpIntoLevel} / {xpForNextLevel} XP</UiText></View>
+      <XPBar tone="parchment" progress={xpProgress} />
+    </SurfaceCard>
+    <SurfaceCard framed style={styles.section}>
+      <SectionHeader title="Account & preferences" />
+      <UiText variant="label">Display name</UiText>
+      <LifeInput tone="parchment" accessibilityLabel="Display name" value={displayName} onChangeText={setDisplayName} placeholder="Adventurer" />
+      <UiText variant="label">Time zone · Automatic</UiText>
+      <UiText>{timeZoneLabel(user?.timeZone ?? "UTC")}</UiText>
+      <UiText variant="caption" style={styles.secondary}>Follows your device’s time zone for task dates and reminders. No location access needed.</UiText>
+      <PrimaryButton title={saving ? "Saving…" : "Save settings"} onPress={saveProfile} disabled={saving || !displayName.trim()} />
+    </SurfaceCard>
+    <SurfaceCard framed style={styles.premium}>
+      <SectionHeader title={entitlement.loading ? "Checking plan…" : entitlement.premium ? "Premium" : "Free Plan"}
+        trailing={<MaterialCommunityIcons name="crown-outline" color={ui.colors.coin} size={24} accessible={false} />} />
+      <UiText variant="caption" style={styles.secondary}>{entitlement.premium ? "Ad-free" : "Your core productivity features are included."}</UiText>
+      {!!entitlement.error && <UiText accessibilityRole="alert" style={styles.secondary}>{entitlement.error}</UiText>}
+      <PrimaryButton title={entitlement.premium ? "View Premium" : "Upgrade to Premium"} onPress={() => router.push("/premium")} />
+    </SurfaceCard>
+    <NotificationSettings tone="parchment" timeZone={user?.timeZone ?? "UTC"} />
+    <SurfaceCard framed style={styles.section}>
+      <SectionHeader title="Account actions" />
+      <SecondaryButton title={loggingOut ? "Signing out…" : "Logout"} onPress={handleLogout} disabled={loggingOut} />
+      <View style={styles.destructive}>
+        <UiText variant="label" style={styles.danger}>Delete Account</UiText>
+        <UiText variant="caption" style={styles.secondary}>Permanently delete your account, game progress, tasks, purchases, and settings. This does not cancel Apple or Google subscription billing.</UiText>
+        <DestructiveButton title={deletingAccount ? "Deleting Account…" : "Delete Account"} onPress={confirmAccountDeletion} disabled={deletingAccount || loggingOut} />
       </View>
-
-      <LifeCard style={styles.profileCard}>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarInitial}>
-            {(user?.username?.[0] ?? "H").toUpperCase()}
-          </Text>
-        </View>
-
-        <Text style={styles.username}>{user?.username ?? "Hero"}</Text>
-        <Text style={styles.email}>{user?.email ?? "No email found"}</Text>
-      </LifeCard>
-
-      <LifeCard>
-        <Text style={styles.cardTitle}>Progress</Text>
-
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Level</Text>
-          <Text style={styles.statValue}>{level}</Text>
-        </View>
-
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Total XP</Text>
-          <Text style={styles.statValue}>{totalXp}</Text>
-        </View>
-
-        <View style={styles.xpBarWrapper}>
-          <XPBar progress={xpProgress} />
-        </View>
-        <Text style={styles.helper}>{xpIntoLevel} / {xpForNextLevel} XP</Text>
-      </LifeCard>
-
-      <LifeCard>
-        <Text style={styles.cardTitle}>Profile settings</Text>
-
-        <Text style={styles.statLabel}>Display name</Text>
-        <LifeInput value={displayName} onChangeText={setDisplayName} placeholder="Adventurer" />
-
-        <Text style={styles.statLabel}>Time zone</Text>
-        <LifeInput value={timeZone} onChangeText={setTimeZone} placeholder="America/New_York" autoCapitalize="none" />
-        <Text style={styles.helper}>Use an IANA time zone. Task dates and reminders use this setting.</Text>
-
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Email</Text>
-          <Text style={styles.statValue}>{user?.email}</Text>
-        </View>
-
-        <LifeButton title={saving ? "Saving…" : "Save settings"} onPress={saveProfile} disabled={saving || !displayName.trim() || !timeZone.trim()} />
-      </LifeCard>
-
-      <NotificationSettings timeZone={user?.timeZone ?? "UTC"} />
-
-      <LifeCard>
-        <Text accessibilityRole="header" style={styles.cardTitle}>{entitlement.loading ? "Checking plan…" : entitlement.premium ? "Premium" : "Free Plan"}</Text>
-        <Text style={styles.helper}>{entitlement.premium ? "Ad-free" : "Your core productivity features are included."}</Text>
-        {!!entitlement.error && <Text accessibilityRole="alert" style={styles.helper}>{entitlement.error}</Text>}
-        <LifeButton title={entitlement.premium ? "View Premium" : "Upgrade to Premium"} variant="secondary" onPress={() => router.push("/premium")} />
-      </LifeCard>
-
-      <LifeButton title={loggingOut ? "Signing out…" : "Logout"} variant="danger" onPress={handleLogout} disabled={loggingOut} />
-
-      <LifeCard>
-        <Text style={styles.cardTitle}>Delete Account</Text>
-        <Text style={styles.helper}>Permanently delete your account, game progress, tasks, purchases, and settings. This does not cancel Apple or Google subscription billing.</Text>
-        <LifeButton
-          title={deletingAccount ? "Deleting Account…" : "Delete Account"}
-          variant="danger"
-          onPress={confirmAccountDeletion}
-          disabled={deletingAccount || loggingOut}
-        />
-      </LifeCard>
-    </ScrollView>
-  );
+    </SurfaceCard>
+  </ScreenShell>;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-
-  content: {
-    padding: spacing.lg,
-    paddingBottom: 120,
-    gap: spacing.lg,
-  },
-
-  title: {
-    color: colors.text,
-    fontSize: 30,
-    fontWeight: "700",
-  },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    flexWrap: "wrap",
-  },
-
-  homeButton: {
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-
-  homeButtonText: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-
-  buttonPressed: {
-    backgroundColor: colors.cardLight,
-  },
-
-  profileCard: {
-    alignItems: "center",
-  },
-
-  avatarCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.cardLight,
-    borderWidth: 1,
-    borderColor: colors.border,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: spacing.md,
-  },
-
-  avatarInitial: {
-    color: colors.text,
-    fontSize: 36,
-    fontWeight: "700",
-  },
-
-  username: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: "700",
-  },
-
-  email: {
-    color: colors.mutedText,
-    fontSize: 15,
-    marginTop: 4,
-  },
-
-  cardTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: spacing.md,
-  },
-
-  statRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-    justifyContent: "space-between",
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-
-  statLabel: {
-    color: colors.mutedText,
-    fontSize: 15,
-    fontWeight: "500",
-  },
-
-  statValue: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: "600",
-    flex: 1,
-    textAlign: "right",
-  },
-
-  xpBarWrapper: {
-    marginTop: spacing.md,
-  },
-  helper: {
-    color: colors.mutedText,
-    fontSize: 13,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
-  },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: ui.spacing.sm },
+  back: { paddingHorizontal: ui.spacing.md },
+  identity: { flexDirection: "row", alignItems: "center", gap: ui.spacing.md, paddingVertical: ui.spacing.lg },
+  initial: { width: 52, height: 52, borderRadius: ui.radius.pill, backgroundColor: ui.colors.primaryPressed, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: ui.colors.gold },
+  onPrimary: { color: ui.colors.onPrimary },
+  identityCopy: { flex: 1, gap: ui.spacing.xs },
+  section: { gap: ui.spacing.sm },
+  statRow: { flexDirection: "row", justifyContent: "space-between", flexWrap: "wrap", gap: ui.spacing.sm },
+  secondary: { color: ui.colors.secondaryText },
+  premium: { gap: ui.spacing.sm, borderLeftWidth: 0, borderLeftColor: ui.colors.gold },
+  destructive: { paddingTop: ui.spacing.md, borderTopWidth: 1, borderTopColor: ui.colors.divider, gap: ui.spacing.sm },
+  danger: { color: ui.colors.danger },
 });

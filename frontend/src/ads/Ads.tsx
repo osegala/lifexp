@@ -1,3 +1,4 @@
+import GameNotice from "../components/ui/GameNotice";
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { usePathname } from "expo-router";
@@ -83,8 +84,8 @@ export function RewardedAdButton({ onReward }: { onReward?: (result: RewardedAdR
     <Text style={styles.copy}>Optional · {REWARDED_AD_COINS} coins per confirmed ad.{ads.mode === "placeholder" ? " No ad network is connected." : " Rewards require server verification."}</Text>
     <Text style={styles.copy}>{ads.rewardedAdsRemainingToday === null ? "Daily allowance has not been confirmed."
       : `${ads.rewardedAdsRemainingToday} ad rewards remaining today · ${ads.status?.timeZone}`}</Text>
-    {ads.error ? <Text accessibilityRole="alert" style={styles.copy}>{ads.error}</Text> : null}
-    {ads.message ? <Text accessibilityRole="text" accessibilityLiveRegion="polite" style={styles.copy}>{ads.message}</Text> : null}
+    {ads.error ? <GameNotice title="Ad reward status" message={ads.error} variant="error" /> : null}
+    {ads.message ? <GameNotice title="Ad reward status" message={ads.message} variant="info" /> : null}
     {ready ? <>
       <Text style={styles.copy}>{ads.mode === "placeholder" ? "DEV simulation ready. Closing this without completing grants no coins." : "Waiting for verified server confirmation. No coins have been added locally."}</Text>
       <LifeButton title={ads.phase === "claiming" ? "Verifying reward…" : ads.mode === "placeholder" ? "Complete DEV rewarded ad" : "Retry reward verification"} disabled={ads.rewardedAdLoading}

@@ -1,5 +1,6 @@
+import premiumCollection from "../../assets/avatar/v2/premium-collection.json";
 import { useMemo, useState } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { Platform, View, useWindowDimensions } from "react-native";
 import { NavigationContainer } from "expo-router/react-navigation";
 import { createBottomTabNavigator } from "expo-router/js-tabs";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,11 +26,12 @@ const shop: ShopResponse = { player: { coins: 284, level: 6 }, items: [
   gear("forest_ranger_boots", "Forest Ranger Boots", "boots", "avatar-v2/boots/forest-ranger-boots"),
   gear("forestbound_dress", "Forestbound Dress", "tunic", "avatar-v2/dresses/forest-ranger"),
   gear("castle_garden", "Castle Garden", "background", "avatar-v2/backgrounds/castle-garden"),
-  { ...gear("grand_library", "Grand Library", "background", "avatar-v2/backgrounds/grand-library"), requiresPremium: true },
+  gear("grand_library", "Grand Library", "background", "avatar-v2/backgrounds/grand-library"),
   gear("ember_drake", "Ember Drake", "pet", "avatar-v2/pets/ember-drake"),
   gear("verdant_wisps", "Verdant Wisps", "aura", "avatar-v2/auras/verdant-wisps"),
   { ...gear("forestbound_cap", "Forestbound Cap", "hat", "avatar-v2/hats/forest-ranger-hat"), owned: false, unlocked: false,
     status: "LOCKED", effectiveRequiredLevel: 9, canPurchase: false },
+  ...premiumCollection.map(item => ({ ...gear(item.itemId, item.name, item.category, item.assetKey), requiresPremium: true })),
 ] };
 const equipment: InventoryEquipment = { tunic: "starweaver_tunic", pants: "forest_ranger_trousers", boots: "forest_ranger_boots",
   background: "castle_garden", hair: null, hat: null, pet: "ember_drake", aura: "verdant_wisps" };
@@ -37,10 +39,20 @@ const initial: InventoryResponse = { equipped: equipment, items: shop.items.filt
   itemId: item.itemId, name: item.name, category: item.category, assetKey: item.assetKey, purchasedAt: null, purchasePrice: 0,
   equipped: Object.values(equipment).includes(item.itemId),
 })) };
+function premiumInventory(set: string, dress: boolean, scene = "premium_starwatch_terrace", aura: string | null = "premium_lunar_veil", pet: string | null = "premium_mooncrystal_fawn") {
+  const find = (kind: string) => premiumCollection.find(item => item.set === set && item.kind === kind)?.itemId;
+  if (!find("tops")) return initial;
+  const equipped: InventoryEquipment = { ...equipment, tunic: find(dress ? "dresses" : "tops")!, pants: find("bottoms")!, hat: find("hats")!, boots: find("boots")!, background: scene, aura, pet };
+  return { ...initial, equipped, items: initial.items.map(item => ({ ...item, equipped: Object.values(equipped).includes(item.itemId) })) };
+}
+const params = () => new URLSearchParams(Platform.OS === "web" ? window.location.search : "");
 const slots: Record<CosmeticType, keyof InventoryEquipment> = { HAIR: "hair", HAT: "hat", TOP: "tunic", BOTTOM: "pants", BOOTS: "boots", BACKGROUND: "background", PET: "pet", AURA: "aura" };
 function PreviewAvatar() {
   const [mode, setMode] = useState("Normal"), [controls, setControls] = useState(true);
-  const [inventory, setInventory] = useState(initial), [appearance, setAppearance] = useState<AvatarAppearance>(DEFAULT_APPEARANCE);
+  const [inventory, setInventory] = useState(() => params().has("look") ? premiumInventory(params().get("look")!, params().get("outfit") === "dress",
+    params().get("scene") ?? undefined, params().get("aura") === "none" ? null : params().get("aura") ?? undefined,
+    params().get("pet") === "none" ? null : params().get("pet") ?? undefined) : initial);
+  const [appearance, setAppearance] = useState<AvatarAppearance>(() => ({ ...DEFAULT_APPEARANCE, bodyType: params().get("body") === "GIRL" ? "GIRL" : "BOY" }));
   const [saved, setSaved] = useState(appearance), [editing, setEditing] = useState(false), [discard, setDiscard] = useState(false);
   const [selectedType, setSelectedType] = useState<CosmeticType>("HAIR"), [previewAll, setPreviewAll] = useState(false);
   const [loadingId, setLoadingId] = useState<string | number | null>(null), [saving, setSaving] = useState(false);
@@ -48,6 +60,7 @@ function PreviewAvatar() {
   const cosmetics = useMemo(() => wardrobeCosmetics(shop, inventory, getCosmeticAssetIds("hair"), appearance.hairId, getCosmeticAssetMetadata), [inventory, appearance]);
   const avatar = avatarFromInventory(inventory, appearance);
   const dirty = JSON.stringify(appearance) !== JSON.stringify(saved);
+  function premiumLook(set: string, dress: boolean) { setInventory(premiumInventory(set, dress)); setSelectedType("TOP"); }
   function change(patch: Partial<AvatarAppearance>) { setAppearance(value => normalizeAppearance({ ...value, ...patch })); setError(""); }
   function equip(cosmetic: Cosmetic) {
     if (!previewAll && !cosmetic.unlocked) return;
@@ -69,11 +82,14 @@ function PreviewAvatar() {
   }
   function close() { if (!saving) { if (dirty) setDiscard(true); else setEditing(false); } }
   return <View style={{ flex: 1, backgroundColor: ui.colors.background }}>
-    <View style={{ padding: ui.spacing.sm, gap: ui.spacing.sm, borderBottomWidth: 1, borderBottomColor: ui.colors.border }}>
+    <View testID="avatar-review-controls" style={{ padding: ui.spacing.sm, gap: ui.spacing.sm, borderBottomWidth: 1, borderBottomColor: ui.colors.border }}>
       <UiText variant="caption">DEV Avatar shell review · fixture inventory · no account or network</UiText>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.xs }}>
         {controls && ["Normal", "Loading", "Error", "Empty hats", "Equipment failure", "Save failure", "Long name"].map(label =>
           <FilterChip key={label} label={label} selected={mode === label} onPress={() => { setMode(label); if (label === "Empty hats") setSelectedType("HAT"); }} />)}
+        {controls && ["rose_bard", "verdant_sovereign", "celestial_regent", "dawnfire_sovereign", "royal_wayfinder"].map(set =>
+          <View key={set} style={{ flexDirection: "row", gap: 4 }}><FilterChip label={`${set} tunic`} onPress={() => premiumLook(set, false)} />
+            <FilterChip label={`${set} dress`} onPress={() => premiumLook(set, true)} /></View>)}
         <FilterChip label={controls ? "Hide review controls" : "Show review controls"} onPress={() => setControls(value => !value)} />
       </View>
     </View>
@@ -82,7 +98,7 @@ function PreviewAvatar() {
       username={mode === "Long name" ? "Rowan the patient adventurer with a longer name" : "Rowan"} level={6}
       selectedType={selectedType} loading={mode === "Loading"} loadingId={loadingId}
       loadError={mode === "Error" ? "Could not refresh your wardrobe. Showing your last confirmed look." : ""}
-      equipmentError={equipmentError} premiumItemIds={["grand_library"]} previewAllCosmetics={previewAll} canPreview
+      equipmentError={equipmentError} premiumItemIds={premiumCollection.map(item => item.itemId)} premiumAvailable previewAllCosmetics={previewAll} canPreview
       editingAppearance={editing} confirmDiscardAppearance={discard} draftAppearance={appearance}
       appearanceDirty={dirty} savingAppearance={saving} appearanceSaveError={error}
       onType={setSelectedType} onEquip={equip} onRetry={() => setMode("Normal")}

@@ -2,8 +2,6 @@ import { Amplify } from "aws-amplify";
 import {
   confirmSignUp,
   fetchAuthSession,
-  fetchUserAttributes,
-  getCurrentUser,
   signIn,
   signOut,
   signUp,
@@ -39,11 +37,13 @@ Amplify.configure({
 
 async function getSession(forceRefresh = false): Promise<CognitoIdentity | null> {
   const session = await fetchAuthSession({ forceRefresh });
-  const token = session.tokens?.idToken?.toString();
-  if (!token) return null;
+  const idToken = session.tokens?.idToken;
+  if (!idToken || typeof idToken.payload.sub !== "string" || !idToken.payload.sub) return null;
 
-  const [user, attributes] = await Promise.all([getCurrentUser(), fetchUserAttributes()]);
-  return { token, userId: user.userId, email: attributes.email ?? "" };
+  // Amplify restores/refreshes the token. Its subject is the same account ID
+  // getCurrentUser uses; fetching attributes would add a network gate to startup.
+  return { token: idToken.toString(), userId: idToken.payload.sub,
+    email: typeof idToken.payload.email === "string" ? idToken.payload.email : "" };
 }
 
 export const cognitoAuth: CognitoAuth = {

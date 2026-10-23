@@ -1,0 +1,64 @@
+[
+  {
+    "brokenImages": 0,
+    "coins": {
+      "bottom": 38,
+      "height": 30,
+      "left": 221.3125,
+      "right": 295.65625,
+      "top": 8,
+      "width": 74.34375,
+      "x": 221.3125,
+      "y": 8
+    },
+    "documentWidth": 390,
+    "headings": [],
+    "selectedTab": "\udb80\udd1a\udb80\udd1aBase",
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "worldPoints": {
+      "bottom": 38,
+      "height": 30,
+      "left": 299.65625,
+      "right": 374,
+      "top": 8,
+      "width": 74.34375,
+      "x": 299.65625,
+      "y": 8
+    },
+    "buildingControlsObservedInAccessibilityTree": 6
+  },
+  {
+    "brokenImages": 0,
+    "coins": {
+      "bottom": 38,
+      "height": 30,
+      "left": 261.3125,
+      "right": 335.65625,
+      "top": 8,
+      "width": 74.34375,
+      "x": 261.3125,
+      "y": 8
+    },
+    "documentWidth": 430,
+    "headings": [],
+    "selectedTab": "\udb80\udd1a\udb80\udd1aBase",
+    "viewport": {
+      "height": 932,
+      "width": 430
+    },
+    "worldPoints": {
+      "bottom": 38,
+      "height": 30,
+      "left": 339.65625,
+      "right": 414,
+      "top": 8,
+      "width": 74.34375,
+      "x": 339.65625,
+      "y": 8
+    },
+    "buildingControlsObservedInAccessibilityTree": 6
+  }
+]

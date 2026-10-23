@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, Animated, Easing, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { api } from "../api/client";
 import { apiRoutes } from "../api/routes";
 import { completionAnnouncement, completionFrame, questCompletionMessages } from "../feedback/completion";
 import type { CompletionEvent } from "../feedback/completion";
 import type { AchievementsResponse } from "../types";
-import { colors, radius, spacing } from "../theme/theme";
-import CompletionScene from "./CompletionScene";
+import { setGameFeedbackActive } from "../feedback/notices";
+import GameNotice, { GameNoticeOverlay } from "./ui/GameNotice";
 import XPBar from "./XPBar";
 
 export default function CompletionFeedback({ event, onDone }: {
@@ -23,11 +23,12 @@ export default function CompletionFeedback({ event, onDone }: {
 
   useEffect(() => {
     let active = true;
+    setGameFeedbackActive("completion", true);
     void AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active) setReducedMotion(value); })
       .catch(() => { if (active) setReducedMotion(true); });
     const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReducedMotion);
     if (Platform.OS !== "web") AccessibilityInfo.announceForAccessibility(announcement);
-    return () => { active = false; subscription.remove(); };
+    return () => { active = false; subscription.remove(); setGameFeedbackActive("completion", false); };
   }, [announcement]);
 
   useEffect(() => {
@@ -50,61 +51,34 @@ export default function CompletionFeedback({ event, onDone }: {
     return () => { active = false; };
   }, [newAchievements]);
 
-  return (
-    <View pointerEvents="box-none" style={styles.overlay}>
-      <View style={styles.card}>
-        <View style={styles.header}>
-          <Text style={styles.eyebrow}>✓ TASK COMPLETE</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Dismiss completion feedback" onPress={() => onDone(event.id)} style={styles.dismiss}>
-            <Text style={styles.dismissText}>×</Text>
-          </Pressable>
-        </View>
-        <View style={styles.row}>
-          <CompletionScene progress={progress} reducedMotion={reducedMotion !== false} />
-          <View style={styles.copy}>
-            <Text numberOfLines={2} style={styles.title}>{task.title}</Text>
-            <Text style={styles.rewards}>+{rewards.xp} XP · +{rewards.coins} coins</Text>
-            <Text style={styles.caption}>{frame.leveledUp ? "Level Up! · " : ""}Level {frame.level}</Text>
-            <View accessibilityRole="progressbar" accessibilityLabel="Level experience" accessibilityValue={{ min: 0, max: 100, now: Math.round(frame.progress * 100) }}>
-              <XPBar progress={frame.progress} />
-            </View>
-            <Text style={styles.caption}>{frame.coins} coins total{rewards.worldPoints ? ` · +${rewards.worldPoints} World Points` : ""}</Text>
-          </View>
-        </View>
-        {questMessages.map(message => <Text key={message} style={styles.achievementName}>{message}</Text>)}
-        {typeof event.response.player.worldPoints === "number" && <Text style={styles.caption}>
-          {event.response.player.worldPoints} World Points total
-        </Text>}
-        {!!newAchievements.length && <ScrollView style={styles.achievements}>
-          {newAchievements.map(achievement => <View key={achievement.achievementId} style={styles.achievement}>
-            <Text style={styles.achievementName}>✦ {achievement.name}</Text>
-            <Text style={styles.caption}>{rewardNames[achievement.achievementId]?.length
-              ? `Achievement requirement met: ${rewardNames[achievement.achievementId].join(", ")}. Check Shop to purchase; not automatically owned or equipped.`
-              : "Achievement earned. Check Shop for related cosmetic requirements."}</Text>
-          </View>)}
-        </ScrollView>}
-        <Text style={styles.worldNote}>A little brighter in Evrenthia</Text>
-        <Text style={styles.xpTotal}>After completion: {progression.xpIntoLevel} / {progression.xpForNextLevel} XP · Level {progression.level}</Text>
+  return <GameNoticeOverlay placement="lower">
+    <GameNotice title="Task Complete" message={task.title} variant="success" announce={false}
+      duration={questMessages.length ? 5500 : 2800} dismissLabel="Dismiss completion feedback" onDismiss={() => onDone(event.id)}
+      rewards={{ xp: rewards.xp, coins: rewards.coins, ...(rewards.worldPoints ? { worldPoints: rewards.worldPoints } : {}) }}>
+      <View style={styles.progressRow}>
+        <Text style={styles.caption}>{frame.leveledUp ? "Level Up! · " : ""}Level {frame.level}</Text>
+        <View style={styles.bar}><XPBar tone="parchment" label="Level experience" progress={frame.progress} style={{ height: 5 }} /></View>
       </View>
-    </View>
-  );
+      <Text style={styles.caption}>{frame.coins} coins total{typeof event.response.player.worldPoints === "number" ? ` · ${event.response.player.worldPoints} World Points total` : ""}</Text>
+      {questMessages.map(message => <Text key={message} style={styles.achievementName}>{message}</Text>)}
+      {!!newAchievements.length && <ScrollView style={styles.achievements}>
+        {newAchievements.map(achievement => <View key={achievement.achievementId} style={styles.achievement}>
+          <Text style={styles.achievementName}>✦ {achievement.name}</Text>
+          <Text style={styles.caption}>{rewardNames[achievement.achievementId]?.length
+            ? `Achievement requirement met: ${rewardNames[achievement.achievementId].join(", ")}. Check Shop to purchase; not automatically owned or equipped.`
+            : "Achievement earned. Check Shop for related cosmetic requirements."}</Text>
+        </View>)}
+      </ScrollView>}
+      <Text style={styles.caption}>After completion: {progression.xpIntoLevel} / {progression.xpForNextLevel} XP · Level {progression.level}</Text>
+    </GameNotice>
+  </GameNoticeOverlay>;
 }
 
 const styles = StyleSheet.create({
-  overlay: { position: "absolute", top: spacing.sm, left: spacing.md, right: spacing.md, alignItems: "center", zIndex: 20 },
-  card: { width: "100%", maxWidth: 460, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.card, gap: spacing.sm },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  eyebrow: { color: colors.accent, fontSize: 12, fontWeight: "800", letterSpacing: 1 },
-  dismiss: { width: 44, height: 44, alignItems: "center", justifyContent: "center", margin: -spacing.sm },
-  dismissText: { color: colors.mutedText, fontSize: 26 },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  copy: { flex: 1, minWidth: 0, gap: spacing.xs },
-  title: { color: colors.text, fontWeight: "700", fontSize: 16 },
-  rewards: { color: colors.text, fontWeight: "800", fontSize: 18 },
-  caption: { color: colors.mutedText, fontSize: 12, lineHeight: 18 },
+  progressRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  bar: { flex: 1 },
+  caption: { color: "#E9DFC9", fontSize: 12, lineHeight: 17 },
   achievements: { maxHeight: 96 },
-  achievement: { paddingVertical: spacing.xs },
-  achievementName: { color: colors.accent, fontWeight: "700" },
-  worldNote: { color: colors.mutedText, fontSize: 11 },
-  xpTotal: { color: colors.mutedText, fontSize: 11 },
+  achievement: { paddingVertical: 3 },
+  achievementName: { color: "#F2D493", fontSize: 13, lineHeight: 19, fontWeight: "600" },
 });

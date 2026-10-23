@@ -1,0 +1,8 @@
+{
+  "suppliedBytes": 12253302,
+  "optimizedEightBytes": 3372360,
+  "allRuntimeMaterialBytes": 3566746,
+  "runtimeMaterialPngs": 10,
+  "uniqueRgbaPixelBudgetBytes": 11668624,
+  "note": "Pixel budget estimates unique decoded RGBA surfaces, not a measured native working set."
+}

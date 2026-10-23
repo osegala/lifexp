@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, Text, View } from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
 import { getBuildingImageSource } from "../base/buildingAssetRegistry";
 import { buildingUpgradeAnnouncement } from "../base/buildingProgress";
 import type { BuildingUpgrade, BuildingUpgradeBatch } from "../base/buildingProgress";
 import type { BuildingType } from "../types/progression";
-import { colors, radius, spacing, uiTheme as ui } from "../theme/theme";
-import { UiPressable } from "./ui/Primitives";
+import { colors, radius } from "../theme/theme";
+import { setGameFeedbackActive } from "../feedback/notices";
+import GameNotice, { GameNoticeOverlay } from "./ui/GameNotice";
 
 /** Only pass a batch while World is focused and its confirmed new artwork is loaded. */
 export function useBuildingUpgradePresentation(batch: BuildingUpgradeBatch | undefined, onDone: (id: string) => void) {
@@ -21,6 +22,7 @@ export function useBuildingUpgradePresentation(batch: BuildingUpgradeBatch | und
   }, []);
   useEffect(() => {
     if (!batch || reducedMotion === null) return;
+    setGameFeedbackActive("building-upgrade", true);
     progress.setValue(reducedMotion ? 1 : 0);
     if (Platform.OS !== "web") AccessibilityInfo.announceForAccessibility(buildingUpgradeAnnouncement(batch));
     const animation = Animated.timing(progress, {
@@ -28,7 +30,7 @@ export function useBuildingUpgradePresentation(batch: BuildingUpgradeBatch | und
     });
     if (!reducedMotion) animation.start();
     const timer = setTimeout(() => onDone(batch.id), 2800);
-    return () => { clearTimeout(timer); animation.stop(); progress.setValue(0); };
+    return () => { clearTimeout(timer); animation.stop(); progress.setValue(0); setGameFeedbackActive("building-upgrade", false); };
   }, [batch, onDone, progress, reducedMotion]);
   return { progress, reducedMotion: reducedMotion !== false };
 }
@@ -55,41 +57,28 @@ export function BuildingTierArtwork({ type, tier, upgrade, motion }: {
   </View>;
 }
 
-export default function BuildingUpgradeFeedback({ batch, motion, onDone, tone = "legacy", style }: {
+export default function BuildingUpgradeFeedback({ batch, motion, onDone, style }: {
   batch: BuildingUpgradeBatch; motion: Motion; onDone: (id: string) => void;
   tone?: "legacy" | "parchment"; style?: StyleProp<ViewStyle>;
 }) {
-  const Action = tone === "parchment" ? UiPressable : Pressable;
-  return <View pointerEvents="box-none" style={[styles.overlay, style]}>
-    <View style={[styles.card, tone === "parchment" && styles.parchmentCard]}>
-      <View style={styles.header}>
-        <Text style={[styles.eyebrow, tone === "parchment" && styles.parchmentText]}>✦ KINGDOM UPGRADED</Text>
-        <Action accessibilityRole="button" accessibilityLabel="Dismiss building upgrade" style={styles.dismiss}
-          onPress={() => onDone(batch.id)}><Text style={[styles.dismissText, tone === "parchment" && styles.parchmentText]}>×</Text></Action>
-      </View>
+  return <GameNoticeOverlay style={style}>
+    <GameNotice title="Kingdom Upgraded" variant="success" icon="castle" announce={false} duration={2800}
+      dismissLabel="Dismiss building upgrade" onDismiss={() => onDone(batch.id)}>
       {batch.upgrades.map(upgrade => <View key={upgrade.buildingId} style={styles.row}>
         <View style={styles.thumbnail} accessible={false}>
           <BuildingTierArtwork type={upgrade.buildingName} tier={upgrade.newTier} upgrade={upgrade} motion={motion} />
         </View>
-        <Text style={[styles.message, tone === "parchment" && styles.parchmentText]}>{upgrade.buildingName} reached Tier {upgrade.newTier}</Text>
+        <Text style={styles.message}>{upgrade.buildingName} reached Tier {upgrade.newTier}</Text>
       </View>)}
-    </View>
-  </View>;
+    </GameNotice>
+  </GameNoticeOverlay>;
 }
 
 const styles = StyleSheet.create({
   art: { width: "100%", height: "100%" },
   layer: { position: "absolute", inset: 0 },
   glow: { position: "absolute", inset: "10%", borderRadius: radius.pill, backgroundColor: colors.primary },
-  overlay: { position: "absolute", bottom: spacing.lg, left: spacing.md, right: spacing.md, alignItems: "center", zIndex: 1100 },
-  card: { width: "100%", maxWidth: 420, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.card, gap: spacing.xs },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  eyebrow: { color: colors.text, fontSize: 12, fontWeight: "800", letterSpacing: 1 },
-  dismiss: { width: 44, height: 44, margin: -spacing.sm, alignItems: "center", justifyContent: "center" },
-  dismissText: { color: colors.mutedText, fontSize: 26 },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  thumbnail: { width: 48, height: 48 },
-  message: { flex: 1, color: colors.text, fontSize: 15, fontWeight: "700" },
-  parchmentCard: { backgroundColor: ui.colors.surface, borderColor: ui.colors.border, borderRadius: ui.radius.md },
-  parchmentText: { color: ui.colors.text },
+  row: { flexDirection: "row", alignItems: "center", gap: 8 },
+  thumbnail: { width: 36, height: 36 },
+  message: { flex: 1, color: "#F0E7D4", fontSize: 13, lineHeight: 19 },
 });

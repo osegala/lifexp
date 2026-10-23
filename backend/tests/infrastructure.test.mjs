@@ -49,6 +49,48 @@ function resourceBlock(name) {
     return marker + (next < 0 ? remainder : remainder.slice(0, next));
 }
 
+test("TestFlight sandbox opt-in defaults off and is wired only to BillingFunction", () => {
+    const parameter = resourceBlock("RevenueCatSandboxInProdEnabled");
+    assert.match(parameter, /Type: String\n    Default: "false"\n    AllowedValues:\n      - "false"\n      - "true"\n    Description:/);
+    const billing = resourceBlock("BillingFunction");
+    assert.match(billing, /Environment:\n        Variables:[\s\S]*?REVENUECAT_SANDBOX_IN_PROD_ENABLED:\n            Ref: RevenueCatSandboxInProdEnabled/);
+    assert.equal((template.match(/REVENUECAT_SANDBOX_IN_PROD_ENABLED:/g) ?? []).length, 1);
+    assert.equal((template.match(/Ref: RevenueCatSandboxInProdEnabled/g) ?? []).length, 1);
+    assert.doesNotMatch(samconfig, /RevenueCatSandboxInProdEnabled/);
+    assert.doesNotMatch(template, /EXPO_PUBLIC_.*SANDBOX_IN_PROD/);
+    for (const file of ["app.config.js", "app.json", "eas.json", ".env.example", ".env.production.example"]) {
+        assert.doesNotMatch(readFileSync(`${repository}/frontend/${file}`, "utf8"), /SANDBOX_IN_PROD|SandboxInProd/, file);
+    }
+});
+
+test("RevenueCat product scalars build the BillingFunction JSON allowlist", () => {
+    assert.doesNotMatch(template, /\n  RevenueCatProducts:\n/);
+    for (const name of ["RevenueCatProductId", "RevenueCatAppId", "RevenueCatStoreIdentifier"]) {
+        assert.match(resourceBlock(name), /Type: String\n    Default: ""/);
+    }
+    assert.match(resourceBlock("RevenueCatStore"), /Type: String\n    Default: "app_store"\n    AllowedValues:\n      - "app_store"\n      - "play_store"/);
+
+    const billing = resourceBlock("BillingFunction");
+    const productJson = billing.match(/REVENUECAT_PRODUCTS: !Sub '([^']+)'/)?.[1];
+    assert.ok(productJson);
+    assert.equal((template.match(/REVENUECAT_PRODUCTS:/g) ?? []).length, 1);
+    assert.deepEqual(JSON.parse(productJson
+        .replace("${RevenueCatProductId}", "prod13ca64f713")
+        .replace("${RevenueCatAppId}", "app1cdc79444d")
+        .replace("${RevenueCatStoreIdentifier}", "evrenthia_premium_monthly")
+        .replace("${RevenueCatStore}", "app_store")), [{
+        id: "prod13ca64f713",
+        appId: "app1cdc79444d",
+        storeIdentifier: "evrenthia_premium_monthly",
+        store: "app_store",
+    }]);
+
+    for (const file of ["app.config.js", "app.json", "eas.json", ".env.example", ".env.production.example"]) {
+        assert.doesNotMatch(readFileSync(`${repository}/frontend/${file}`, "utf8"),
+            /EXPO_PUBLIC_REVENUECAT_(?:PRODUCT_ID|APP_ID|STORE_IDENTIFIER|STORE)/, file);
+    }
+});
+
 test("all Lambda log groups use environment-scoped names and retention", () => {
     assert.match(template, /LoggingConfig:\n\s+LogFormat: JSON\n\s+ApplicationLogLevel: INFO\n\s+SystemLogLevel: WARN/);
     assert.match(template, /LogRetentionDays:[\s\S]*?Default: 14[\s\S]*?Description: CloudWatch Logs retention period/);

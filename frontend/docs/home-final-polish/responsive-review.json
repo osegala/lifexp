@@ -1,0 +1,446 @@
+[
+  {
+    "brokenImages": 0,
+    "characterCanvas": {
+      "bottom": 399.5,
+      "height": 288,
+      "left": 27,
+      "right": 315,
+      "top": 111.5,
+      "width": 288,
+      "x": 27,
+      "y": 111.5
+    },
+    "coins": {
+      "bottom": 107,
+      "height": 26,
+      "left": 247.3125,
+      "right": 312.65625,
+      "top": 81,
+      "width": 65.34375,
+      "x": 247.3125,
+      "y": 81
+    },
+    "documentWidth": 390,
+    "header": {
+      "bottom": 81,
+      "height": 81,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "headerPaddingTop": "16px",
+    "hero": {
+      "bottom": 440,
+      "height": 440,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "journal": {
+      "bottom": 735,
+      "height": 279,
+      "left": 16,
+      "right": 374,
+      "top": 456,
+      "width": 358,
+      "x": 16,
+      "y": 456
+    },
+    "profile": {
+      "bottom": 62.5,
+      "height": 36,
+      "left": 334,
+      "right": 370,
+      "top": 26.5,
+      "width": 36,
+      "x": 334,
+      "y": 26.5
+    },
+    "rows": [
+      {
+        "label": "Read a chapter, Due today · 12:00 PM · +35 XP · +4 coins",
+        "rect": {
+          "bottom": 570,
+          "height": 51,
+          "left": 26,
+          "right": 364,
+          "top": 519,
+          "width": 338,
+          "x": 26,
+          "y": 519
+        }
+      },
+      {
+        "label": "Take an afternoon walk, Due today · 4:00 PM · +35 XP · +4 coins",
+        "rect": {
+          "bottom": 624,
+          "height": 51,
+          "left": 26,
+          "right": 364,
+          "top": 573,
+          "width": 338,
+          "x": 26,
+          "y": 573
+        }
+      },
+      {
+        "label": "Plan tomorrow, Due today · 8:00 PM · +35 XP · +4 coins",
+        "rect": {
+          "bottom": 678,
+          "height": 51,
+          "left": 26,
+          "right": 364,
+          "top": 627,
+          "width": 338,
+          "x": 26,
+          "y": 627
+        }
+      }
+    ],
+    "scene": {
+      "bottom": 400,
+      "height": 400,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "tabs": [
+      {
+        "label": "󰋞󰮧Home",
+        "rect": {
+          "bottom": 840,
+          "height": 56,
+          "left": 6,
+          "right": 78.3984375,
+          "top": 784,
+          "width": 72.3984375,
+          "x": 6,
+          "y": 784
+        },
+        "selected": "true"
+      },
+      {
+        "label": "󰝖󰝖Tasks",
+        "rect": {
+          "bottom": 840,
+          "height": 56,
+          "left": 82.3984375,
+          "right": 154.8046875,
+          "top": 784,
+          "width": 72.40625,
+          "x": 82.3984375,
+          "y": 784
+        },
+        "selected": "false"
+      },
+      {
+        "label": "󰄚󰄚Base",
+        "rect": {
+          "bottom": 840,
+          "height": 56,
+          "left": 158.8046875,
+          "right": 231.203125,
+          "top": 784,
+          "width": 72.3984375,
+          "x": 158.8046875,
+          "y": 784
+        },
+        "selected": "false"
+      },
+      {
+        "label": "󰀄󰀓Avatar",
+        "rect": {
+          "bottom": 840,
+          "height": 56,
+          "left": 235.203125,
+          "right": 307.6015625,
+          "top": 784,
+          "width": 72.3984375,
+          "x": 235.203125,
+          "y": 784
+        },
+        "selected": "false"
+      },
+      {
+        "label": "󰒚󱇕Shop",
+        "rect": {
+          "bottom": 840,
+          "height": 56,
+          "left": 311.6015625,
+          "right": 384,
+          "top": 784,
+          "width": 72.3984375,
+          "x": 311.6015625,
+          "y": 784
+        },
+        "selected": "false"
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "worldPoints": {
+      "bottom": 107,
+      "height": 26,
+      "left": 316.65625,
+      "right": 382,
+      "top": 81,
+      "width": 65.34375,
+      "x": 316.65625,
+      "y": 81
+    },
+    "xpBar": {
+      "bottom": 431.5,
+      "height": 5,
+      "left": 61.28125,
+      "right": 382,
+      "top": 426.5,
+      "width": 320.71875,
+      "x": 61.28125,
+      "y": 426.5
+    },
+    "xpStrip": {
+      "bottom": 439,
+      "height": 39,
+      "left": 0,
+      "right": 390,
+      "top": 400,
+      "width": 390,
+      "x": 0,
+      "y": 400
+    }
+  },
+  {
+    "brokenImages": 0,
+    "characterCanvas": {
+      "bottom": 399.5,
+      "height": 288,
+      "left": 47,
+      "right": 335,
+      "top": 111.5,
+      "width": 288,
+      "x": 47,
+      "y": 111.5
+    },
+    "coins": {
+      "bottom": 107,
+      "height": 26,
+      "left": 287.3125,
+      "right": 352.65625,
+      "top": 81,
+      "width": 65.34375,
+      "x": 287.3125,
+      "y": 81
+    },
+    "documentWidth": 430,
+    "header": {
+      "bottom": 81,
+      "height": 81,
+      "left": 0,
+      "right": 430,
+      "top": 0,
+      "width": 430,
+      "x": 0,
+      "y": 0
+    },
+    "headerPaddingTop": "16px",
+    "hero": {
+      "bottom": 440,
+      "height": 440,
+      "left": 0,
+      "right": 430,
+      "top": 0,
+      "width": 430,
+      "x": 0,
+      "y": 0
+    },
+    "journal": {
+      "bottom": 735,
+      "height": 279,
+      "left": 16,
+      "right": 414,
+      "top": 456,
+      "width": 398,
+      "x": 16,
+      "y": 456
+    },
+    "profile": {
+      "bottom": 62.5,
+      "height": 36,
+      "left": 374,
+      "right": 410,
+      "top": 26.5,
+      "width": 36,
+      "x": 374,
+      "y": 26.5
+    },
+    "rows": [
+      {
+        "label": "Read a chapter, Due today · 12:00 PM · +35 XP · +4 coins",
+        "rect": {
+          "bottom": 570,
+          "height": 51,
+          "left": 26,
+          "right": 404,
+          "top": 519,
+          "width": 378,
+          "x": 26,
+          "y": 519
+        }
+      },
+      {
+        "label": "Take an afternoon walk, Due today · 4:00 PM · +35 XP · +4 coins",
+        "rect": {
+          "bottom": 624,
+          "height": 51,
+          "left": 26,
+          "right": 404,
+          "top": 573,
+          "width": 378,
+          "x": 26,
+          "y": 573
+        }
+      },
+      {
+        "label": "Plan tomorrow, Due today · 8:00 PM · +35 XP · +4 coins",
+        "rect": {
+          "bottom": 678,
+          "height": 51,
+          "left": 26,
+          "right": 404,
+          "top": 627,
+          "width": 378,
+          "x": 26,
+          "y": 627
+        }
+      }
+    ],
+    "scene": {
+      "bottom": 400,
+      "height": 400,
+      "left": 0,
+      "right": 430,
+      "top": 0,
+      "width": 430,
+      "x": 0,
+      "y": 0
+    },
+    "tabs": [
+      {
+        "label": "󰋞󰮧Home",
+        "rect": {
+          "bottom": 928,
+          "height": 56,
+          "left": 6,
+          "right": 86.3984375,
+          "top": 872,
+          "width": 80.3984375,
+          "x": 6,
+          "y": 872
+        },
+        "selected": "true"
+      },
+      {
+        "label": "󰝖󰝖Tasks",
+        "rect": {
+          "bottom": 928,
+          "height": 56,
+          "left": 90.3984375,
+          "right": 170.8046875,
+          "top": 872,
+          "width": 80.40625,
+          "x": 90.3984375,
+          "y": 872
+        },
+        "selected": "false"
+      },
+      {
+        "label": "󰄚󰄚Base",
+        "rect": {
+          "bottom": 928,
+          "height": 56,
+          "left": 174.8046875,
+          "right": 255.203125,
+          "top": 872,
+          "width": 80.3984375,
+          "x": 174.8046875,
+          "y": 872
+        },
+        "selected": "false"
+      },
+      {
+        "label": "󰀄󰀓Avatar",
+        "rect": {
+          "bottom": 928,
+          "height": 56,
+          "left": 259.203125,
+          "right": 339.6015625,
+          "top": 872,
+          "width": 80.3984375,
+          "x": 259.203125,
+          "y": 872
+        },
+        "selected": "false"
+      },
+      {
+        "label": "󰒚󱇕Shop",
+        "rect": {
+          "bottom": 928,
+          "height": 56,
+          "left": 343.6015625,
+          "right": 424,
+          "top": 872,
+          "width": 80.3984375,
+          "x": 343.6015625,
+          "y": 872
+        },
+        "selected": "false"
+      }
+    ],
+    "viewport": {
+      "height": 932,
+      "width": 430
+    },
+    "worldPoints": {
+      "bottom": 107,
+      "height": 26,
+      "left": 356.65625,
+      "right": 422,
+      "top": 81,
+      "width": 65.34375,
+      "x": 356.65625,
+      "y": 81
+    },
+    "xpBar": {
+      "bottom": 431.5,
+      "height": 5,
+      "left": 61.28125,
+      "right": 422,
+      "top": 426.5,
+      "width": 360.71875,
+      "x": 61.28125,
+      "y": 426.5
+    },
+    "xpStrip": {
+      "bottom": 439,
+      "height": 39,
+      "left": 0,
+      "right": 430,
+      "top": 400,
+      "width": 430,
+      "x": 0,
+      "y": 400
+    }
+  }
+]

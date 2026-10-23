@@ -35,11 +35,17 @@ export const shadow = {
   elevation: 2,
 };
 
-// Phase 1: opt-in parchment surfaces; no global recoloring of game scenes/modals.
+// Shared Evrenthia surfaces. Scene/renderer colors above remain independent.
 export const uiTheme = {
   colors: {
     background: "#F3EBDC",
-    surface: "#FBF6EC",
+    sky: "#DDE8E9",
+    ivory: "#F8F1E3",
+    parchment: "#EBD8B9",
+    surface: "#FBF3E3",
+    paperInset: "#F5E8D0",
+    sceneShade: "rgba(29, 41, 35, 0.88)",
+    scrim: "rgba(4, 10, 8, 0.72)",
     elevated: "#FFFCF5",
     stone: "#E8DFD0",
     primary: "#2E503D",
@@ -65,9 +71,9 @@ export const uiTheme = {
     coinSurface: "#F4E5BF",
     gem: "#305C79",
     gemSurface: "#E1EBEF",
-    xp: "#4B7895",
-    xpTrack: "#E0E4DE",
-    focus: "#3B5F7D",
+    xp: "#83BCD6",
+    xpTrack: "#35423C",
+    focus: "#8A642E",
     navigation: "#1D2923",
     navigationSelected: "#344F3D",
     navigationText: "#CFC7B8",
@@ -81,9 +87,9 @@ export const uiTheme = {
     body: { ios: "System", android: "sans-serif", default: "system-ui, sans-serif" },
   },
   type: {
-    display: { fontSize: 30, lineHeight: 38, fontWeight: "400" },
+    display: { fontSize: 30, lineHeight: 36, fontWeight: "400" },
     section: { fontSize: 21, lineHeight: 28, fontWeight: "400" },
-    body: { fontSize: 16, lineHeight: 24, fontWeight: "400" },
+    body: { fontSize: 16, lineHeight: 23, fontWeight: "400" },
     label: { fontSize: 15, lineHeight: 22, fontWeight: "600" },
     caption: { fontSize: 13, lineHeight: 19, fontWeight: "400" },
     tab: { fontSize: 12, lineHeight: 16, fontWeight: "600" },

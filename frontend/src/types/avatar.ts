@@ -52,6 +52,9 @@ export type Cosmetic = {
   fullOutfit?: boolean;
   shopStatus?: "LOCKED" | "PURCHASABLE" | "NOT_ENOUGH_COINS" | "OWNED";
   requirementText?: string | null;
+  requiresPremium?: boolean;
+  /** A zero-price claim permitted by the server catalog; never implies ownership. */
+  claimable?: boolean;
 };
 
 export type InventoryEquipment = {

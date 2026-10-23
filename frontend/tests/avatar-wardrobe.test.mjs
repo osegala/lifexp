@@ -232,16 +232,16 @@ test("Shop and Avatar share canonical catalog category and asset mapping", () =>
   const shopScreen = readFileSync(new URL("../src/components/ShopItemCard.tsx", import.meta.url), "utf8");
   const avatarScreen = readFileSync(new URL("../app/(tabs)/avatar.tsx", import.meta.url), "utf8");
   assert.match(shopScreen, /catalogCosmeticReference\(item\)/);
-  assert.match(avatarScreen, /api\.get<ShopResponse>\(apiRoutes\.shop\)/);
-  assert.match(avatarScreen, /api\.get<InventoryResponse>\(apiRoutes\.inventory\)/);
+  assert.match(avatarScreen, /api\.get<ShopResponse>\(apiRoutes\.shop, config\)/);
+  assert.match(avatarScreen, /api\.get<InventoryResponse>\(apiRoutes\.inventory, config\)/);
 });
 
 test("production ownership gates remain intact and DEV preview never calls equip endpoints", () => {
   const avatarScreen = readFileSync(new URL("../app/(tabs)/avatar.tsx", import.meta.url), "utf8");
   assert.match(avatarScreen, /CAN_PREVIEW_ALL_COSMETICS = __DEV__ && environment\.environment === "dev"/);
   assert.match(avatarScreen, /if \(CAN_PREVIEW_ALL_COSMETICS && previewAllCosmetics\) \{\s*previewCosmetic\(cosmetic\);\s*return;/);
-  assert.match(avatarScreen, /if \(!cosmetic\.unlocked\) \{\s*return;/);
-  assert.match(readFileSync(new URL("../src/components/WardrobeCard.tsx", import.meta.url), "utf8"), /const disabled = !\(previewMode \|\| cosmetic\.unlocked\) \|\| loading/);
+  assert.match(avatarScreen, /if \(!cosmetic\.unlocked && !claim\) \{\s*return;/);
+  assert.match(readFileSync(new URL("../src/components/WardrobeCard.tsx", import.meta.url), "utf8"), /const disabled = !\(previewMode \|\| cosmetic\.unlocked \|\| claim \|\| upgrade\) \|\| loading/);
   assert.match(avatarScreen, /inventoryEquip[\s\S]*?itemId: String\(cosmetic\.id\)/);
   assert.match(readFileSync(new URL("../src/components/AvatarContent.tsx", import.meta.url), "utf8"), /DEV only · changes are not saved/);
 });
@@ -263,7 +263,7 @@ test("hair is server-saved while hats retain clipping and ponytail rules", () =>
   const avatarScreen = readFileSync(new URL("../app/(tabs)/avatar.tsx", import.meta.url), "utf8");
   const registry = readFileSync(new URL("../src/avatar/assetRegistry.ts", import.meta.url), "utf8");
   assert.match(avatarScreen, /cosmetic\.type === "HAIR"[\s\S]*?updateAppearance/);
-  assert.match(avatarScreen, /api\.patch<AvatarAppearance>\(apiRoutes\.me, draftAppearance\)/);
+  assert.match(avatarScreen, /api\.patch<AvatarAppearance>\(apiRoutes\.me, draftAppearance,/);
   assert.match(registry, /hairClip/);
   assert.match(registry, /headClip/);
   assert.match(registry, /tuckPonytail/);

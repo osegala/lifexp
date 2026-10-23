@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import { clearLocalAppearance } from "../avatar/localAppearance";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { progressKey } from "../onboarding/progress";
+import { playerCache } from "../cache/playerData";
 
 export const BASE_LAYOUT_STORAGE_KEY = "lifexp.base.building-layouts.v1";
 
@@ -12,5 +13,6 @@ export async function clearLocalAccountData(userId?: string | number) {
     : SecureStore.deleteItemAsync(BASE_LAYOUT_STORAGE_KEY);
   const appearance = userId === undefined ? Promise.resolve() : clearLocalAppearance(userId);
   const onboarding = userId === undefined ? Promise.resolve() : AsyncStorage.removeItem(progressKey(userId));
-  await Promise.allSettled([appearance, clearLayout, onboarding]);
+  const cache = userId === undefined ? Promise.resolve() : playerCache.clearUser(userId);
+  await Promise.allSettled([appearance, clearLayout, onboarding, cache]);
 }

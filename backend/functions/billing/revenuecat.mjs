@@ -16,9 +16,11 @@ export function revenueCatConfig(env) {
     let products;
     try { products = JSON.parse(env.REVENUECAT_PRODUCTS ?? "[]"); } catch { throw unavailable(); }
     const providerEnvironment = env.REVENUECAT_ENVIRONMENT;
+    const sandboxAllowed = env.ENVIRONMENT_NAME === "dev"
+        || (env.ENVIRONMENT_NAME === "prod" && env.REVENUECAT_SANDBOX_IN_PROD_ENABLED === "true");
     if (!env.REVENUECAT_SECRET_API_KEY || !env.REVENUECAT_PROJECT_ID || !env.REVENUECAT_ENTITLEMENT_ID
         || !["sandbox", "production"].includes(providerEnvironment)
-        || (providerEnvironment === "sandbox" && env.ENVIRONMENT_NAME !== "dev")
+        || (providerEnvironment === "sandbox" && !sandboxAllowed)
         || !Array.isArray(products) || !products.length || products.length > 8
         || products.some(p => !p?.id || !p.appId || !p.storeIdentifier || !["app_store", "play_store"].includes(p.store))) throw unavailable();
     return { secret: env.REVENUECAT_SECRET_API_KEY, project: env.REVENUECAT_PROJECT_ID,

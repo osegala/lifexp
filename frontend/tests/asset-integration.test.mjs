@@ -42,8 +42,8 @@ test("achievement cosmetics use existing central avatar registry keys", () => {
 
 test("every runtime non-hair cosmetic has a backend catalog mapping", () => {
   const nonHair = [...runtimeAssetKeys].filter((assetKey) => !assetKey.includes("/hair/"));
-  assert.equal(runtimeAssetKeys.size, 104);
-  assert.equal(nonHair.length, 84);
+  assert.equal(runtimeAssetKeys.size, 138);
+  assert.equal(nonHair.length, 118);
   assert.deepEqual(nonHair.filter((assetKey) => !canonicalCatalogKeys.has(assetKey)), []);
 });
 
@@ -53,7 +53,7 @@ test("every backend cosmetic asset resolves in the frontend registry", () => {
     return !runtimeAssetKeys.has(canonical);
   });
   assert.deepEqual(unknown, []);
-  assert.equal(cosmetics.length, 85);
+  assert.equal(cosmetics.length, 119);
 });
 
 test("hair and Dragon Helm remain absent from the backend catalog", () => {

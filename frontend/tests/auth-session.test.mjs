@@ -6,6 +6,9 @@ import { AuthSession, userFromProfile } from "../src/auth/session.ts";
 import { authDestination } from "../src/auth/destination.ts";
 import { FREE_ENTITLEMENTS } from "../src/entitlements/model.ts";
 
+import { memoryCache, inventory, tasks, goals, achievements, world, baseLayout } from "./cache-test-support.mjs";
+import { PlayerCache } from "../src/cache/PlayerCache.ts";
+
 const identity = { token: "saved-id-token", userId: "user-sub-1", email: "hero@example.test" };
 const nextIdentity = { token: "new-id-token", userId: "user-sub-2", email: "second@example.test" };
 const profile = {
@@ -29,13 +32,15 @@ const httpError = (config, status, data = {}) => new AxiosError(
   { ...response(config, data), status },
 );
 
-function harness(t, { session = identity } = {}) {
+function harness(t, { session = identity, deviceTimeZone = profile.timeZone, cache, prepareDisplay } = {}) {
   const calls = [], authCalls = [];
   const h = {
     calls,
     authCalls,
     session,
+    deviceTimeZone,
     profile: config => response(config, profile),
+    saveProfile: config => response(config, JSON.parse(config.data)),
     entitlement: config => response(config, { plan: "FREE", subscriptionStatus: "FREE" }),
   };
   h.auth = {
@@ -62,11 +67,11 @@ function harness(t, { session = identity } = {}) {
   };
   h.client = axios.create({ adapter: async config => {
     calls.push(config);
-    if (config.url === "/me") return h.profile(config);
+    if (config.url === "/me") return config.method === "patch" ? h.saveProfile(config) : h.profile(config);
     if (config.url === "/entitlements") return h.entitlement(config);
     return response(config, {});
   } });
-  h.authSession = new AuthSession(h.client, h.auth);
+  h.authSession = new AuthSession(h.client, h.auth, () => h.deviceTimeZone, cache, prepareDisplay);
   const stop = h.authSession.start();
   t.after(stop);
   h.ready = async () => {
@@ -333,6 +338,67 @@ test("concurrent profile refreshes share one forced Cognito refresh", async t =>
   assert.ok((await Promise.all(refreshes)).every(Boolean));
 });
 
+test("startup stores the device IANA zone before publishing the account", async t => {
+  const h = harness(t, { deviceTimeZone: "America/Los_Angeles" });
+  let published = false;
+  h.saveProfile = config => {
+    assert.equal(h.authSession.getSnapshot().user, null);
+    assert.deepEqual(JSON.parse(config.data), { timeZone: "America/Los_Angeles" });
+    published = true;
+    return response(config, { timeZone: "America/Los_Angeles" });
+  };
+  await h.ready();
+  assert.ok(published);
+  assert.equal(h.authSession.getSnapshot().user.timeZone, "America/Los_Angeles");
+  assert.equal(h.authSession.getSnapshot().sessionError, null);
+});
+
+test("account refresh follows a changed device zone and deduplicates concurrent timezone writes", async t => {
+  const h = harness(t); await h.ready();
+  let stored = profile.timeZone;
+  h.profile = config => response(config, { ...profile, timeZone: stored });
+  h.saveProfile = config => { stored = JSON.parse(config.data).timeZone; return response(config, { timeZone: stored }); };
+  h.deviceTimeZone = "Asia/Tokyo";
+  assert.ok((await Promise.all(Array.from({ length: 8 }, () => h.authSession.refreshUser()))).every(Boolean));
+  assert.equal(h.authSession.getSnapshot().user.timeZone, "Asia/Tokyo");
+  assert.equal(h.calls.filter(c => c.method === "patch").length, 1);
+  await h.authSession.refreshUser();
+  assert.equal(h.calls.filter(c => c.method === "patch").length, 1, "unchanged zone needs no write");
+});
+
+test("existing abbreviated profiles migrate even if device detection is unavailable", async t => {
+  for (const [legacy, iana] of [["EST", "America/New_York"], ["CST", "America/Chicago"],
+    ["MST", "America/Denver"], ["PST", "America/Los_Angeles"]]) {
+    const h = harness(t, { deviceTimeZone: null });
+    h.profile = config => response(config, { ...profile, timeZone: legacy });
+    await h.ready();
+    assert.equal(h.authSession.getSnapshot().user.timeZone, iana);
+    assert.deepEqual(JSON.parse(h.calls.find(c => c.method === "patch").data), { timeZone: iana });
+  }
+});
+
+test("offline timezone sync keeps the confirmed saved zone, surfaces a retry, and later recovers", async t => {
+  const h = harness(t, { deviceTimeZone: "Europe/London" });
+  h.saveProfile = () => { throw new Error("offline"); };
+  await h.ready();
+  assert.equal(h.authSession.getSnapshot().user.timeZone, profile.timeZone);
+  assert.match(h.authSession.getSnapshot().sessionError, /last confirmed time zone/);
+  h.saveProfile = config => response(config, JSON.parse(config.data));
+  assert.equal(await h.authSession.retrySession(), true);
+  assert.equal(h.authSession.getSnapshot().user.timeZone, "Europe/London");
+  assert.equal(h.authSession.getSnapshot().sessionError, null);
+});
+
+test("a timezone write finishing after logout cannot restore the old account", async t => {
+  const h = harness(t); await h.ready();
+  h.deviceTimeZone = "Asia/Tokyo";
+  const pending = deferred();
+  h.saveProfile = config => pending.promise.then(() => response(config, { timeZone: "Asia/Tokyo" }));
+  const refresh = h.authSession.refreshUser(); await nextTick();
+  await h.authSession.logout(); pending.resolve();
+  assert.equal(await refresh, false); assert.equal(h.authSession.getSnapshot().user, null);
+});
+
 test("a late profile response cannot restore a signed-out session", async t => {
   const h = harness(t);
   await h.ready();
@@ -427,4 +493,176 @@ test("profile mapping preserves progression and premium state", () => {
     coins: 20,
     premiumActive: true,
   });
+});
+
+
+test("Profile keeps its confirmed identity on refresh, writes display cache only on success and clears it on logout", async t => {
+  const { cache } = memoryCache(); const h = harness(t, { cache }); await h.ready();
+  assert.deepEqual(cache.peek(identity.userId, "profile"), profile);
+  const pending = deferred(); h.profile = config => pending.promise.then(() => response(config, { ...profile, displayName: "Updated Hero" }));
+  const refresh = h.authSession.refreshUser(); await nextTick();
+  assert.equal(h.authSession.getSnapshot().user.username, "Test Hero"); assert.equal(h.authSession.getSnapshot().loading, false);
+  pending.resolve(); await refresh; assert.equal(cache.peek(identity.userId, "profile").displayName, "Updated Hero");
+  h.profile = () => { throw Error("offline"); }; assert.equal(await h.authSession.refreshUser(), false);
+  assert.equal(h.authSession.getSnapshot().user.username, "Updated Hero"); assert.equal(cache.peek(identity.userId, "profile").displayName, "Updated Hero");
+  await h.authSession.logout(); assert.equal(cache.peek(identity.userId, "profile"), null);
+});
+
+test("persisted Profile never establishes auth, onboarding or Premium authority without a Cognito identity", async t => {
+  const { cache } = memoryCache(); cache.set(identity.userId, "profile", { ...profile, premiumActive: true });
+  const h = harness(t, { cache, session: null }); h.profile = () => { throw Error("offline"); }; await h.ready();
+  assert.equal(h.authSession.getSnapshot().user, null); assert.equal(h.authSession.getSnapshot().entitlements.premium, false);
+  assert.equal(authDestination(h.authSession.getSnapshot().token, h.authSession.getSnapshot().user), "/login");
+  assert.equal(h.calls.length, 0);
+});
+
+test("cold startup publishes the same account's disk profile and resources before AWS responds, then reconciles", async t => {
+  const first = memoryCache();
+  const saved = { ...profile, premiumActive: true, coins: 481 };
+  for (const [resource, data] of Object.entries({ profile: saved, inventory, tasks, goals, achievements,
+    shop: { player: { coins: 481, level: 3 }, items: [] } })) first.cache.set(identity.userId, resource, data);
+  await nextTick();
+  const cache = new PlayerCache(first.storage, "test"), network = deferred();
+  const h = harness(t, { cache });
+  h.profile = config => network.promise.then(() => response(config, { ...profile, coins: 99 }));
+  h.entitlement = () => { throw Error("offline"); };
+  await h.ready();
+  assert.equal(h.authSession.getSnapshot().user.coins, 481);
+  assert.equal(h.authSession.getSnapshot().user.id, identity.userId);
+  assert.equal(h.authSession.getSnapshot().loading, false);
+  assert.equal(h.authSession.getSnapshot().user.premiumActive, false);
+  assert.equal(h.authSession.getSnapshot().entitlementsConfirmed, false);
+  for (const resource of ["inventory", "shop", "tasks", "goals", "achievements"]) assert.ok(cache.peek(identity.userId, resource));
+  const refresh = h.authSession.refreshUser();
+  assert.equal(h.calls.filter(call => call.url === "/me").length, 1, "Home reuses the startup profile refresh");
+  network.resolve(); await refresh;
+  assert.equal(h.authSession.getSnapshot().user.coins, 99);
+  await nextTick();
+  const restarted = new PlayerCache(first.storage, "test"); await restarted.hydrateUser(identity.userId);
+  assert.equal(restarted.peek(identity.userId, "profile").coins, 99);
+});
+
+test("offline cold startup keeps the last profile visible and cannot grant cached Premium", async t => {
+  const first = memoryCache(); first.cache.set(identity.userId, "profile", { ...profile, premiumActive: true }); await nextTick();
+  const h = harness(t, { cache: new PlayerCache(first.storage, "test") });
+  h.profile = () => { throw Error("offline"); }; h.entitlement = () => { throw Error("offline"); };
+  await h.ready(); await nextTick();
+  assert.equal(h.authSession.getSnapshot().user.username, profile.displayName);
+  assert.equal(h.authSession.getSnapshot().user.premiumActive, false);
+  assert.match(h.authSession.getSnapshot().sessionError, /Couldn't refresh/);
+});
+
+test("first launch and an incomplete cached profile wait for fresh onboarding state", async t => {
+  for (const saved of [null, { ...profile, onboardingCompleted: false }]) {
+    const { cache } = memoryCache(); if (saved) cache.set(identity.userId, "profile", saved);
+    const pending = deferred(); const h = harness(t, { cache });
+    h.profile = config => pending.promise.then(() => response(config, profile));
+    await nextTick(); assert.equal(h.authSession.getSnapshot().loading, true); assert.equal(h.authSession.getSnapshot().user, null);
+    pending.resolve(); await h.ready(); assert.equal(h.authSession.getSnapshot().user.onboardingCompleted, true);
+  }
+});
+
+test("startup never hydrates another account and late disk reads cannot resurrect logout/deleted sessions", async t => {
+  const first = memoryCache(); first.cache.set(identity.userId, "profile", profile); await nextTick();
+  const fresh = new PlayerCache(first.storage, "test"), pendingProfile = deferred();
+  const other = harness(t, { cache: fresh, session: nextIdentity });
+  other.profile = config => pendingProfile.promise.then(() => response(config, { ...profile, displayName: "Second Hero" }));
+  await nextTick(); assert.equal(other.authSession.getSnapshot().user, null); assert.equal(fresh.peek(nextIdentity.userId, "profile"), null);
+  pendingProfile.resolve(); await other.ready(); assert.equal(other.authSession.getSnapshot().user.id, nextIdentity.userId);
+  for (const clear of ["logout", "clearDeletedAccountSession"]) {
+    const disk = deferred(), cache = new PlayerCache({ getItem: () => disk.promise, setItem: async () => {}, removeItem: async () => {} }, "test");
+    const h = harness(t, { cache }); await nextTick();
+    await h.authSession[clear](); disk.resolve(JSON.stringify({ version: 1, data: profile })); await nextTick();
+    assert.equal(h.authSession.getSnapshot().user, null); assert.equal(h.authSession.getSnapshot().token, null);
+    assert.equal(cache.peek(identity.userId, "profile"), null);
+  }
+});
+
+test("a cold disk response cannot overwrite a newer confirmed profile mutation", async t => {
+  const disk = deferred(), network = deferred();
+  const cache = new PlayerCache({ getItem: () => disk.promise, setItem: async () => {}, removeItem: async () => {} }, "test");
+  const h = harness(t, { cache }); h.profile = config => network.promise.then(() => response(config, { ...profile, coins: 73 }));
+  await nextTick(); cache.set(identity.userId, "profile", { ...profile, coins: 73 });
+  disk.resolve(JSON.stringify({ version: 1, data: { ...profile, coins: 99999 } })); await h.ready();
+  assert.equal(h.authSession.getSnapshot().user.coins, 73); network.resolve(); await h.authSession.refreshUser();
+  assert.equal(h.authSession.getSnapshot().user.coins, 73);
+});
+
+test("fresh server onboarding state replaces the cached completed display profile", async t => {
+  const { cache } = memoryCache(); cache.set(identity.userId, "profile", profile);
+  const network = deferred(), h = harness(t, { cache });
+  h.profile = config => network.promise.then(() => response(config, { ...profile, onboardingCompleted: false }));
+  await h.ready(); assert.equal(h.authSession.getSnapshot().user.onboardingCompleted, true);
+  network.resolve(); await h.authSession.refreshUser();
+  assert.equal(authDestination(h.authSession.getSnapshot().token, h.authSession.getSnapshot().user), "/onboarding");
+});
+
+test("switching accounts during cold disk hydration cannot publish or repopulate the previous account", async t => {
+  const disk = deferred();
+  const cache = new PlayerCache({ getItem: key => key.includes(encodeURIComponent(identity.userId)) ? disk.promise : Promise.resolve(null),
+    setItem: async () => {}, removeItem: async () => {} }, "test");
+  const h = harness(t, { cache }); await nextTick();
+  await h.authSession.login("second@example.test", "password");
+  assert.equal(h.authSession.getSnapshot().user.id, nextIdentity.userId);
+  disk.resolve(JSON.stringify({ version: 1, data: { ...profile, displayName: "Old Hero" } })); await nextTick();
+  assert.equal(h.authSession.getSnapshot().user.id, nextIdentity.userId);
+  assert.equal(cache.peek(identity.userId, "profile"), null);
+});
+
+test("session hydrates equipment and Base, then awaits equipped asset warm-up before cached tabs can mount", async t => {
+  const first = memoryCache();
+  for (const [resource, data] of Object.entries({ profile, inventory, world, baseLayout })) first.cache.set(identity.userId, resource, data);
+  await nextTick();
+  const cache = new PlayerCache(first.storage, "test"), sprites = deferred(), backend = deferred(); let preparations = 0;
+  const h = harness(t, { cache, prepareDisplay: async userId => {
+    preparations++;
+    assert.equal(userId, identity.userId); assert.deepEqual(cache.peek(userId, "inventory"), inventory);
+    assert.deepEqual(cache.peek(userId, "world"), world); assert.deepEqual(cache.peek(userId, "baseLayout"), baseLayout);
+    await sprites.promise;
+  } });
+  h.profile = config => backend.promise.then(() => response(config, profile));
+  await nextTick();
+  assert.equal(preparations, 1); assert.equal(h.authSession.getSnapshot().loading, true);
+  assert.equal(h.authSession.getSnapshot().user, null); assert.equal(h.calls.length, 0);
+  sprites.resolve(); await h.ready();
+  assert.equal(h.authSession.getSnapshot().user.id, identity.userId); assert.equal(h.authSession.getSnapshot().loading, false);
+  backend.resolve(); await h.authSession.refreshUser();
+});
+
+test("asset warm-up failure keeps cached equipment usable and logout during warm-up cannot restore it", async t => {
+  const first = memoryCache(); first.cache.set(identity.userId, "profile", profile);
+  const h = harness(t, { cache: first.cache, prepareDisplay: async () => { throw Error("native image unavailable"); } });
+  h.profile = () => { throw Error("offline"); }; await h.ready();
+  assert.equal(h.authSession.getSnapshot().user.username, profile.displayName);
+  const second = memoryCache(); second.cache.set(identity.userId, "profile", profile);
+  const sprites = deferred(), g = harness(t, { cache: second.cache, prepareDisplay: () => sprites.promise });
+  await nextTick(); await g.authSession.logout(); sprites.resolve(); await nextTick();
+  assert.equal(g.authSession.getSnapshot().user, null); assert.equal(second.cache.peek(identity.userId, "profile"), null);
+});
+
+test("a fresh profile read waiting on sprites cannot undo a newer confirmed appearance mutation", async t => {
+  const { cache } = memoryCache(), sprites = deferred(); let prepare = false;
+  const h = harness(t, { cache, prepareDisplay: () => prepare ? sprites.promise : Promise.resolve() }); await h.ready();
+  prepare = true;
+  let data = profile; h.profile = config => response(config, data);
+  const refresh = h.authSession.refreshUser(); await nextTick();
+  data = { ...profile, displayName: "New appearance owner", bodyType: "GIRL" };
+  cache.set(identity.userId, "profile", data); sprites.resolve(); await refresh;
+  assert.equal(h.authSession.getSnapshot().user.username, "New appearance owner");
+  assert.equal(cache.peek(identity.userId, "profile").bodyType, "GIRL");
+});
+
+test("an older session refresh cannot undo a confirmed profile change or use cached onboarding instead of the server", async t => {
+  const { cache } = memoryCache(); const h = harness(t, { cache }); await h.ready();
+  const old = deferred(); let reads = 0;
+  const confirmed = { ...profile, displayName: "Saved name", coins: 73, onboardingCompleted: true };
+  h.profile = config => ++reads === 1 ? old.promise.then(() => response(config, profile)) : response(config, confirmed);
+  const refresh = h.authSession.refreshUser(); await nextTick();
+  cache.invalidate(identity.userId, ["profile"]);
+  cache.set(identity.userId, "profile", { ...profile, displayName: "Saved name", onboardingCompleted: false, coins: 99999 });
+  old.resolve(); assert.equal(await refresh, true);
+  assert.equal(reads, 2); assert.equal(h.authSession.getSnapshot().user.username, "Saved name");
+  assert.equal(h.authSession.getSnapshot().user.coins, 73);
+  assert.equal(h.authSession.getSnapshot().user.onboardingCompleted, true);
+  assert.deepEqual(cache.peek(identity.userId, "profile"), confirmed);
 });

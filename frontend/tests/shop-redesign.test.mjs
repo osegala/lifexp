@@ -1,3 +1,4 @@
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -9,6 +10,9 @@ import * as layout from "../src/avatar/spriteLayout.ts";
 import { apiError } from "../src/api/errors.ts";
 import { apiRoutes } from "../src/api/routes.ts";
 
+import { memoryCache, deferred } from "./cache-test-support.mjs";
+import { SupersededCacheRead } from "../src/cache/PlayerCache.ts";
+
 const require = createRequire(import.meta.url);
 function load(path, imports) {
   const exports = {};
@@ -16,7 +20,11 @@ function load(path, imports) {
     jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true,
   } }).outputText;
   new Function("require", "exports", code)(id => {
-    if (id === "react/jsx-runtime") return require(id);
+    if (id === "react/jsx-runtime") return noticeJsxRuntime;
+    const notice = noticeImport(id, imports); if (notice !== undefined) return notice;
+    if (id === "./ui/PaperTexture") return "PaperTexture";
+    if (id === "./ui/FantasyMaterial") return "FantasyMaterial";
+    if (id === "@expo/vector-icons/MaterialCommunityIcons") return "Icon";
     assert.ok(id in imports, `Unexpected import: ${id}`);
     return imports[id];
   }, exports);
@@ -29,11 +37,11 @@ function hooks() {
     const i = index++;
     if (!(i in values)) values[i] = typeof initial === "function" ? initial() : initial;
     return [values[i], value => { values[i] = typeof value === "function" ? value(values[i]) : value; }];
-  }, useCallback: fn => fn, useMemo: fn => fn(), memo: fn => fn };
+  }, useRef: initial => react.useState(() => ({ current: initial }))[0], useEffect() {}, useCallback: fn => fn, useMemo: fn => fn(), memo: fn => fn };
   return { react, render(fn) { index = 0; return fn(); } };
 }
 const native = { ...Object.fromEntries(["FlatList", "View", "ScrollView", "ActivityIndicator", "Image"].map(name => [name, name])),
-  StyleSheet: { create: value => value } };
+  Platform: { select: value => value.default }, StyleSheet: { create: value => value } };
 const primitives = Object.fromEntries(["UiText", "UiPressable", "SurfaceCard", "EmptyState", "FilterChip"].map(name => [name, name]));
 const indicators = Object.fromEntries(["BadgePill", "ResourcePill", "ResourceCluster"].map(name => [name, name]));
 const nodes = tree => Array.isArray(tree) ? tree.flatMap(nodes) : tree?.props ? [tree, ...nodes(tree.props.children)] : [];
@@ -49,21 +57,22 @@ function content() {
   const h = hooks(); let dimensions = { width: 390, fontScale: 1 };
   const Content = load("../src/components/ShopContent.tsx", { react: h.react,
     "react-native": { ...native, useWindowDimensions: () => dimensions }, "../theme/theme": theme,
-    "./ShopItemCard": "Card", "./LifeButton": "Button", "./ui/Indicators": indicators, "./ui/Primitives": primitives });
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 20 }) },
+    "../avatar/prefetch": { prefetchShopThumbnails: async () => {} }, "./ui/PageBackground": "Background", "./ShopItemCard": "Card", "./LifeButton": "Button", "./ui/Indicators": indicators, "./ui/Primitives": primitives });
   const defaults = { shop, loading: false, busyId: null, loadError: "", purchaseError: "", entitlement: { loading: false, premium: false },
     onPurchase() {}, onRetry() {}, onPremium() {}, banner: { type: "Banner", props: { placement: "SHOP" } }, rewarded: { type: "Reward", props: {} } };
-  return { render: patch => h.render(() => Content({ ...defaults, ...patch })), dimensions: value => { dimensions = value; }, defaults };
+  return { render: patch => h.render(() => Content({ ...defaults, ...patch }).props.children), dimensions: value => { dimensions = value; }, defaults };
 }
 
 test("Shop defaults to the server catalog order and filters only actual category values", () => {
   const c = content(); let tree = c.render();
   assert.equal(tree.type, "FlatList"); assert.equal(tree.props.data, shop.items);
   const chips = () => find(tree.props.ListHeaderComponent, "FilterChip");
-  assert.deepEqual(chips().map(n => n.props.label), ["All", "tunic", "pet", "aura"]);
+  assert.deepEqual(chips().map(n => n.props.label), ["All", "Premium", "Outfits", "Pets", "Auras"]);
   assert.equal(chips()[0].props.selected, true);
-  chips().find(n => n.props.label === "tunic").props.onPress(); tree = c.render();
+  chips().find(n => n.props.label === "Outfits").props.onPress(); tree = c.render();
   assert.deepEqual(tree.props.data.map(i => i.itemId), ["second", "fourth"]);
-  assert.equal(chips().find(n => n.props.label === "tunic").props.selected, true);
+  assert.equal(chips().find(n => n.props.label === "Outfits").props.selected, true);
   chips()[0].props.onPress(); assert.equal(c.render().props.data, shop.items);
   assert.equal(find(tree, "Card").length, 0, "renderItem is lazy, not an eager catalog map");
 });
@@ -90,7 +99,7 @@ function card() {
     "react-native": native, "@expo/vector-icons/MaterialCommunityIcons": "Icon", "../types": {}, "../theme/theme": theme,
     "../avatar/inventory": inventory, "../avatar/assetRegistry": { getCosmeticPreviewSource: ref => ref.imageUrl, getCosmeticPreviewCrop: () => ({ width: 100, height: 200 }) },
     "./CosmeticImage": "Preview", "./ui/Indicators": indicators, "./ui/Primitives": primitives });
-  return { render: (value, busy = false, onPurchase = () => {}) => Card({ item: value, busy, onPurchase }), memoized };
+  return { render: (value, busy = false, onPurchase = () => {}, extra = {}) => Card({ item: value, busy, onPurchase, ...extra }), memoized };
 }
 
 test("memoized cards use shared asset mapping, effective prices and server purchase flags", () => {
@@ -132,7 +141,7 @@ test("Shop has honest loading/error/empty states, actual Coins, Premium navigati
   assert.equal(find(tree.props.ListHeaderComponent, "ResourcePill")[0].props.value, 481);
   assert.equal(nodes(tree.props.ListHeaderComponent).filter(n => n.props.accessibilityRole === "alert").length, 2);
   const buttons = find(tree.props.ListHeaderComponent, "Button");
-  buttons.find(n => n.props.title === "Retry shop").props.onPress(); buttons.find(n => n.props.title === "View Premium").props.onPress();
+  buttons.find(n => n.props.title === "Retry shop").props.onPress(); find(tree.props.ListHeaderComponent, "UiPressable").find(n => n.props.accessibilityLabel === "View Premium").props.onPress();
   assert.equal(retried, 1); assert.equal(premium, 1);
   assert.deepEqual(tree.props.ListFooterComponent.props.children, [c.defaults.banner, c.defaults.rewarded]);
   assert.equal(c.render({ shop: { ...shop, items: [] } }).props.ListEmptyComponent.props.title, "No items available");
@@ -155,19 +164,19 @@ test("Shop cached previews preserve crop/aspect geometry and leave the original 
   assert.equal(find(render({ crop }), "Image")[0].props.resizeMode, "stretch");
 });
 
-async function controller({ get, post = async () => ({}) }) {
+async function controller({ get, post = async () => ({}), cache = memoryCache().cache, autoFocus = true }) {
   const h = hooks(), calls = [], alerts = [], routes = []; let focus, refreshes = 0;
   const Screen = load("../app/(tabs)/shop.tsx", { react: h.react, "react-native": { Alert: { alert: (...args) => alerts.push(args) } },
     "expo-router": { router: { push: route => routes.push(route) }, useFocusEffect: fn => { focus = fn; } },
     "../../src/api/client": { apiError, api: { get: async route => { calls.push(["GET", route]); return { data: await get() }; },
       post: async (route, input) => { calls.push(["POST", route, input]); return { data: await post() }; } } },
-    "../../src/api/routes": { apiRoutes }, "../../src/components/ShopContent": "Content",
-    "../../src/context/AuthContext": { useAuth: () => ({ refreshUser: async () => { refreshes++; } }) },
+    "../../src/cache/playerData": { playerCache: cache }, "../../src/cache/PlayerCache": { SupersededCacheRead }, "../../src/api/routes": { apiRoutes }, "../../src/components/ShopContent": "Content",
+    "../../src/context/AuthContext": { useAuth: () => ({ user: { id: "local" }, refreshUser: async () => { refreshes++; } }) },
     "../../src/entitlements/useEntitlements": { useEntitlements: () => ({ loading: false, premium: false }) },
     "../../src/ads/Ads": { BannerAdPlacement: "Banner", RewardedAdButton: "Reward" } });
   const render = () => h.render(Screen);
-  render(); focus(); await tick();
-  return { render, calls, alerts, routes, refreshes: () => refreshes };
+  render(); if (autoFocus) { focus(); await tick(); }
+  return { render, calls, alerts, routes, focus: () => focus(), refreshes: () => refreshes };
 }
 
 test("purchase waits for the server catalog, sends only itemId and refreshes authoritative ownership/balance", async () => {
@@ -193,4 +202,122 @@ test("catalog and purchase failures preserve last confirmed balances and expose 
   assert.equal(ui.render().props.shop.player.coins, 481); assert.match(ui.render().props.purchaseError, /Not enough coins/);
   failed = true; ui.render().props.onRetry(); await tick(); assert.equal(ui.render().props.shop, shop);
   assert.equal(ui.calls.filter(([method]) => method === "POST").length, 1); assert.equal(ui.alerts.length, 3);
+});
+
+
+test("all 119 seed items remain in the review catalog and every friendly category reaches the same original IDs", () => {
+  const source = readFileSync(new URL("../src/dev/ShopPreview.tsx", import.meta.url), "utf8");
+  const catalog = JSON.parse(source.match(/const catalog = (\[[\s\S]*?\]);/)[1].replace(/,\s*\]/g, "]"));
+  const seed = JSON.parse(readFileSync(new URL("../../backend/seeds/cosmetics.json", import.meta.url), "utf8"));
+  assert.equal(catalog.length, 119);
+  assert.deepEqual(catalog.map(row => row.itemId).sort(), seed.map(row => row.itemId).sort());
+  const reviewed = { ...shop, items: catalog.map(row => item(row.itemId, row)) };
+  const c = content(); let tree = c.render({ shop: reviewed });
+  for (const [value, label] of [["tunic", "Outfits"], ["hat", "Hats"], ["pet", "Pets"], ["pants", "Bottoms"], ["boots", "Boots"], ["aura", "Auras"], ["background", "Scenes"]]) {
+    find(tree.props.ListHeaderComponent, "FilterChip").find(n => n.props.label === label).props.onPress();
+    tree = c.render({ shop: reviewed });
+    assert.deepEqual(tree.props.data.map(row => row.itemId), reviewed.items.filter(row => row.category === value).map(row => row.itemId));
+  }
+});
+
+test("Shop shows cached server balances and purchase flags on entry while a background response is pending", async () => {
+  const { cache } = memoryCache(); cache.set("local", "shop", shop); const request = deferred();
+  const ui = await controller({ cache, autoFocus: false, get: () => request.promise });
+  assert.equal(ui.render().props.shop.player.coins, 481); assert.equal(ui.render().props.loading, false);
+  ui.focus(); await tick(); assert.equal(ui.render().props.refreshing, true); assert.equal(ui.render().props.loading, false);
+  assert.deepEqual(ui.render().props.shop.items, shop.items);
+  const fresh = { ...shop, player: { coins: 407, level: 12 } }; request.resolve(fresh); await tick();
+  assert.equal(ui.render().props.shop, fresh); assert.equal(ui.render().props.refreshing, false);
+  assert.deepEqual(cache.peek("local", "shop"), fresh);
+});
+
+test("Shop hydrates disk before network completion and survives offline tab re-entry", async () => {
+  const original = memoryCache(); original.cache.set("local", "shop", shop); await tick();
+  const { cache } = memoryCache("test", original.values); const request = deferred();
+  const ui = await controller({ cache, get: () => request.promise });
+  assert.equal(ui.render().props.loading, false); assert.equal(ui.render().props.shop.player.coins, 481);
+  request.reject(Error("offline")); await tick(); assert.equal(ui.render().props.shop.player.coins, 481);
+  assert.match(ui.render().props.loadError, /Could not load/);
+  ui.focus(); await tick(); assert.equal(ui.render().props.loading, false); assert.equal(ui.render().props.shop.items.length, 4);
+});
+
+test("an old catalog read finishing after a purchase cannot restore old ownership or coins", async () => {
+  const { cache } = memoryCache(); cache.set("local", "shop", shop);
+  const old = deferred(); let reads = 0;
+  const confirmed = { ...shop, player: { coins: 408, level: 12 }, items: [{ ...shop.items[0], owned: true, canPurchase: false, status: "OWNED" }] };
+  const ui = await controller({ cache, get: () => ++reads === 1 ? old.promise : Promise.resolve(confirmed) });
+  await ui.render().props.onPurchase(shop.items[0]);
+  assert.equal(ui.render().props.shop.player.coins, 408); assert.equal(ui.render().props.shop.items[0].owned, true);
+  old.resolve(shop); await tick();
+  assert.equal(ui.render().props.shop.player.coins, 408); assert.deepEqual(cache.peek("local", "shop"), confirmed);
+});
+
+test("a purchase reply after logout cannot resurrect a cleared cache or start another account's refresh", async () => {
+  const { cache } = memoryCache(); const reply = deferred();
+  const ui = await controller({ cache, get: async () => shop, post: () => reply.promise });
+  const purchase = ui.render().props.onPurchase(shop.items[0]);
+  await cache.clearUser("local"); reply.resolve({ coins: 1000 }); await purchase;
+  assert.equal(cache.peek("local", "shop"), null); assert.equal(ui.calls.filter(([method]) => method === "GET").length, 1);
+});
+
+test("a confirmed reward during cold loading restarts the superseded catalog read and caches only server totals", async () => {
+  const { cache } = memoryCache(); const old = deferred(); let reads = 0;
+  const confirmed = { ...shop, player: { coins: 531, level: 12 } };
+  const ui = await controller({ cache, get: () => ++reads === 1 ? old.promise : Promise.resolve(confirmed) });
+  assert.equal(ui.render().props.shop, null); assert.equal(ui.render().props.loading, true);
+  ui.render().props.rewarded.props.onReward({ coins: 531 }); await tick();
+  assert.equal(ui.render().props.shop.player.coins, 531); assert.equal(ui.render().props.loading, false);
+  old.resolve(shop); await tick();
+  assert.equal(cache.peek("local", "shop").player.coins, 531); assert.equal(ui.render().props.shop.player.coins, 531);
+});
+
+test("Premium filter contains all 34 releases while normal category filters retain the same Premium items", () => {
+  const c = content(); const seed = JSON.parse(readFileSync(new URL("../../backend/seeds/cosmetics.json", import.meta.url)));
+  const full = { ...shop, items: seed.map(row => item(row.itemId, row)) };
+  let tree = c.render({ shop: full });
+  find(tree.props.ListHeaderComponent, "FilterChip").find(node => node.props.label === "Premium").props.onPress();
+  tree = c.render({ shop: full }); assert.equal(tree.props.data.length, 34); assert.ok(tree.props.data.every(item => item.requiresPremium));
+  for (const [category, label, count] of [["tunic", "Outfits", 10], ["boots", "Boots", 5], ["pet", "Pets", 3]]) {
+    find(tree.props.ListHeaderComponent, "FilterChip").find(node => node.props.label === label).props.onPress(); tree = c.render({ shop: full });
+    assert.ok(tree.props.data.every(item => item.category === category)); assert.equal(tree.props.data.filter(item => item.requiresPremium).length, count);
+  }
+});
+
+test("Premium cards offer the existing upgrade route or a server-permitted free unlock, never a coin charge", () => {
+  const c = card(); let upgrades = 0, claims = 0;
+  const release = item("Rose Bard Dress", { requiresPremium: true, effectivePrice: 0, premiumRequirementSatisfied: true });
+  const active = c.render(release, false, () => claims++, { premiumAvailable: true, onPremium: () => upgrades++ });
+  assert.equal(find(active, "ResourcePill").length, 0); assert.match(text(active), /Included with Premium/);
+  const unlock = find(active, "UiPressable")[0]; assert.equal(unlock.props.accessibilityLabel, "Unlock: Rose Bard Dress"); unlock.props.onPress(); assert.equal(claims, 1);
+  const free = c.render(release, false, () => claims++, { premiumAvailable: false, onPremium: () => upgrades++ });
+  assert.equal(find(free, "UiPressable")[0].props.accessibilityLabel, "View Premium for Rose Bard Dress"); find(free, "UiPressable")[0].props.onPress();
+  assert.equal(upgrades, 1); assert.equal(claims, 1, "fresh Free status denies a stale cached offer");
+  const owned = c.render({ ...release, owned: true, status: "OWNED", premiumRequirementSatisfied: false }, false, () => claims++, { premiumAvailable: false });
+  assert.equal(find(owned, "UiPressable").length, 0); assert.ok(find(owned, "BadgePill").some(node => node.props.label === "Owned")); assert.doesNotMatch(text(owned), /Premium required/);
+});
+
+test("a server Premium denial reconciles cached offers through the same background refresh path", async () => {
+  const { cache } = memoryCache();
+  const release = item("premium_hat", { price: 0, effectivePrice: 0, requiresPremium: true, premiumRequirementSatisfied: true });
+  let current = { ...shop, items: [release] };
+  const ui = await controller({ cache, get: async () => current, post: async () => {
+    current = { ...current, items: [{ ...release, canPurchase: false, unlocked: false, premiumRequirementSatisfied: false, status: "LOCKED" }] };
+    throw { response: { data: { error: { code: "PREMIUM_REQUIRED", message: "Premium required" } } } };
+  } });
+  await ui.render().props.onPurchase(release);
+  assert.equal(ui.render().props.shop.items[0].canPurchase, false);
+  assert.equal(cache.peek("local", "shop").items[0].premiumRequirementSatisfied, false);
+  assert.equal(ui.render().props.shop.player.coins, 481); assert.match(ui.render().props.purchaseError, /Premium required/);
+});
+
+test("cold Shop restores all 34 Premium entries before the backend response and retains them offline", async () => {
+  const premium = JSON.parse(readFileSync(new URL("../../backend/seeds/cosmetics.json", import.meta.url), "utf8"))
+    .filter(row => row.requiresPremium).map(row => item(row.itemId, { ...row, effectivePrice: row.price, effectiveRequiredLevel: row.requiredLevel }));
+  const first = memoryCache(); first.cache.set("local", "shop", { ...shop, items: premium }); await tick();
+  const cache = memoryCache("test", first.values).cache; await cache.hydrateUser("local");
+  const pending = deferred(), ui = await controller({ cache, get: () => pending.promise, autoFocus: false });
+  assert.equal(ui.calls.length, 0); assert.equal(ui.render().props.loading, false);
+  assert.equal(ui.render().props.shop.items.filter(row => row.requiresPremium).length, 34);
+  ui.focus(); await tick(); pending.reject(Error("offline")); await tick();
+  assert.equal(ui.render().props.shop.items.length, 34); assert.equal(ui.render().props.loading, false);
 });

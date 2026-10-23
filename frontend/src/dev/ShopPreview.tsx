@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { Platform, View, useWindowDimensions } from "react-native";
 import { NavigationContainer } from "expo-router/react-navigation";
 import { createBottomTabNavigator } from "expo-router/js-tabs";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,7 +11,7 @@ import { uiTheme as ui } from "../theme/theme";
 import { tabAppearance, TabIcon, tabIcons } from "../navigation/tabAppearance";
 import type { ShopItem, ShopResponse } from "../types";
 
-// Seed metadata snapshot from backend/seeds/cosmetics.json, October 13, 2026.
+// Seed metadata snapshot from backend/seeds/cosmetics.json, October 22, 2026.
 // Kept inside the frontend because Metro cannot import outside its project root.
 const catalog = [
   {"itemId":"starter_tunic","name":"Starter Tunic","category":"tunic","price":25,"requiredLevel":1,"requiredAchievement":null,"assetKey":"starter-tunic.png"},
@@ -99,21 +99,55 @@ const catalog = [
   {"itemId":"royal_training_yard","name":"Royal Training Yard","category":"background","price":200,"requiredLevel":4,"requiredAchievement":null,"assetKey":"avatar-v2/backgrounds/royal-training-yard"},
   {"itemId":"castle_garden","name":"Castle Garden","category":"background","price":150,"requiredLevel":3,"requiredAchievement":null,"assetKey":"avatar-v2/backgrounds/castle-garden"},
   {"itemId":"moonlit_glade","name":"Moonlit Glade","category":"background","price":500,"requiredLevel":8,"requiredAchievement":null,"assetKey":"avatar-v2/backgrounds/moonlit-glade"},
+  {"itemId":"premium_rose_bard_tunic","name":"Rose Bard Tunic","category":"tunic","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/tops/premium-rose-bard-tunic","requiresPremium":true},
+  {"itemId":"premium_verdant_sovereign_tunic","name":"Verdant Sovereign Tunic","category":"tunic","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/tops/premium-verdant-sovereign-tunic","requiresPremium":true},
+  {"itemId":"premium_celestial_regent_tunic","name":"Celestial Regent Tunic","category":"tunic","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/tops/premium-celestial-regent-tunic","requiresPremium":true},
+  {"itemId":"premium_dawnfire_sovereign_tunic","name":"Dawnfire Sovereign Tunic","category":"tunic","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/tops/premium-dawnfire-sovereign-tunic","requiresPremium":true},
+  {"itemId":"premium_royal_wayfinder_tunic","name":"Royal Wayfinder Tunic","category":"tunic","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/tops/premium-royal-wayfinder-tunic","requiresPremium":true},
+  {"itemId":"premium_rose_bard_dress","name":"Rose Bard Dress","category":"tunic","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/dresses/premium-rose-bard-dress","requiresPremium":true},
+  {"itemId":"premium_verdant_sovereign_dress","name":"Verdant Sovereign Dress","category":"tunic","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/dresses/premium-verdant-sovereign-dress","requiresPremium":true},
+  {"itemId":"premium_celestial_regent_dress","name":"Celestial Regent Dress","category":"tunic","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/dresses/premium-celestial-regent-dress","requiresPremium":true},
+  {"itemId":"premium_dawnfire_sovereign_dress","name":"Dawnfire Sovereign Dress","category":"tunic","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/dresses/premium-dawnfire-sovereign-dress","requiresPremium":true},
+  {"itemId":"premium_royal_wayfinder_dress","name":"Royal Wayfinder Dress","category":"tunic","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/dresses/premium-royal-wayfinder-dress","requiresPremium":true},
+  {"itemId":"premium_rose_bard_trousers","name":"Rose Bard Trousers","category":"pants","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/bottoms/premium-rose-bard-trousers","requiresPremium":true},
+  {"itemId":"premium_verdant_sovereign_trousers","name":"Verdant Sovereign Trousers","category":"pants","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/bottoms/premium-verdant-sovereign-trousers","requiresPremium":true},
+  {"itemId":"premium_celestial_regent_trousers","name":"Celestial Regent Trousers","category":"pants","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/bottoms/premium-celestial-regent-trousers","requiresPremium":true},
+  {"itemId":"premium_dawnfire_sovereign_trousers","name":"Dawnfire Sovereign Trousers","category":"pants","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/bottoms/premium-dawnfire-sovereign-trousers","requiresPremium":true},
+  {"itemId":"premium_royal_wayfinder_trousers","name":"Royal Wayfinder Trousers","category":"pants","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/bottoms/premium-royal-wayfinder-trousers","requiresPremium":true},
+  {"itemId":"premium_rose_bard_hat","name":"Rose Bard Hat","category":"hat","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/hats/premium-rose-bard-hat","requiresPremium":true},
+  {"itemId":"premium_verdant_sovereign_hat","name":"Verdant Sovereign Hat","category":"hat","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/hats/premium-verdant-sovereign-hat","requiresPremium":true},
+  {"itemId":"premium_celestial_regent_hat","name":"Celestial Regent Hat","category":"hat","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/hats/premium-celestial-regent-hat","requiresPremium":true},
+  {"itemId":"premium_dawnfire_sovereign_hat","name":"Dawnfire Sovereign Hat","category":"hat","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/hats/premium-dawnfire-sovereign-hat","requiresPremium":true},
+  {"itemId":"premium_royal_wayfinder_hat","name":"Royal Wayfinder Hat","category":"hat","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/hats/premium-royal-wayfinder-hat","requiresPremium":true},
+  {"itemId":"premium_rose_bard_boots","name":"Rose Bard Boots","category":"boots","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/boots/premium-rose-bard-boots","requiresPremium":true},
+  {"itemId":"premium_verdant_sovereign_boots","name":"Verdant Sovereign Boots","category":"boots","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/boots/premium-verdant-sovereign-boots","requiresPremium":true},
+  {"itemId":"premium_celestial_regent_boots","name":"Celestial Regent Boots","category":"boots","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/boots/premium-celestial-regent-boots","requiresPremium":true},
+  {"itemId":"premium_dawnfire_sovereign_boots","name":"Dawnfire Sovereign Boots","category":"boots","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/boots/premium-dawnfire-sovereign-boots","requiresPremium":true},
+  {"itemId":"premium_royal_wayfinder_boots","name":"Royal Wayfinder Boots","category":"boots","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/boots/premium-royal-wayfinder-boots","requiresPremium":true},
+  {"itemId":"premium_rose_palace","name":"Rose Palace","category":"background","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/backgrounds/premium-rose-palace","requiresPremium":true},
+  {"itemId":"premium_aurora_springs","name":"Aurora Springs","category":"background","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/backgrounds/premium-aurora-springs","requiresPremium":true},
+  {"itemId":"premium_starwatch_terrace","name":"Starwatch Terrace","category":"background","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/backgrounds/premium-starwatch-terrace","requiresPremium":true},
+  {"itemId":"premium_astral_clockwork","name":"Astral Clockwork","category":"aura","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/auras/premium-astral-clockwork","requiresPremium":true},
+  {"itemId":"premium_lunar_veil","name":"Lunar Veil","category":"aura","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/auras/premium-lunar-veil","requiresPremium":true},
+  {"itemId":"premium_prismatic_crown","name":"Prismatic Crown","category":"aura","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/auras/premium-prismatic-crown","requiresPremium":true},
+  {"itemId":"premium_mooncrystal_fawn","name":"Mooncrystal Fawn","category":"pet","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/pets/premium-mooncrystal-fawn","requiresPremium":true},
+  {"itemId":"premium_lotus_otter","name":"Lotus Otter","category":"pet","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/pets/premium-lotus-otter","requiresPremium":true},
+  {"itemId":"premium_starlight_moth","name":"Starlight Moth","category":"pet","price":0,"requiredLevel":1,"requiredAchievement":null,"assetKey":"avatar-v2/pets/premium-starlight-moth","requiresPremium":true},
 ];
 
 // Actual seed products/art, explicit fixture states. No account, purchase, billing or ad requests.
 const items: ShopItem[] = catalog.map((record, index) => ({
   ...record, effectivePrice: record.price, effectiveRequiredLevel: record.requiredLevel,
-  owned: index === 0, unlocked: index !== 2 && index !== 3, canAfford: index !== 1,
-  canPurchase: index > 3, status: index === 0 ? "OWNED" : index === 1 ? "NOT_ENOUGH_COINS" : index < 4 ? "LOCKED" : "PURCHASABLE",
-  requiresPremium: index === 0 || index === 3, premiumRequirementSatisfied: index !== 3,
+  owned: index === 0, unlocked: !("requiresPremium" in record && record.requiresPremium) && index !== 2 && index !== 3, canAfford: index !== 1,
+  canPurchase: index > 3 && !("requiresPremium" in record && record.requiresPremium), status: index === 0 ? "OWNED" : index === 1 ? "NOT_ENOUGH_COINS" : index < 4 || ("requiresPremium" in record && record.requiresPremium) ? "LOCKED" : "PURCHASABLE",
+  requiresPremium: "requiresPremium" in record && record.requiresPremium === true, premiumRequirementSatisfied: !("requiresPremium" in record && record.requiresPremium),
   requirementSatisfied: index !== 2,
   achievementRequirement: index === 2 ? { achievementId: "COMPLETE_25_TASKS", name: "Forestbound", description: "Complete 25 tasks.",
     type: "TASKS_COMPLETED", currentValue: 12, requiredValue: 25, progressPercent: 48, satisfied: false } : null,
 }));
 const original: ShopResponse = { player: { coins: 284, level: 6 }, items };
 function PreviewShop() {
-  const [mode, setMode] = useState("Free"), [controls, setControls] = useState(true);
+  const [mode, setMode] = useState(Platform.OS === "web" && new URLSearchParams(window.location.search).get("plan") === "premium" ? "Premium" : "Free"), [controls, setControls] = useState(true);
   const [shop, setShop] = useState(original), [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState(""), [purchaseError, setPurchaseError] = useState("");
   const premium = mode === "Premium", unknown = mode === "Plan loading";
@@ -131,7 +165,7 @@ function PreviewShop() {
     }, 800);
   }
   return <View style={{ flex: 1, backgroundColor: ui.colors.background }}>
-    <View style={{ padding: ui.spacing.sm, gap: ui.spacing.sm, borderBottomWidth: 1, borderBottomColor: ui.colors.border }}>
+    <View testID="shop-review-controls" style={{ padding: ui.spacing.sm, gap: ui.spacing.sm, borderBottomWidth: 1, borderBottomColor: ui.colors.border }}>
       <UiText variant="caption">DEV Shop review · seed catalog + fixture states · no account or ad requests</UiText>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: ui.spacing.xs }}>
         {controls && ["Free", "Premium", "Plan loading", "Loading", "Error", "Empty", "Purchase failure", "Large balance"].map(label =>

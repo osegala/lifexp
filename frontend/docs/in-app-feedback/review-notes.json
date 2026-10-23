@@ -1,0 +1,36 @@
+{
+  "widths": [
+    390,
+    430
+  ],
+  "narrowEnlargedText": {
+    "width": 320,
+    "fontSize": 24,
+    "allFourNoticeCards": {
+      "left": 16,
+      "right": 304,
+      "width": 288,
+      "horizontalOverflow": false
+    }
+  },
+  "baseColorBodyTextContrastRatios": {
+    "success": 9.64,
+    "info": 9.72,
+    "error": 9.73,
+    "warning": 8.69
+  },
+  "reviewMode": "DEV web, real screen controllers with isolated local API/store fixtures",
+  "nativeDeviceReview": false,
+  "realStoreTransaction": false,
+  "flows": [
+    "task completion +35 XP/+4 coins and auto dismissal",
+    "profile save success",
+    "profile recoverable error with input preserved",
+    "keyboard dismissal with Enter",
+    "equip Forestbound Dress: selected state changes and no new toast",
+    "equipment error: previous item remains equipped",
+    "restore: FREE to confirmed PREMIUM via local BillingClient verification",
+    "Workshop upgrade: Tier 1 to 2, points 412 to 312",
+    "generic information notice auto dismissal"
+  ]
+}

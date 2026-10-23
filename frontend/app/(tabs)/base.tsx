@@ -1,10 +1,9 @@
+import { showGameNotice } from "../../src/feedback/notices";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import * as SecureStore from "expo-secure-store";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   Image,
@@ -19,6 +18,9 @@ import {
 
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
+import type { AxiosRequestConfig } from "axios";
+import { playerCache } from "../../src/cache/playerData";
+import { SupersededCacheRead } from "../../src/cache/PlayerCache";
 import {
   BASE_BACKGROUND_IMAGES,
   getBuildingImageSource,
@@ -32,12 +34,13 @@ import { buildPathNetwork } from "../../src/base/pathNetwork";
 import { buildingUpgradeAnnouncement, confirmedBuildingUpgrade, worldToBaseProgress } from "../../src/base/buildingProgress";
 import type { BuildingUpgrade } from "../../src/base/buildingProgress";
 import BuildingUpgradeFeedback, { BuildingTierArtwork, useBuildingUpgradePresentation } from "../../src/components/BuildingUpgradeFeedback";
+import { useAuth } from "../../src/context/AuthContext";
 import { BaseBuildingPanel, BaseResources } from "../../src/components/BasePanels";
 import { useBuildingFeedback } from "../../src/context/CompletionFeedbackContext";
-import { BASE_LAYOUT_STORAGE_KEY } from "../../src/storage/localAccountData";
 import { colors, radius, spacing, uiTheme as ui } from "../../src/theme/theme";
 import {
   BaseProgress,
+  BuildingLayout,
   BuildingProgress,
   BuildingType,
   UpgradeBuildingResponse,
@@ -46,12 +49,7 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-type BuildingMapLayout = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
+type BuildingMapLayout = BuildingLayout;
 type MapCamera = {
   zoom: number;
   x: number;
@@ -604,66 +602,6 @@ function resolveBuildingMove(
     : snappedTarget;
 }
 
-function isBuildingLayoutMap(
-  value: unknown,
-): value is Record<BuildingType, BuildingMapLayout> {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  return (Object.keys(BUILDING_MAP_POSITIONS) as BuildingType[]).every(
-    (type) => {
-      const layout = (
-        value as Partial<Record<BuildingType, BuildingMapLayout>>
-      )[type];
-
-      return (
-        Boolean(layout) &&
-        typeof layout?.x === "number" &&
-        typeof layout?.y === "number" &&
-        typeof layout?.width === "number" &&
-        typeof layout?.height === "number"
-      );
-    },
-  );
-}
-
-async function loadStoredBuildingLayouts() {
-  try {
-    const stored =
-      Platform.OS === "web"
-        ? globalThis.localStorage?.getItem(BASE_LAYOUT_STORAGE_KEY)
-        : await SecureStore.getItemAsync(BASE_LAYOUT_STORAGE_KEY);
-
-    if (!stored) {
-      return null;
-    }
-
-    const parsed = JSON.parse(stored) as unknown;
-    return isBuildingLayoutMap(parsed) ? parsed : null;
-  } catch (error) {
-    console.log("Building layout load error:", error);
-    return null;
-  }
-}
-
-async function saveStoredBuildingLayouts(
-  layouts: Record<BuildingType, BuildingMapLayout>,
-) {
-  try {
-    const serialized = JSON.stringify(layouts);
-
-    if (Platform.OS === "web") {
-      globalThis.localStorage?.setItem(BASE_LAYOUT_STORAGE_KEY, serialized);
-      return;
-    }
-
-    await SecureStore.setItemAsync(BASE_LAYOUT_STORAGE_KEY, serialized);
-  } catch (error) {
-    console.log("Building layout save error:", error);
-  }
-}
-
 function MapViewport({
   image,
   children,
@@ -811,20 +749,26 @@ function mapScaleTransform(camera: MapCamera, baseScale: number): ViewStyle {
 }
 
 export default function BaseScreen() {
-  const [base, setBase] = useState<BaseProgress | null>(null);
+  const { user } = useAuth();
+  const userId = user?.id;
+  const accountActive = useMemo(() => userId == null ? () => false : playerCache.accountCurrent(userId), [userId]);
+  const [base, setBase] = useState<BaseProgress | null>(() => {
+    const world = userId == null ? null : playerCache.peek(userId, "world");
+    return world ? worldToBaseProgress(world) : null;
+  });
+  const hasView = useRef(!!base), loadVersion = useRef(0);
   const [selectedBuilding, setSelectedBuilding] =
     useState<BuildingProgress | null>(null);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const { pending, enqueue: enqueueBuildings, finish: finishBuildings } = useBuildingFeedback();
   const upgrading = useRef(false);
-  const [buildingLayouts, setBuildingLayouts] = useState(() =>
-    getSizedBuildingLayouts(BUILDING_MAP_POSITIONS),
-  );
-  const [layoutHydrated, setLayoutHydrated] = useState(false);
+  const [buildingLayouts, setBuildingLayouts] = useState(() => getSizedBuildingLayouts(
+    (userId == null ? null : playerCache.peek(userId, "baseLayout")) ?? BUILDING_MAP_POSITIONS));
+  const [layoutHydrated, setLayoutHydrated] = useState(() => userId != null && !!playerCache.peek(userId, "baseLayout"));
   const [mapCamera, setMapCamera] = useState<MapCamera>(DEFAULT_MAP_CAMERA);
   const [mapSize, setMapSize] = useState({ width: 1, height: MAP_HEIGHT });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!base);
   const [loadError, setLoadError] = useState("");
   const [upgradeError, setUpgradeError] = useState("");
   // Never consume off-screen, before XP feedback finishes, or against stale map artwork.
@@ -846,6 +790,8 @@ export default function BaseScreen() {
 
   const moveBuilding = useCallback(
     (type: BuildingType, layout: BuildingMapLayout) => {
+      if (!accountActive()) return;
+      if (userId != null) playerCache.invalidate(userId, ["baseLayout"]);
       setBuildingLayouts((current) => {
         const nextLayout = resolveBuildingMove(type, layout, current);
 
@@ -859,7 +805,7 @@ export default function BaseScreen() {
         return { ...current, [type]: nextLayout };
       });
     },
-    [],
+    [userId, accountActive],
   );
 
   const composedMapGesture = useMemo(() => {
@@ -976,14 +922,16 @@ export default function BaseScreen() {
   }, [mapSize]);
 
   useEffect(() => {
+    if (userId == null || !accountActive()) return;
     let mounted = true;
-
-    loadStoredBuildingLayouts().then((stored) => {
-      if (!mounted) {
+    const accountCurrent = playerCache.accountCurrent(userId), layoutCurrent = playerCache.checkpoint(userId, "baseLayout");
+    void playerCache.hydrate(userId, "baseLayout").then(() => {
+      if (!mounted || !accountCurrent()) {
         return;
       }
 
-      if (stored) {
+      const stored = playerCache.peek(userId, "baseLayout");
+      if (stored && layoutCurrent()) {
         setBuildingLayouts(getSizedBuildingLayouts(stored));
       }
 
@@ -993,24 +941,21 @@ export default function BaseScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [userId, accountActive]);
 
   useEffect(() => {
-    if (layoutHydrated) {
-      saveStoredBuildingLayouts(buildingLayouts);
+    if (layoutHydrated && userId != null && accountActive()) {
+      playerCache.set(userId, "baseLayout", buildingLayouts);
     }
-  }, [buildingLayouts, layoutHydrated]);
+  }, [buildingLayouts, layoutHydrated, userId, accountActive]);
 
   useEffect(() => {
     setMapCamera((current) => clampMapCamera(current, mapSize));
   }, [mapSize]);
 
-  const loadBase = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await api.get<WorldResponse>(apiRoutes.world);
-      const nextBase = worldToBaseProgress(response.data);
-      setLoadError("");
+  const applyWorld = useCallback((world: WorldResponse) => {
+      const nextBase = worldToBaseProgress(world);
+      hasView.current = true;
       setBase(nextBase);
       setSelectedBuilding((current) => {
         if (!current) {
@@ -1026,20 +971,41 @@ export default function BaseScreen() {
         );
       });
       return nextBase;
+  }, []);
+
+  const loadBase = useCallback(async () => {
+    if (userId == null || !accountActive()) return null;
+    const version = ++loadVersion.current, accountCurrent = playerCache.accountCurrent(userId);
+    const current = () => version === loadVersion.current && accountCurrent();
+    const showCached = () => {
+      const world = playerCache.peek(userId, "world");
+      if (current() && world) { applyWorld(world); setLoading(false); }
+    };
+    showCached();
+    const hydration = playerCache.hydrate(userId, "world").then(showCached);
+    try {
+      setLoading(!hasView.current);
+      const world = await playerCache.refresh(userId, "world", async () =>
+        (await api.get<WorldResponse>(apiRoutes.world, { expectedUserId: String(userId) } as AxiosRequestConfig)).data);
+      if (!current()) return null;
+      setLoadError("");
+      return applyWorld(world);
     } catch (error) {
+      if (!current() || error instanceof SupersededCacheRead) return null;
       const message = apiError(error, "Could not load your world.").message;
       setLoadError(message);
-      Alert.alert("World", message);
+      showGameNotice("World", message, "error");
       return null;
     } finally {
-      setLoading(false);
+      await hydration;
+      if (current()) setLoading(false);
     }
-  }, []);
+  }, [userId, applyWorld, accountActive]);
 
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
-      return () => setFocused(false);
+      return () => { loadVersion.current++; setFocused(false); };
     }, []),
   );
   useEffect(() => {
@@ -1205,14 +1171,14 @@ export default function BaseScreen() {
     }
 
     if (action === "enter") {
-      Alert.alert("Interiors unavailable", "Interior customization needs a future backend API.");
+      showGameNotice("Interiors unavailable", "Interior customization needs a future backend API.", "info");
       return;
     }
 
     if (action === "upgrade") {
       if (upgrading.current) return;
       if (!selectedBuilding.upgradeAvailable) {
-        Alert.alert(
+        showGameNotice(
           `${selectedBuilding.type} upgrade`,
           selectedBuilding.level >= selectedBuilding.maxLevel
             ? "This building is at its maximum level."
@@ -1221,13 +1187,31 @@ export default function BaseScreen() {
         return;
       }
 
+      if (userId == null || !accountActive()) return;
+      const accountCurrent = playerCache.accountCurrent(userId);
       try {
         upgrading.current = true;
         setUpgradeError("");
+        loadVersion.current++;
+        playerCache.invalidate(userId, ["world", "goals", "shop", "achievements", "tasks", "inventory"]);
         const response = await api.post<UpgradeBuildingResponse>(
           apiRoutes.upgradeBuilding(selectedBuilding.buildingId),
           {},
+          { expectedUserId: String(userId) } as AxiosRequestConfig,
         );
+        if (!accountCurrent()) return;
+        playerCache.invalidate(userId, ["world", "goals", "shop", "achievements", "tasks", "inventory"]);
+        const world = playerCache.peek(userId, "world");
+        if (world) {
+          // Copy only confirmed fields. Costs, unlocks and upgrade availability
+          // remain last-known display hints until GET /world reconciles them.
+          const confirmed = { ...world, worldPoints: response.data.player.worldPoints,
+            buildings: world.buildings.map(building => building.buildingId === response.data.building.buildingId
+              ? { ...building, level: response.data.building.newLevel, currentLevel: response.data.building.newLevel,
+                maxLevel: response.data.building.maxLevel } : building) };
+          playerCache.set(userId, "world", confirmed);
+          applyWorld(confirmed);
+        }
         const upgrades = confirmedBuildingUpgrade(response.data);
         enqueueBuildings({ id: JSON.stringify(["upgrade", response.data.building.buildingId, response.data.building.newLevel]), upgrades });
         const nextBase = await loadBase();
@@ -1238,9 +1222,10 @@ export default function BaseScreen() {
           setSelectedBuilding(upgradedBuilding);
         }
       } catch (error) {
+        if (!accountCurrent()) return;
         const message = apiError(error, "This building cannot be upgraded yet.").message;
         setUpgradeError(message);
-        Alert.alert("Upgrade unavailable", message);
+        showGameNotice("Upgrade unavailable", message, "error");
       } finally {
         upgrading.current = false;
       }
@@ -1374,14 +1359,14 @@ export default function BaseScreen() {
         </View>
       </MapViewport>
 
-      <BaseResources worldPoints={base?.worldPoints} loading={loading} error={loadError} onRetry={() => void loadBase()} />
+      <BaseResources coins={user?.coins} worldPoints={base?.worldPoints} loading={loading} error={loadError} onRetry={() => void loadBase()} />
       {selectedBuilding && <BaseBuildingPanel building={selectedBuilding} description={BUILDING_META[selectedBuilding.type].description}
         descriptionOpen={descriptionOpen} error={upgradeError} onAction={handleBuildingAction} onClose={clearSelectedBuilding} />}
 
       {Platform.OS === "web" && <Text role="status" aria-live="polite" aria-atomic style={styles.announcement}>
         {celebration ? buildingUpgradeAnnouncement(celebration) : ""}
       </Text>}
-      {celebration && <BuildingUpgradeFeedback batch={celebration} motion={upgradeMotion} onDone={finishBuildings} tone="parchment" style={styles.upgradeFeedback} />}
+      {celebration && <BuildingUpgradeFeedback batch={celebration} motion={upgradeMotion} onDone={finishBuildings} tone="parchment" />}
     </View>
   );
 }
@@ -1622,7 +1607,6 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   buildingFocus: { outlineWidth: 2, outlineOffset: 3, outlineColor: ui.colors.focus, outlineStyle: "solid" },
-  upgradeFeedback: { top: ui.spacing.md * 2 + ui.size.target, bottom: undefined },
   buildingNode: {
     width: "100%",
     height: "100%",

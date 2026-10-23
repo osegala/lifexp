@@ -8,6 +8,8 @@ import * as streak from "../layers/api-shared/nodejs/activity-streak.mjs";
 import * as scheduling from "../layers/notification-shared/nodejs/scheduling.mjs";
 import * as prefs from "../layers/notification-shared/nodejs/preferences.mjs";
 import * as logic from "../functions/notification-worker/logic.mjs";
+import { notificationMessage } from "../functions/notification-worker/messages.mjs";
+import { createExpoProvider } from "../functions/notification-worker/push-provider.mjs";
 import * as reminderLogic from "../functions/reminders/logic.mjs";
 import * as http from "../layers/api-shared/nodejs/http.mjs";
 import { notificationWakeups } from "../layers/api-shared/nodejs/notification-wakeup.mjs";
@@ -110,8 +112,9 @@ test("quiet hours suppress (never defer), including overnight boundaries; disabl
   assert.equal(leavingQuiet.events[0].reason, "QUIET_HOURS");
 });
 
-function fixture({ daily = false, lostResponse = false, result = { status: "PREPARED" }, failRead = false, afterReservation } = {}) {
+function fixture({ daily = false, lostResponse = false, result = { status: "PREPARED" }, failRead = false, afterReservation, message = notificationMessage } = {}) {
   let clock = now, sendCount = 0, lose = lostResponse;
+  const payloads = [], requests = [];
   const data = new Map([profile, task, device, config].map(item => [item.SK.S, structuredClone(item)]));
   if (daily) {
     data.delete(config.SK.S);
@@ -134,6 +137,7 @@ function fixture({ daily = false, lostResponse = false, result = { status: "PREP
   }
   sdk.DynamoDBClient = class { async send(command) {
     const request = command.input;
+    requests.push({ command: command.name, input: structuredClone(request) });
     if (command.name === "GetItemCommand") { if (failRead && request.Key.SK.S === "PREFERENCES") throw new Error("offline"); return { Item: structuredClone(data.get(request.Key.SK.S)) }; }
     if (command.name === "QueryCommand") return { Items: structuredClone([...data.values()].filter(item => request.IndexName
       ? item.GSI1SK?.S <= request.ExpressionAttributeValues[":boundary"].S
@@ -157,9 +161,10 @@ function fixture({ daily = false, lostResponse = false, result = { status: "PREP
   } };
   const worker = load("functions/notification-worker/index.mjs", { "node:crypto": crypto, "@aws-sdk/client-dynamodb": sdk,
     "/opt/nodejs/preferences.mjs": prefs, "/opt/nodejs/planning.mjs": planning, "./logic.mjs": logic,
-    "./push-provider.mjs": { deliveryMode: () => "DRY_RUN", createExpoProvider: () => ({ mode: "DRY_RUN", send: async () => { sendCount++; return result; } }) } },
+    "./messages.mjs": { notificationMessage: message },
+    "./push-provider.mjs": { deliveryMode: () => "DRY_RUN", createExpoProvider: () => ({ mode: "DRY_RUN", send: async payload => { sendCount++; payloads.push(structuredClone(payload)); return result; } }) } },
     { Date: class extends Date { constructor(value = clock) { super(value); } }, process: { env: { TABLE_NAME: "local" } }, console: { error() {} } });
-  return { data, run: () => worker.handler({}), get sends() { return sendCount; }, setNow: value => { clock = new Date(value); },
+  return { data, payloads, requests, run: () => worker.handler({}), get sends() { return sendCount; }, setNow: value => { clock = new Date(value); },
     records: () => [...data.values()].filter(item => item.SK.S.startsWith("NOTIFICATION_DELIVERY#")), sdk };
 }
 test("real worker reserves task occurrence once across duplicate/stale-index runs and time edits", async () => {
@@ -167,6 +172,72 @@ test("real worker reserves task occurrence once across duplicate/stale-index run
   await f.run(); assert.equal(f.sends, 1); await f.run(); assert.equal(f.sends, 1);
   f.data.set(config.SK.S, original); await f.run(); assert.equal(f.sends, 1); assert.equal(f.records().length, 1);
   assert.doesNotMatch(JSON.stringify(f.records()), /private-token|pushToken/);
+});
+test("copy changes leave worker requests, reminder IDs, scheduling and delivery fields unchanged", async () => {
+  const withoutHistoryCopy = value => JSON.parse(JSON.stringify(value, (_key, entry) => {
+    if (!entry?.SK?.S?.startsWith("NOTIFICATION_DELIVERY#")) return entry;
+    const { message, ...fields } = entry;
+    return fields;
+  }));
+  const withoutPayloadCopy = ({ title, body, ...fields }) => fields;
+  for (const daily of [false, true]) {
+    const current = fixture({ daily });
+    const legacy = fixture({ daily, message: ({ summaryBody }) => ({ title: "Evrenthia", body: summaryBody }) });
+    const sk = daily ? "PREFERENCES" : config.SK.S;
+    const original = structuredClone(current.data.get(sk));
+    await current.run(); await legacy.run();
+    assert.equal(current.sends, daily ? 3 : 1);
+    assert.deepEqual(current.payloads.map(Object.keys), legacy.payloads.map(Object.keys));
+    assert.deepEqual(current.payloads.map(withoutPayloadCopy), legacy.payloads.map(withoutPayloadCopy));
+    for (const payload of current.payloads) {
+      const record = current.records().find(item => item.notificationType.S === payload.data.type);
+      const expected = notificationMessage({ type: payload.data.type, taskTitle: task.title.S,
+        deliveryId: record.deliveryId.S, summaryBody: "1 task awaits you in Evrenthia." });
+      assert.deepEqual({ title: payload.title, body: payload.body }, expected);
+      assert.equal(record.message.S, expected.body, "history uses the same copy as the push");
+      const identity = `${daily ? payload.data.type : config.reminderId.S}#2026-10-05`;
+      const id = crypto.createHash("sha256").update(identity).digest("hex");
+      assert.equal(record.deliveryId.S, id);
+      assert.equal(record.SK.S, `NOTIFICATION_DELIVERY#2026-10-05#${id}`);
+    }
+    // Replaying a stale index still reserves/sends exactly once, independent of copy.
+    current.data.set(sk, structuredClone(original)); legacy.data.set(sk, structuredClone(original));
+    await current.run(); await legacy.run();
+    assert.equal(current.sends, daily ? 3 : 1);
+    assert.deepEqual(withoutHistoryCopy([...current.data]), withoutHistoryCopy([...legacy.data]));
+    assert.deepEqual(withoutHistoryCopy(current.requests), withoutHistoryCopy(legacy.requests));
+  }
+});
+test("actual Expo payloads preserve every field except title/body for task, quest and streak reminders", async () => {
+  const current = fixture({ daily: true }); await current.run();
+  const taskFixture = fixture(); await taskFixture.run();
+  const sent = [];
+  const provider = createExpoProvider({ mode: "LIVE", fetchImpl: async (_url, request) => {
+    sent.push(JSON.parse(request.body));
+    return { ok: true, json: async () => ({ data: { status: "ok" } }) };
+  } });
+  for (const payload of [...taskFixture.payloads, ...current.payloads]) {
+    await provider.send(payload);
+    await provider.send({ ...payload, title: "Evrenthia", body: "Previous notification wording" });
+    const [updated, previous] = sent.slice(-2);
+    const { title, body, ...updatedFields } = updated;
+    const { title: previousTitle, body: previousBody, ...previousFields } = previous;
+    assert.deepEqual(updatedFields, previousFields);
+    assert.deepEqual(Object.keys(updated), ["to", "title", "body", "data", "sound"]);
+    assert.deepEqual({ title, body }, { title: payload.title, body: payload.body });
+    assert.equal(Buffer.byteLength(JSON.stringify(updated), "utf8") < 4096, true);
+  }
+});
+test("real task pushes use safe missing-title copy and bounded long names", async () => {
+  for (const title of [undefined, " \n\t ", "🌱".repeat(200)]) {
+    const f = fixture();
+    f.data.get(task.SK.S).title = title === undefined ? undefined : S(title);
+    await f.run(); assert.equal(f.sends, 1);
+    const payload = f.payloads[0];
+    if (title?.trim()) assert.ok(payload.body.startsWith(`${"🌱".repeat(119)}…`));
+    else assert.equal(payload.body, "Your task is ready");
+    assert.equal(payload.body.isWellFormed(), true);
+  }
 });
 test("lost reservation response and ambiguous provider timeout never cause automatic resend", async () => {
   const f = fixture({ lostResponse: true }); await f.run(); await f.run(); assert.equal(f.sends, 0); assert.equal(f.records().length, 1);

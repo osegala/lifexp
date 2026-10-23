@@ -1,0 +1,565 @@
+{
+  "mainScreens": [
+    {
+      "screen": "home",
+      "viewport": 320,
+      "heading": "Evrenthia",
+      "navTop": 785,
+      "scrollWidth": 320,
+      "width": 320,
+      "errors": []
+    },
+    {
+      "screen": "tasks",
+      "viewport": 320,
+      "heading": "Tasks",
+      "navTop": 785,
+      "scrollWidth": 320,
+      "width": 320,
+      "errors": []
+    },
+    {
+      "screen": "base",
+      "viewport": 320,
+      "heading": "Base",
+      "navTop": 785,
+      "scrollWidth": 320,
+      "width": 320,
+      "errors": []
+    },
+    {
+      "screen": "avatar",
+      "viewport": 320,
+      "heading": "Avatar",
+      "navTop": 785,
+      "sceneHeight": 348.1328125,
+      "scrollWidth": 320,
+      "trayBottom": 780,
+      "width": 320,
+      "errors": []
+    },
+    {
+      "screen": "shop",
+      "viewport": 320,
+      "heading": "Shop",
+      "navTop": 785,
+      "scrollWidth": 320,
+      "width": 320,
+      "errors": []
+    },
+    {
+      "screen": "home",
+      "viewport": 390,
+      "heading": "Evrenthia",
+      "navTop": 785,
+      "scrollWidth": 390,
+      "width": 390,
+      "errors": []
+    },
+    {
+      "screen": "tasks",
+      "viewport": 390,
+      "heading": "Tasks",
+      "navTop": 785,
+      "scrollWidth": 390,
+      "width": 390,
+      "errors": []
+    },
+    {
+      "screen": "base",
+      "viewport": 390,
+      "heading": "Base",
+      "navTop": 785,
+      "scrollWidth": 390,
+      "width": 390,
+      "errors": []
+    },
+    {
+      "screen": "avatar",
+      "viewport": 390,
+      "heading": "Avatar",
+      "navTop": 785,
+      "sceneHeight": 349.3125,
+      "scrollWidth": 390,
+      "trayBottom": 780,
+      "width": 390,
+      "errors": []
+    },
+    {
+      "screen": "shop",
+      "viewport": 390,
+      "heading": "Shop",
+      "navTop": 785,
+      "scrollWidth": 390,
+      "width": 390,
+      "errors": []
+    },
+    {
+      "screen": "home",
+      "viewport": 430,
+      "heading": "Evrenthia",
+      "navTop": 785,
+      "scrollWidth": 430,
+      "width": 430,
+      "errors": []
+    },
+    {
+      "screen": "tasks",
+      "viewport": 430,
+      "heading": "Tasks",
+      "navTop": 785,
+      "scrollWidth": 430,
+      "width": 430,
+      "errors": []
+    },
+    {
+      "screen": "base",
+      "viewport": 430,
+      "heading": "Base",
+      "navTop": 785,
+      "scrollWidth": 430,
+      "width": 430,
+      "errors": []
+    },
+    {
+      "screen": "avatar",
+      "viewport": 430,
+      "heading": "Avatar",
+      "navTop": 785,
+      "sceneHeight": 349.9921875,
+      "scrollWidth": 430,
+      "trayBottom": 780,
+      "width": 430,
+      "errors": []
+    },
+    {
+      "screen": "shop",
+      "viewport": 430,
+      "heading": "Shop",
+      "navTop": 785,
+      "scrollWidth": 430,
+      "width": 430,
+      "errors": []
+    },
+    {
+      "screen": "home",
+      "viewport": 768,
+      "heading": "Evrenthia",
+      "navTop": 785,
+      "scrollWidth": 768,
+      "width": 768,
+      "errors": []
+    },
+    {
+      "screen": "tasks",
+      "viewport": 768,
+      "heading": "Tasks",
+      "navTop": 785,
+      "scrollWidth": 768,
+      "width": 768,
+      "errors": []
+    },
+    {
+      "screen": "base",
+      "viewport": 768,
+      "heading": "Base",
+      "navTop": 785,
+      "scrollWidth": 768,
+      "width": 768,
+      "errors": []
+    },
+    {
+      "screen": "avatar",
+      "viewport": 768,
+      "heading": "Avatar",
+      "navTop": 785,
+      "sceneHeight": 342.65625,
+      "scrollWidth": 768,
+      "trayBottom": 780,
+      "width": 768,
+      "errors": []
+    },
+    {
+      "screen": "shop",
+      "viewport": 768,
+      "heading": "Shop",
+      "navTop": 785,
+      "scrollWidth": 768,
+      "width": 768,
+      "errors": []
+    },
+    {
+      "screen": "home",
+      "viewport": 1024,
+      "heading": "Evrenthia",
+      "navTop": 785,
+      "scrollWidth": 1024,
+      "width": 1024,
+      "errors": []
+    },
+    {
+      "screen": "tasks",
+      "viewport": 1024,
+      "heading": "Tasks",
+      "navTop": 785,
+      "scrollWidth": 1024,
+      "width": 1024,
+      "errors": []
+    },
+    {
+      "screen": "base",
+      "viewport": 1024,
+      "heading": "Base",
+      "navTop": 785,
+      "scrollWidth": 1024,
+      "width": 1024,
+      "errors": []
+    },
+    {
+      "screen": "avatar",
+      "viewport": 1024,
+      "heading": "Avatar",
+      "navTop": 785,
+      "sceneHeight": 349.703125,
+      "scrollWidth": 1024,
+      "trayBottom": 780,
+      "width": 1024,
+      "errors": []
+    },
+    {
+      "screen": "shop",
+      "viewport": 1024,
+      "heading": "Shop",
+      "navTop": 785,
+      "scrollWidth": 1024,
+      "width": 1024,
+      "errors": []
+    },
+    {
+      "screen": "home",
+      "viewport": 1440,
+      "heading": "Evrenthia",
+      "navTop": 785,
+      "scrollWidth": 1440,
+      "width": 1440,
+      "errors": []
+    },
+    {
+      "screen": "tasks",
+      "viewport": 1440,
+      "heading": "Tasks",
+      "navTop": 785,
+      "scrollWidth": 1440,
+      "width": 1440,
+      "errors": []
+    },
+    {
+      "screen": "base",
+      "viewport": 1440,
+      "heading": "Base",
+      "navTop": 785,
+      "scrollWidth": 1440,
+      "width": 1440,
+      "errors": []
+    },
+    {
+      "screen": "avatar",
+      "viewport": 1440,
+      "heading": "Avatar",
+      "navTop": 785,
+      "sceneHeight": 348.234375,
+      "scrollWidth": 1440,
+      "trayBottom": 780,
+      "width": 1440,
+      "errors": []
+    },
+    {
+      "screen": "shop",
+      "viewport": 1440,
+      "heading": "Shop",
+      "navTop": 785,
+      "scrollWidth": 1440,
+      "width": 1440,
+      "errors": []
+    }
+  ],
+  "accountScreens": [
+    {
+      "view": "login",
+      "viewport": 320,
+      "heading": "Welcome back",
+      "scrollWidth": 320,
+      "width": 320,
+      "errors": []
+    },
+    {
+      "view": "register",
+      "viewport": 320,
+      "heading": "Begin your adventure",
+      "scrollWidth": 320,
+      "width": 320,
+      "errors": []
+    },
+    {
+      "view": "profile",
+      "viewport": 320,
+      "heading": "Profile",
+      "scrollWidth": 320,
+      "width": 320,
+      "errors": []
+    },
+    {
+      "view": "premium",
+      "viewport": 320,
+      "heading": "Evrenthia Premium",
+      "scrollWidth": 320,
+      "width": 320,
+      "errors": []
+    },
+    {
+      "view": "onboarding",
+      "viewport": 320,
+      "heading": "Welcome",
+      "scrollWidth": 320,
+      "width": 320,
+      "errors": []
+    },
+    {
+      "view": "login",
+      "viewport": 390,
+      "heading": "Welcome back",
+      "scrollWidth": 390,
+      "width": 390,
+      "errors": []
+    },
+    {
+      "view": "register",
+      "viewport": 390,
+      "heading": "Begin your adventure",
+      "scrollWidth": 390,
+      "width": 390,
+      "errors": []
+    },
+    {
+      "view": "profile",
+      "viewport": 390,
+      "heading": "Profile",
+      "scrollWidth": 390,
+      "width": 390,
+      "errors": []
+    },
+    {
+      "view": "premium",
+      "viewport": 390,
+      "heading": "Evrenthia Premium",
+      "scrollWidth": 390,
+      "width": 390,
+      "errors": []
+    },
+    {
+      "view": "onboarding",
+      "viewport": 390,
+      "heading": "Welcome",
+      "scrollWidth": 390,
+      "width": 390,
+      "errors": []
+    },
+    {
+      "view": "login",
+      "viewport": 430,
+      "heading": "Welcome back",
+      "scrollWidth": 430,
+      "width": 430,
+      "errors": []
+    },
+    {
+      "view": "register",
+      "viewport": 430,
+      "heading": "Begin your adventure",
+      "scrollWidth": 430,
+      "width": 430,
+      "errors": []
+    },
+    {
+      "view": "profile",
+      "viewport": 430,
+      "heading": "Profile",
+      "scrollWidth": 430,
+      "width": 430,
+      "errors": []
+    },
+    {
+      "view": "premium",
+      "viewport": 430,
+      "heading": "Evrenthia Premium",
+      "scrollWidth": 430,
+      "width": 430,
+      "errors": []
+    },
+    {
+      "view": "onboarding",
+      "viewport": 430,
+      "heading": "Welcome",
+      "scrollWidth": 430,
+      "width": 430,
+      "errors": []
+    },
+    {
+      "view": "login",
+      "viewport": 768,
+      "heading": "Welcome back",
+      "scrollWidth": 768,
+      "width": 768,
+      "errors": []
+    },
+    {
+      "view": "register",
+      "viewport": 768,
+      "heading": "Begin your adventure",
+      "scrollWidth": 768,
+      "width": 768,
+      "errors": []
+    },
+    {
+      "view": "profile",
+      "viewport": 768,
+      "heading": "Profile",
+      "scrollWidth": 768,
+      "width": 768,
+      "errors": []
+    },
+    {
+      "view": "premium",
+      "viewport": 768,
+      "heading": "Evrenthia Premium",
+      "scrollWidth": 768,
+      "width": 768,
+      "errors": []
+    },
+    {
+      "view": "onboarding",
+      "viewport": 768,
+      "heading": "Welcome",
+      "scrollWidth": 768,
+      "width": 768,
+      "errors": []
+    },
+    {
+      "view": "login",
+      "viewport": 1440,
+      "heading": "Welcome back",
+      "scrollWidth": 1440,
+      "width": 1440,
+      "errors": []
+    },
+    {
+      "view": "register",
+      "viewport": 1440,
+      "heading": "Begin your adventure",
+      "scrollWidth": 1440,
+      "width": 1440,
+      "errors": []
+    },
+    {
+      "view": "profile",
+      "viewport": 1440,
+      "heading": "Profile",
+      "scrollWidth": 1440,
+      "width": 1440,
+      "errors": []
+    },
+    {
+      "view": "premium",
+      "viewport": 1440,
+      "heading": "Evrenthia Premium",
+      "scrollWidth": 1440,
+      "width": 1440,
+      "errors": []
+    },
+    {
+      "view": "onboarding",
+      "viewport": 1440,
+      "heading": "Welcome",
+      "scrollWidth": 1440,
+      "width": 1440,
+      "errors": []
+    }
+  ],
+  "stress": [
+    {
+      "scenario": "short-phone",
+      "screen": "home",
+      "navTop": 509,
+      "scrollWidth": 320,
+      "width": 320
+    },
+    {
+      "scenario": "short-phone",
+      "screen": "tasks",
+      "navTop": 509,
+      "scrollWidth": 320,
+      "width": 320
+    },
+    {
+      "scenario": "short-phone",
+      "screen": "base",
+      "navTop": 509,
+      "scrollWidth": 320,
+      "width": 320
+    },
+    {
+      "scenario": "short-phone",
+      "screen": "avatar",
+      "navTop": 509,
+      "sceneHeight": 219.015625,
+      "scrollWidth": 320,
+      "trayBottom": 504,
+      "width": 320
+    },
+    {
+      "scenario": "short-phone",
+      "screen": "shop",
+      "navTop": 509,
+      "scrollWidth": 320,
+      "width": 320
+    },
+    {
+      "scenario": "large-text",
+      "screen": "home",
+      "navTop": 785,
+      "scrollWidth": 320,
+      "width": 320
+    },
+    {
+      "scenario": "large-text",
+      "screen": "tasks",
+      "navTop": 785,
+      "scrollWidth": 320,
+      "width": 320
+    },
+    {
+      "scenario": "large-text",
+      "screen": "base",
+      "navTop": 785,
+      "scrollWidth": 320,
+      "width": 320
+    },
+    {
+      "scenario": "large-text",
+      "screen": "avatar",
+      "navTop": 785,
+      "sceneHeight": 287.15625,
+      "scrollWidth": 320,
+      "trayBottom": 780,
+      "width": 320
+    },
+    {
+      "scenario": "large-text",
+      "screen": "shop",
+      "navTop": 785,
+      "scrollWidth": 320,
+      "width": 320
+    }
+  ],
+  "note": "Browser fixture review. Large text uses CSS; native keyboard, safe-area insets and Dynamic Type require device validation."
+}

@@ -1,3 +1,4 @@
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -8,6 +9,8 @@ import * as theme from "../src/theme/theme.ts";
 import * as progress from "../src/base/buildingProgress.ts";
 import { apiRoutes } from "../src/api/routes.ts";
 import { apiError } from "../src/api/errors.ts";
+import { memoryCache, deferred, world as cachedWorld, baseLayout } from "./cache-test-support.mjs";
+import { SupersededCacheRead } from "../src/cache/PlayerCache.ts";
 
 const require = createRequire(import.meta.url);
 const source = readFileSync(new URL("../app/(tabs)/base.tsx", import.meta.url), "utf8");
@@ -15,24 +18,26 @@ const ast = ts.createSourceFile("base.tsx", source, ts.ScriptTarget.Latest, true
 const syntax = []; function walk(node) { syntax.push(node); ts.forEachChild(node, walk); } walk(ast);
 const hash = nodes => createHash("sha256").update(nodes.map(n => n.getText()).join("\n")).digest("hex");
 
-test("Base retains the exact pre-phase world renderer, geometry, coordinates, placement and storage helpers", () => {
-  // Fingerprints taken from the pre-Phase-6 HEAD. UI-only edits must not touch these.
+test("Base retains the world renderer, geometry, coordinates and placement while account cache owns storage", () => {
+  // Geometry fingerprints exclude the retired unscoped storage helpers.
   const functions = ast.statements.filter(n => ts.isFunctionDeclaration(n) && !["BaseScreen", "BuildingNode"].includes(n.name?.text));
   const constants = ast.statements.filter(ts.isVariableStatement).flatMap(s => [...s.declarationList.declarations]).filter(n => n.name.getText() !== "styles");
-  assert.equal(hash(functions), "0189cc0315513ce1d95e09b0108a694ec095c39c4a7caff4f1231222d0074f19");
+  assert.equal(hash(functions), "d49427c1c236e1cb0a6aaa893e00caae107585d06c566037cc34940630c7e321");
   assert.equal(hash(constants), "d04991d9bf726c6e7190aec056293a1043f7ab44d9f49ac586d91b66c3c10272");
   assert.match(source, /<MapViewport\s+image=\{BASE_BACKGROUND_IMAGES\.tiledGround\}/);
   assert.match(source, /layout=\{buildingLayouts\[building\.type\]\}/);
   assert.match(source, /<BuildingTierArtwork type=\{building\.type\} tier=\{building\.visualTier\}/);
-  assert.match(source, /<BuildingUpgradeFeedback batch=\{celebration\} motion=\{upgradeMotion\} onDone=\{finishBuildings\} tone="parchment" style=\{styles\.upgradeFeedback\}/);
-  assert.match(source, /upgradeFeedback: \{ top: ui\.spacing\.md \* 2 \+ ui\.size\.target, bottom: undefined \}/);
+  assert.match(source, /<BuildingUpgradeFeedback batch=\{celebration\} motion=\{upgradeMotion\} onDone=\{finishBuildings\} tone="parchment"/);
+  assert.match(readFileSync(new URL("../src/components/BuildingUpgradeFeedback.tsx", import.meta.url), "utf8"), /<GameNoticeOverlay/);
   assert.doesNotMatch(source, /kingdomMap|Skia|expo-image|recyclingKey|FlatList/);
+  assert.doesNotMatch(source, /SecureStore|BASE_LAYOUT_STORAGE_KEY|localStorage/);
 });
 
 test("camera, gestures, collision-aware dragging, path generation and decoration rendering are unchanged", () => {
-  const names = ["composedMapGesture", "webMapHandlers", "moveBuilding", "sortedBuildings", "pathTiles", "mapDecorations", "buildingGesture"];
+  // moveBuilding adds cache invalidation; its geometry remains in resolveBuildingMove above.
+  const names = ["composedMapGesture", "webMapHandlers", "sortedBuildings", "pathTiles", "mapDecorations", "buildingGesture"];
   assert.equal(hash(names.map(name => syntax.find(n => ts.isVariableDeclaration(n) && n.name.getText() === name))),
-    "734c8c7eab661af6e3e00b47f108a232a6d8483ccfbb13a10ff976710c30ca87");
+    "c56e6f75d3b0db42536a461a34ca401d5a69103ba2319034e035e0c2c94cbcd8");
   assert.match(source, /accessible accessibilityRole="button"[\s\S]*?Select building/);
   assert.match(source, /Platform\.OS === "web" \? \{ tabIndex: 0 \}/);
   assert.doesNotMatch(source, /onKeyDown|onKeyUp/, "RNGH already activates tap gestures with Enter/Space; do not double-toggle selection");
@@ -47,7 +52,9 @@ function load(path, imports) {
     jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true,
   } }).outputText;
   new Function("require", "exports", "__DEV__", code)(id => {
-    if (id === "react/jsx-runtime") return require(id);
+    if (id === "react/jsx-runtime") return noticeJsxRuntime;
+    const notice = noticeImport(id, imports); if (notice !== undefined) return notice;
+    if (id === "../../src/context/AuthContext") return imports[id] ?? { useAuth: () => ({ user: { id: "base-user", coins: 739 } }) };
     assert.ok(id in imports, `Unexpected import ${id}`); return imports[id];
   }, exports, false);
   return exports;
@@ -58,17 +65,18 @@ const nodes = tree => Array.isArray(tree) ? tree.flatMap(nodes) : tree?.props ? 
 const text = tree => Array.isArray(tree) ? tree.map(text).join("") : tree?.props ? text(tree.props.children) : typeof tree === "string" || typeof tree === "number" ? String(tree) : "";
 const find = (tree, type) => nodes(tree).find(n => n.type === type || typeof n.type === "function" && n.type.name === type);
 const panel = load("../src/components/BasePanels.tsx", {
-  "react-native": native, "@expo/vector-icons/MaterialCommunityIcons": "Icon", "../base/buildingAssetRegistry": { getBuildingImageSource: (type, tier) => ({ uri: `${type}-${tier}` }) },
+  "react-native": native, "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 20 }) }, "@expo/vector-icons/MaterialCommunityIcons": "Icon", "../base/buildingAssetRegistry": { getBuildingImageSource: (type, tier) => ({ uri: `${type}-${tier}` }) },
   "../theme/theme": theme, "./ui/Indicators": { ResourcePill: "Resource" },
   "./ui/Primitives": Object.fromEntries(["SurfaceCard", "UiPressable", "UiText"].map(n => [n, n])),
 });
 const building = { buildingId: "workshop", type: "Workshop", level: 1, maxLevel: 5, visualTier: 1, upgradeAvailable: true, upgradeCost: 100 };
 
-test("resource overlay displays only authoritative World Points, unknown stays unknown, retry retains its callback", () => {
+test("resource overlay displays authoritative Coins and World Points, unknown stays unknown, retry retains its callback", () => {
   let retried = false;
   for (const value of [0, 412, 1234567890, undefined]) {
-    const ui = panel.BaseResources({ worldPoints: value, loading: false, error: "Offline", onRetry: () => { retried = true; } });
-    assert.deepEqual(find(ui, "Resource").props, { resource: "worldPoints", value: value ?? "—" });
+    const ui = panel.BaseResources({ coins: value, worldPoints: value, loading: false, error: "Offline", onRetry: () => { retried = true; } });
+    assert.deepEqual(nodes(ui).filter(n => n.type === "Resource").map(n => n.props),
+      ["coins", "worldPoints"].map(resource => ({ tone: "hud", resource, value: value ?? "—" })));
     const retry = find(ui, "UiPressable"); assert.equal(retry.props.accessibilityLabel, "Retry loading world"); retry.props.onPress();
     assert.match(text(ui), /Offline/); assert.doesNotMatch(text(ui), /Coins|Gems|XP/);
   }
@@ -93,25 +101,32 @@ test("screen-space panel preserves upgrade/enter/info/close semantics, requireme
 });
 
 const tick = () => new Promise(setImmediate);
-async function controller({ failRead = false, failPost = false, locked = false, maxed = false, deferPost } = {}) {
-  const state = []; let index = 0, effects = [], focus;
+async function controller({ failRead = false, failPost = false, locked = false, maxed = false, deferPost,
+  cache = memoryCache().cache, userId = "base-user", read, autoFocus = true } = {}) {
+  const state = [], cleanups = new Map(); let index = 0, effects = [], focus, blur;
+  const changed = (before, after) => !before || after.some((value, i) => value !== before[i]);
   const react = { useState(initial) { const i = index++; if (!(i in state)) state[i] = typeof initial === "function" ? initial() : initial;
     return [state[i], value => { state[i] = typeof value === "function" ? value(state[i]) : value; }]; },
-    useRef(initial) { const i = index++; return state[i] ??= { current: initial }; }, useMemo: fn => fn(), useCallback: fn => fn,
-    useEffect: fn => effects.push(fn) };
+    useRef(initial) { const i = index++; return state[i] ??= { current: initial }; },
+    useMemo(fn, deps) { const i = index++; if (!state[i] || changed(state[i].deps, deps)) state[i] = { deps, value: fn() }; return state[i].value; },
+    useCallback(fn, deps) { return react.useMemo(() => fn, deps); },
+    useEffect(fn, deps) { const i = index++; if (changed(state[i], deps)) { state[i] = deps; effects.push(() => { cleanups.get(i)?.(); cleanups.set(i, fn()); }); } } };
   const calls = [], alerts = [], batches = [];
   let blockedRead = failRead;
-  let world = { worldPoints: 412, buildings: [{ buildingId: "workshop", name: "Workshop", currentLevel: maxed ? 5 : 1, level: maxed ? 5 : 1,
-    maxLevel: 5, upgradeCost: maxed ? null : 100, canUpgrade: !locked && !maxed }] };
+  let world = { ...cachedWorld, buildings: [{ ...cachedWorld.buildings[0], currentLevel: maxed ? 5 : 1, level: maxed ? 5 : 1,
+    maxed, maxLevel: 5, upgradeCost: maxed ? null : 100, canUpgrade: !locked && !maxed }] };
   const gesture = new Proxy({}, { get: () => () => gesture });
   const Screen = load("../app/(tabs)/base.tsx", { react, "react-native": { ...native, Alert: { alert: (...args) => alerts.push(args) } },
     "expo-secure-store": {}, "expo-router": { useFocusEffect: fn => { focus = fn; } }, "@expo/vector-icons/MaterialCommunityIcons": "Icon",
     "react-native-gesture-handler": { Gesture: gesture, GestureDetector: "Gesture" },
+    "../../src/cache/playerData": { playerCache: cache }, "../../src/cache/PlayerCache": { SupersededCacheRead },
+    "../../src/context/AuthContext": { useAuth: () => ({ user: { id: userId, coins: 739 } }) },
     "../../src/api/client": { apiError, api: {
-      get: async route => { calls.push(["GET", route]); if (blockedRead) throw new Error("offline"); return { data: world }; },
+      get: async route => { calls.push(["GET", route]); if (blockedRead) throw new Error("offline"); return { data: read ? await read(world, calls.filter(([method]) => method === "GET").length) : world }; },
       post: async (route, body) => { calls.push(["POST", route, body]); if (deferPost) await deferPost;
         if (failPost) throw new Error("offline"); world = { ...world, worldPoints: 312, buildings: [{ ...world.buildings[0], level: 2, currentLevel: 2 }] };
-        return { data: { upgraded: true, building: { buildingId: "workshop", name: "Workshop", oldLevel: 1, newLevel: 2, maxLevel: 5 } } }; },
+        return { data: { upgraded: true, building: { buildingId: "workshop", name: "Workshop", oldLevel: 1, newLevel: 2, maxLevel: 5 },
+          cost: { worldPoints: 100 }, player: { worldPoints: 312 } } }; },
     } }, "../../src/api/routes": { apiRoutes }, "../../src/base/buildingProgress": progress,
     "../../src/base/buildingAssetRegistry": { BASE_BACKGROUND_IMAGES: { tiledGround: "ground" }, getBuildingImageSource: () => "art" },
     "../../src/base/mapAssetRegistry": { DECORATION_IMAGES: {}, getPathTileSource: () => "path" }, "../../src/base/pathNetwork": { buildPathNetwork: () => [] },
@@ -120,10 +135,12 @@ async function controller({ failRead = false, failPost = false, locked = false, 
     "../../src/context/CompletionFeedbackContext": { useBuildingFeedback: () => ({ pending: undefined, enqueue: batch => batches.push(batch), finish() {} }) },
     "../../src/storage/localAccountData": { BASE_LAYOUT_STORAGE_KEY: "layout" }, "../../src/theme/theme": theme,
   }).default;
-  function render() { index = 0; effects = []; return Screen(); }
-  render(); focus(); render(); effects.find(fn => String(fn).includes("if (focused)"))(); await tick();
+  function render() { index = 0; effects = []; const tree = Screen(); effects.forEach(fn => fn()); return tree; }
+  const initial = render(); if (autoFocus) { blur = focus(); render(); await tick(); }
   const select = () => { find(render(), "BuildingNode").props.onPress(); return find(render(), "Panel"); };
-  return { render, select, calls, alerts, batches, blockRead(value) { blockedRead = value; } };
+  return { render, initial, select, calls, alerts, batches, cache, blockRead(value) { blockedRead = value; },
+    focus: async () => { blur = focus(); render(); await tick(); },
+    dispose: () => { blur?.(); for (const cleanup of cleanups.values()) cleanup?.(); } };
 }
 
 test("confirmed upgrades keep exact POST, same-tick guard, server refresh and celebration flow", async () => {
@@ -163,4 +180,81 @@ test("initial/refresh failures keep unknown/last confirmed resources and recover
   ui.blockRead(true); find(ui.render(), "Resources").props.onRetry(); await tick();
   assert.equal(find(ui.render(), "Resources").props.worldPoints, 412);
   assert.equal(find(ui.render(), "Panel").props.building.level, 1);
+});
+
+test("cold Base restores world, building tier, resource HUD and placement before AWS responds", async t => {
+  const first = memoryCache(); first.cache.set("alice", "world", cachedWorld); first.cache.set("alice", "baseLayout", baseLayout); await tick();
+  const cache = memoryCache("test", first.values).cache; await cache.hydrateUser("alice");
+  const pending = deferred(), ui = await controller({ cache, userId: "alice", autoFocus: false, read: () => pending.promise }); t.after(ui.dispose);
+  assert.doesNotMatch(text(ui.initial), /Building your kingdom/);
+  assert.equal(ui.calls.length, 0); assert.equal(find(ui.initial, "Resources").props.worldPoints, 412);
+  assert.equal(find(ui.initial, "Resources").props.coins, 739);
+  const building = find(ui.initial, "BuildingNode"); assert.equal(building.props.building.level, 1);
+  const position = building.props.layout;
+  await ui.focus(); assert.deepEqual(find(ui.render(), "BuildingNode").props.layout, position);
+  pending.reject(Error("offline")); await tick();
+  assert.equal(find(ui.render(), "BuildingNode").props.building.level, 1);
+  assert.equal(find(ui.render(), "Resources").props.worldPoints, 412);
+  assert.match(find(ui.render(), "Resources").props.error, /Could not load/);
+  await tick(); const restarted = memoryCache("test", first.values).cache; await restarted.hydrateUser("alice");
+  assert.deepEqual(restarted.peek("alice", "world"), cachedWorld);
+  assert.ok(restarted.peek("alice", "baseLayout"));
+});
+
+test("Base replaces and persists cached world data after a successful background refresh", async t => {
+  const first = memoryCache(); first.cache.set("alice", "world", cachedWorld); await tick();
+  const cache = memoryCache("test", first.values).cache; await cache.hydrateUser("alice");
+  const pending = deferred(), ui = await controller({ cache, userId: "alice", read: () => pending.promise }); t.after(ui.dispose);
+  const fresh = { ...cachedWorld, worldPoints: 900, buildings: [{ ...cachedWorld.buildings[0], currentLevel: 3, level: 3, upgradeCost: 300 }] };
+  pending.resolve(fresh); await tick();
+  assert.equal(find(ui.render(), "Resources").props.worldPoints, 900);
+  assert.equal(find(ui.render(), "BuildingNode").props.building.visualTier, 3);
+  const restarted = memoryCache("test", first.values).cache; await restarted.hydrateUser("alice");
+  assert.deepEqual(restarted.peek("alice", "world"), fresh);
+});
+
+test("building mutation updates persistent display state only after confirmation, even if the following refresh fails", async t => {
+  const first = memoryCache(), confirm = deferred();
+  const ui = await controller({ cache: first.cache, deferPost: confirm.promise }); t.after(ui.dispose);
+  const original = structuredClone(first.cache.peek("base-user", "world"));
+  const upgrade = ui.select().props.onAction("upgrade"); await tick();
+  assert.deepEqual(first.cache.peek("base-user", "world"), original);
+  ui.blockRead(true); confirm.resolve(); await upgrade;
+  assert.equal(find(ui.render(), "Panel").props.building.level, 2);
+  assert.equal(find(ui.render(), "Resources").props.worldPoints, 312);
+  await tick(); const restarted = memoryCache("test", first.values).cache; await restarted.hydrateUser("base-user");
+  assert.equal(restarted.peek("base-user", "world").worldPoints, 312);
+  assert.equal(restarted.peek("base-user", "world").buildings[0].currentLevel, 2);
+  assert.deepEqual(ui.calls.filter(([method]) => method === "POST"), [["POST", apiRoutes.upgradeBuilding("workshop"), {}]]);
+});
+
+test("a pre-upgrade world read cannot overwrite the confirmed building mutation", async t => {
+  const { cache } = memoryCache(); cache.set("base-user", "world", cachedWorld);
+  const old = deferred(), ui = await controller({ cache, read: (world, count) => count === 1 ? old.promise : Promise.resolve(world) }); t.after(ui.dispose);
+  await ui.select().props.onAction("upgrade");
+  old.resolve(cachedWorld); await tick();
+  assert.equal(find(ui.render(), "BuildingNode").props.building.level, 2);
+  assert.equal(cache.peek("base-user", "world").worldPoints, 312);
+  assert.equal(cache.peek("base-user", "world").buildings[0].currentLevel, 2);
+});
+
+test("Base does not expose another account's world or positions and late work after logout cannot repersist it", async t => {
+  const { cache } = memoryCache(); cache.set("alice", "world", cachedWorld); cache.set("alice", "baseLayout", baseLayout);
+  const pending = deferred(), bob = await controller({ cache, userId: "bob", autoFocus: false, read: () => pending.promise }); t.after(bob.dispose);
+  assert.match(text(bob.initial), /Building your kingdom/); assert.equal(find(bob.initial, "BuildingNode"), undefined);
+  const confirm = deferred(), alice = await controller({ cache, userId: "alice", deferPost: confirm.promise }); t.after(alice.dispose);
+  const node = find(alice.render(), "BuildingNode");
+  const action = alice.select().props.onAction("upgrade"); await tick();
+  await cache.clearUser("alice");
+  node.props.onMove("Workshop", { ...node.props.layout, x: node.props.layout.x + 300 }); alice.render();
+  confirm.resolve(); await action;
+  assert.equal(cache.peek("alice", "world"), null); assert.equal(cache.peek("alice", "baseLayout"), null);
+  assert.equal(alice.batches.length, 0);
+});
+
+test("missing or corrupt world cache shows the genuine first-load state", async t => {
+  const disk = new Map([["evrenthia.player-cache.v1.test.alice.world", JSON.stringify({ version: 1, data: { worldPoints: 0, buildings: [{}] } })]]);
+  const { cache } = memoryCache("test", disk); await cache.hydrateUser("alice");
+  const pending = deferred(), ui = await controller({ cache, userId: "alice", autoFocus: false, read: () => pending.promise }); t.after(ui.dispose);
+  assert.match(text(ui.initial), /Building your kingdom/); assert.equal(cache.peek("alice", "world"), null);
 });

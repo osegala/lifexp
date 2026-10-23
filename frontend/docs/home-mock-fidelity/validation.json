@@ -1,0 +1,27 @@
+{
+  "commands": {
+    "npm test": "278 passed, 0 failed",
+    "npx tsc --noEmit": "passed",
+    "npm run lint": "passed, 0 warnings",
+    "git diff --check": "passed"
+  },
+  "changedExistingFiles": [
+    "frontend/src/components/HomeContent.tsx",
+    "frontend/src/components/ui/Primitives.tsx",
+    "frontend/tests/home-redesign.test.mjs"
+  ],
+  "allOtherInitiallyDirtyFilesUnchanged": true,
+  "todayMarkupAndStylesUnchanged": true,
+  "navigationSourceUnchanged": true,
+  "nativeRuntimeReviewed": false,
+  "reviewViewports": [
+    [
+      390,
+      844
+    ],
+    [
+      430,
+      932
+    ]
+  ]
+}

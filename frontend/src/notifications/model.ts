@@ -30,7 +30,7 @@ export const validClock = (value: string) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(
 export function reminderTiming(choice: ReminderChoice, clock: string, dueTime: string) {
   if (choice === "NONE") return { enabled: false, localTime: null, offsetMinutes: null };
   if (choice === "CUSTOM") {
-    if (!validClock(clock)) throw new Error("Enter a reminder time in 24-hour HH:mm format.");
+    if (!validClock(clock)) throw new Error("Enter a valid reminder time, such as 8:45 AM.");
     return { enabled: true, localTime: clock, offsetMinutes: null };
   }
   if (!validClock(dueTime)) throw new Error("Set a due time or choose an explicit reminder time.");

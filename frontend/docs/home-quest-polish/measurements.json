@@ -1,0 +1,51 @@
+{
+  "before": {
+    "width390": {
+      "daily": 228,
+      "weekly": 228,
+      "streak": 152
+    }
+  },
+  "after": {
+    "width390": [
+      {
+        "height": 137,
+        "label": "Daily Quest, 2 of 3 tasks completed. In progress. Reward: +30 World Points.",
+        "overflow": false,
+        "width": 358
+      },
+      {
+        "height": 137,
+        "label": "Weekly Quest, 8 of 15 tasks completed. In progress. Reward: +100 World Points.",
+        "overflow": false,
+        "width": 358
+      },
+      {
+        "height": 117,
+        "label": "Daily activity streak, 7 days. Longest 9 days. Today counts.",
+        "overflow": false,
+        "width": 358
+      }
+    ],
+    "width430": [
+      {
+        "height": 137,
+        "label": "Daily Quest, 2 of 3 tasks completed. In progress. Reward: +30 World Points.",
+        "overflow": false,
+        "width": 398
+      },
+      {
+        "height": 137,
+        "label": "Weekly Quest, 8 of 15 tasks completed. In progress. Reward: +100 World Points.",
+        "overflow": false,
+        "width": 398
+      },
+      {
+        "height": 117,
+        "label": "Daily activity streak, 7 days. Longest 9 days. Today counts.",
+        "overflow": false,
+        "width": 398
+      }
+    ]
+  }
+}

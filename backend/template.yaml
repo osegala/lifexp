@@ -67,14 +67,32 @@ Parameters:
   RevenueCatEntitlementId:
     Type: String
     Default: ""
-  RevenueCatProducts:
+  RevenueCatProductId:
     Type: String
-    Default: "[]"
-    Description: JSON allowlist of RevenueCat product id, appId, storeIdentifier and store.
+    Default: ""
+  RevenueCatAppId:
+    Type: String
+    Default: ""
+  RevenueCatStoreIdentifier:
+    Type: String
+    Default: ""
+  RevenueCatStore:
+    Type: String
+    Default: "app_store"
+    AllowedValues:
+      - "app_store"
+      - "play_store"
   RevenueCatEnvironment:
     Type: String
     Default: sandbox
     AllowedValues: [sandbox, production]
+  RevenueCatSandboxInProdEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "false"
+      - "true"
+    Description: Temporary TestFlight/sandbox verification against PROD only; defaults off to fail closed. Disable before App Store production billing.
   AdMobSsvEnabled:
     Type: String
     Default: "false"
@@ -865,10 +883,11 @@ Resources:
             Ref: RevenueCatProjectId
           REVENUECAT_ENTITLEMENT_ID:
             Ref: RevenueCatEntitlementId
-          REVENUECAT_PRODUCTS:
-            Ref: RevenueCatProducts
+          REVENUECAT_PRODUCTS: !Sub '[{"id":"${RevenueCatProductId}","appId":"${RevenueCatAppId}","storeIdentifier":"${RevenueCatStoreIdentifier}","store":"${RevenueCatStore}"}]'
           REVENUECAT_ENVIRONMENT:
             Ref: RevenueCatEnvironment
+          REVENUECAT_SANDBOX_IN_PROD_ENABLED:
+            Ref: RevenueCatSandboxInProdEnabled
       Policies:
         - Version: "2012-10-17"
           Statement:

@@ -1,0 +1,348 @@
+[
+  {
+    "brokenImages": 0,
+    "character": {
+      "bottom": 409,
+      "height": 300,
+      "left": 0,
+      "right": 390,
+      "top": 109,
+      "width": 390,
+      "x": 0,
+      "y": 109
+    },
+    "coins": {
+      "bottom": 105,
+      "height": 30,
+      "left": 229.3125,
+      "right": 303.65625,
+      "top": 75,
+      "width": 74.34375,
+      "x": 229.3125,
+      "y": 75
+    },
+    "documentWidth": 390,
+    "header": {
+      "bottom": 75,
+      "height": 75,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "headerPaddingTop": "8px",
+    "hero": {
+      "bottom": 459,
+      "height": 459,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "profile": {
+      "bottom": 56.5,
+      "height": 38,
+      "left": 336,
+      "right": 374,
+      "top": 18.5,
+      "width": 38,
+      "x": 336,
+      "y": 18.5
+    },
+    "scene": {
+      "bottom": 409,
+      "height": 409,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "tabs": [
+      {
+        "label": null,
+        "rect": {
+          "bottom": 840,
+          "height": 56,
+          "left": 6,
+          "right": 78.3984375,
+          "top": 784,
+          "width": 72.3984375,
+          "x": 6,
+          "y": 784
+        },
+        "selected": "true"
+      },
+      {
+        "label": null,
+        "rect": {
+          "bottom": 840,
+          "height": 56,
+          "left": 82.3984375,
+          "right": 154.8046875,
+          "top": 784,
+          "width": 72.40625,
+          "x": 82.3984375,
+          "y": 784
+        },
+        "selected": "false"
+      },
+      {
+        "label": null,
+        "rect": {
+          "bottom": 840,
+          "height": 56,
+          "left": 158.8046875,
+          "right": 231.203125,
+          "top": 784,
+          "width": 72.3984375,
+          "x": 158.8046875,
+          "y": 784
+        },
+        "selected": "false"
+      },
+      {
+        "label": null,
+        "rect": {
+          "bottom": 840,
+          "height": 56,
+          "left": 235.203125,
+          "right": 307.6015625,
+          "top": 784,
+          "width": 72.3984375,
+          "x": 235.203125,
+          "y": 784
+        },
+        "selected": "false"
+      },
+      {
+        "label": null,
+        "rect": {
+          "bottom": 840,
+          "height": 56,
+          "left": 311.6015625,
+          "right": 384,
+          "top": 784,
+          "width": 72.3984375,
+          "x": 311.6015625,
+          "y": 784
+        },
+        "selected": "false"
+      }
+    ],
+    "today": [
+      {
+        "bottom": 515,
+        "height": 28,
+        "left": 28,
+        "right": 260.21875,
+        "top": 487,
+        "width": 232.21875,
+        "x": 28,
+        "y": 487
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "worldPoints": {
+      "bottom": 105,
+      "height": 30,
+      "left": 307.65625,
+      "right": 382,
+      "top": 75,
+      "width": 74.34375,
+      "x": 307.65625,
+      "y": 75
+    },
+    "xp": {
+      "bottom": 449,
+      "height": 7,
+      "left": 67.0546875,
+      "right": 382,
+      "top": 442,
+      "width": 314.9453125,
+      "x": 67.0546875,
+      "y": 442
+    }
+  },
+  {
+    "brokenImages": 0,
+    "character": {
+      "bottom": 409,
+      "height": 300,
+      "left": 0,
+      "right": 430,
+      "top": 109,
+      "width": 430,
+      "x": 0,
+      "y": 109
+    },
+    "coins": {
+      "bottom": 105,
+      "height": 30,
+      "left": 269.3125,
+      "right": 343.65625,
+      "top": 75,
+      "width": 74.34375,
+      "x": 269.3125,
+      "y": 75
+    },
+    "documentWidth": 430,
+    "header": {
+      "bottom": 75,
+      "height": 75,
+      "left": 0,
+      "right": 430,
+      "top": 0,
+      "width": 430,
+      "x": 0,
+      "y": 0
+    },
+    "headerPaddingTop": "8px",
+    "hero": {
+      "bottom": 459,
+      "height": 459,
+      "left": 0,
+      "right": 430,
+      "top": 0,
+      "width": 430,
+      "x": 0,
+      "y": 0
+    },
+    "profile": {
+      "bottom": 56.5,
+      "height": 38,
+      "left": 376,
+      "right": 414,
+      "top": 18.5,
+      "width": 38,
+      "x": 376,
+      "y": 18.5
+    },
+    "scene": {
+      "bottom": 409,
+      "height": 409,
+      "left": 0,
+      "right": 430,
+      "top": 0,
+      "width": 430,
+      "x": 0,
+      "y": 0
+    },
+    "tabs": [
+      {
+        "label": null,
+        "rect": {
+          "bottom": 928,
+          "height": 56,
+          "left": 6,
+          "right": 86.3984375,
+          "top": 872,
+          "width": 80.3984375,
+          "x": 6,
+          "y": 872
+        },
+        "selected": "true"
+      },
+      {
+        "label": null,
+        "rect": {
+          "bottom": 928,
+          "height": 56,
+          "left": 90.3984375,
+          "right": 170.8046875,
+          "top": 872,
+          "width": 80.40625,
+          "x": 90.3984375,
+          "y": 872
+        },
+        "selected": "false"
+      },
+      {
+        "label": null,
+        "rect": {
+          "bottom": 928,
+          "height": 56,
+          "left": 174.8046875,
+          "right": 255.203125,
+          "top": 872,
+          "width": 80.3984375,
+          "x": 174.8046875,
+          "y": 872
+        },
+        "selected": "false"
+      },
+      {
+        "label": null,
+        "rect": {
+          "bottom": 928,
+          "height": 56,
+          "left": 259.203125,
+          "right": 339.6015625,
+          "top": 872,
+          "width": 80.3984375,
+          "x": 259.203125,
+          "y": 872
+        },
+        "selected": "false"
+      },
+      {
+        "label": null,
+        "rect": {
+          "bottom": 928,
+          "height": 56,
+          "left": 343.6015625,
+          "right": 424,
+          "top": 872,
+          "width": 80.3984375,
+          "x": 343.6015625,
+          "y": 872
+        },
+        "selected": "false"
+      }
+    ],
+    "today": [
+      {
+        "bottom": 515,
+        "height": 28,
+        "left": 28,
+        "right": 300.21875,
+        "top": 487,
+        "width": 272.21875,
+        "x": 28,
+        "y": 487
+      }
+    ],
+    "viewport": {
+      "height": 932,
+      "width": 430
+    },
+    "worldPoints": {
+      "bottom": 105,
+      "height": 30,
+      "left": 347.65625,
+      "right": 422,
+      "top": 75,
+      "width": 74.34375,
+      "x": 347.65625,
+      "y": 75
+    },
+    "xp": {
+      "bottom": 449,
+      "height": 7,
+      "left": 67.0546875,
+      "right": 422,
+      "top": 442,
+      "width": 354.9453125,
+      "x": 67.0546875,
+      "y": 442
+    }
+  }
+]

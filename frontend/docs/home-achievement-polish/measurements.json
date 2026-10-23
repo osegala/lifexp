@@ -1,0 +1,44 @@
+{
+  "before390": {
+    "height": 225,
+    "text": "Achievements2/8󰔺First StepsEarned · 1/1 · Complete your first task.󰍁Steady ProgressLocked · 18/25 · Complete 25 tasks.Rewards: Forest Tunic",
+    "width": 358
+  },
+  "after390": {
+    "bars": [
+      {
+        "fillWidth": "100%",
+        "label": "First Steps progress"
+      },
+      {
+        "fillWidth": "72%",
+        "label": "Steady Progress progress"
+      }
+    ],
+    "height": 210,
+    "overflow": false,
+    "text": "Achievements2/8󰔺First Steps✓ EarnedComplete your first task.1/1󰍁Steady ProgressLockedComplete 25 tasks.18/25Rewards: Forest Tunic",
+    "width": 358
+  },
+  "after430": {
+    "bars": [
+      {
+        "fillWidth": "100%",
+        "label": "First Steps progress"
+      },
+      {
+        "fillWidth": "72%",
+        "label": "Steady Progress progress"
+      }
+    ],
+    "height": 210,
+    "overflow": false,
+    "text": "Achievements2/8󰔺First Steps✓ EarnedComplete your first task.1/1󰍁Steady ProgressLockedComplete 25 tasks.18/25Rewards: Forest Tunic",
+    "width": 398
+  },
+  "enlargedText390": {
+    "height": 337.1875,
+    "overflow": false,
+    "width": 358
+  }
+}

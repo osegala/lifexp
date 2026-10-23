@@ -63,7 +63,7 @@ test("frontend contains no legacy users, social, subscription-dev, weekly-quest,
 
 test("task screen uses the SAM task methods and server-owned completion contract", () => {
   const tasks = read("app/(tabs)/tasks.tsx");
-  assert.match(tasks, /api\.get<TasksResponse>\(apiRoutes\.tasks\)/);
+  assert.match(tasks, /api\.get<TasksResponse>\(apiRoutes\.tasks[,)]/);
   assert.match(tasks, /await saveTask\(input, savedTaskId\)/);
   assert.match(read("src/tasks/saveTask.ts"), /api\.post<\{ taskId: string \}>\(apiRoutes\.tasks,/);
   assert.match(tasks, /api\.post<CompletionResponse>\(apiRoutes\.completeTask\(task\.taskId\), \{\}\)/);
@@ -94,13 +94,13 @@ test("dashboard and profile XP bars use backend per-level progression", () => {
   assert.match(dashboard, /user\?\.xpIntoLevel/);
   assert.match(dashboard, /user\?\.xpForNextLevel/);
   assert.match(profile, /xpIntoLevel \/ xpForNextLevel/);
-  assert.match(profile, /<XPBar progress=\{xpProgress\}/);
+  assert.match(profile, /<XPBar tone="parchment" progress=\{xpProgress\}/);
   assert.doesNotMatch(profile, /level \* 100|totalXp %/);
 });
 
 test("weekly progress uses GET goals and has no client claim mutation", () => {
   const dashboard = read("app/(tabs)/dashboard.tsx");
-  assert.match(dashboard, /api\.get<GoalsResponse>\(apiRoutes\.goals\)/);
+  assert.match(dashboard, /api\.get<GoalsResponse>\(apiRoutes\.goals[,)]/);
   assert.doesNotMatch(dashboard, /weekly-quests|claim|api\.post/);
 });
 
@@ -108,7 +108,7 @@ test("shop uses read-only entitlements and the catalog-backed purchase route", (
   const shop = read("app/(tabs)/shop.tsx");
   assert.match(shop, /useEntitlements\(\)/);
   assert.doesNotMatch(shop, /api\.get.*entitlements/);
-  assert.match(shop, /api\.post\(apiRoutes\.shopPurchase, \{ itemId: item\.itemId \}\)/);
+  assert.match(shop, /api\.post\(apiRoutes\.shopPurchase, \{ itemId: item\.itemId \},/);
   assert.doesNotMatch(shop, /dev\/activate|price\s*:/);
 });
 
@@ -121,7 +121,7 @@ test("shop explains achievement locks and exposes no purchase control while lock
   assert.match(shop, /requirement\.currentValue\} \/ \{requirement\.requiredValue/);
   assert.match(shop, /locked \|\| item\.owned \? null : <UiPressable/);
   assert.match(shop, /item\.owned \? <BadgePill label="Owned"[\s\S]*?resource="coins" value=\{item\.effectivePrice\}/);
-  assert.match(dashboard, /Rewards: \{\(achievement\.rewards \?\? \[\]\)\.map/);
+  assert.match(dashboard, /Rewards: <\/UiText>\{\(achievement\.rewards \?\? \[\]\)\.map/);
 });
 
 test("social and interior screens are inert and hidden from tab navigation", () => {
@@ -137,9 +137,12 @@ test("appearance persists through PATCH me and profile settings remain narrowly 
   const session = read("src/auth/session.ts");
   assert.match(setup, /api\.patch<AvatarAppearance>\(apiRoutes\.me, appearance,/);
   assert.match(setup, /<AppearanceEditor[\s\S]*?showSaveButton=\{false\}/);
-  assert.match(profile, /api\.patch\(apiRoutes\.me, \{\s*displayName: displayName\.trim\(\),\s*timeZone: timeZone\.trim\(\),\s*\}\)/);
+  assert.match(profile, /api\.patch<Partial<ProfileResponse>>\(apiRoutes\.me, \{\s*displayName: displayName\.trim\(\),\s*\},/);
+  assert.doesNotMatch(profile, /setTimeZone|accessibilityLabel="Time zone"/);
+  assert.match(profile, /Time zone · Automatic/);
   assert.doesNotMatch(profile, /bodyType|xp\s*:|coins\s*:|worldPoints\s*:/);
-  assert.doesNotMatch(session, /api\.patch|client\.patch/);
+  assert.match(session, /this\.client\.patch<\{ timeZone: string \}>\("\/me", \{ timeZone \}/);
+  assert.doesNotMatch(session, /client\.(?:post|put|delete)\(/, "session timezone sync cannot provision or delete a profile");
 });
 
 test("canonical backend error envelopes are surfaced and malformed errors use a safe fallback", () => {

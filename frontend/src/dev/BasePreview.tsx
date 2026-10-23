@@ -1,10 +1,14 @@
 import { useState, type PropsWithChildren } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { Platform, View, useWindowDimensions } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { ExpoRoot, Tabs } from "expo-router";
 import type { RequireContext } from "expo-router/build/types";
 import BaseScreen from "../../app/(tabs)/base";
+import { AuthProvider } from "../context/AuthContext";
+import { cognitoAuth } from "../auth/cognito";
+import { DEFAULT_APPEARANCE } from "../avatar/appearance";
+import { FREE_ENTITLEMENTS } from "../entitlements/model";
 import { api } from "../api/client";
 import { apiRoutes } from "../api/routes";
 import { CompletionFeedbackProvider } from "../context/CompletionFeedbackContext";
@@ -23,8 +27,11 @@ function makeWorld(): WorldResponse {
     maxed: false, nextLevel: 2, upgradeCost: 100, canAfford: true, canUpgrade: true, sortOrder: index, upgradedAt: null,
   })) };
 }
-if (__DEV__) {
+if (__DEV__ && Platform.OS === "web") {
+  cognitoAuth.getSession = async () => ({ token: "local-fixture-only", userId: "base-ui-review", email: "rowan@example.test" });
   api.get = (async (route: string) => {
+    if (route === "/me") return { data: { ...DEFAULT_APPEARANCE, username: "Rowan", coins: 284, timeZone: "America/New_York", level: 6, onboardingCompleted: true } };
+    if (route === "/entitlements") return { data: FREE_ENTITLEMENTS };
     if (route !== apiRoutes.world) throw new Error("No network in Base review");
     if (mode === "Loading") await new Promise(resolve => setTimeout(resolve, 15000));
     if (mode === "Load failure") throw new Error("Fixture world unavailable");
@@ -77,13 +84,13 @@ function ReviewTabs() {
   </Tabs>;
 }
 function ReviewProviders({ children }: PropsWithChildren) {
-  return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><CompletionFeedbackProvider>
+  return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><AuthProvider><CompletionFeedbackProvider>
     {children}
-  </CompletionFeedbackProvider></SafeAreaProvider></GestureHandlerRootView>;
+  </CompletionFeedbackProvider></AuthProvider></SafeAreaProvider></GestureHandlerRootView>;
 }
 const routes: Record<string, { default: React.ComponentType }> = { "./_layout.tsx": { default: ReviewTabs },
   ...Object.fromEntries(Object.keys(titles).map(name => [`./${name}.tsx`, { default: name === "base" ? ReviewBase : OtherTab }])) };
 const context = Object.assign((id: string) => routes[id], { keys: () => Object.keys(routes), resolve: (id: string) => id, id: "base-review" }) as RequireContext;
 export default function BasePreview() {
-  return __DEV__ ? <ExpoRoot context={context} location="/base" wrapper={ReviewProviders} /> : null;
+  return __DEV__ && Platform.OS === "web" ? <ExpoRoot context={context} location="/base" wrapper={ReviewProviders} /> : null;
 }

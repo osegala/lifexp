@@ -1,3 +1,4 @@
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -15,15 +16,15 @@ function load(path, imports) {
   const code = ts.transpileModule(readFileSync(new URL(path, import.meta.url), "utf8"), { compilerOptions: {
     module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } }).outputText;
-  new Function("require", "exports", code)(id => id === "react/jsx-runtime" ? require(id) : id in imports ? imports[id] : id === "./debug" ? adDiagnostics : (() => { throw new Error(`Missing ${id}`); })(), exports);
+  new Function("require", "exports", code)(id => { if (id === "react/jsx-runtime") return noticeJsxRuntime; const notice = noticeImport(id, imports); if (notice !== undefined) return notice; return id in imports ? imports[id] : id === "./debug" ? adDiagnostics : (() => { throw new Error(`Missing ${id}`); })(); }, exports);
   return exports;
 }
 const react = { useCallback: fn => fn, useEffect() {}, useRef: value => ({ current: value }),
   useState: value => [typeof value === "function" ? value() : value, () => {}], useSyncExternalStore: (_, get) => get(),
   createContext: value => ({ value, Provider: "Provider" }), useContext: c => c.value };
-const native = { ...Object.fromEntries(["View", "Text", "ScrollView", "Pressable"].map(name => [name, name])), StyleSheet: { create: x => x } };
+const native = { ...Object.fromEntries(["View", "Text", "ScrollView", "Pressable"].map(name => [name, name])), Platform: { select: value => value.default }, StyleSheet: { create: x => x } };
 const nodes = tree => Array.isArray(tree) ? tree.flatMap(nodes) : tree?.props ? [tree, ...nodes(tree.props.children)] : [];
-const text = tree => typeof tree === "string" ? tree : Array.isArray(tree) ? tree.map(text).join("") : tree?.props ? text(tree.props.children) : "";
+const text = tree => typeof tree === "string" ? tree : Array.isArray(tree) ? tree.map(text).join("") : tree?.props ? text(typeof tree.type === "function" ? tree.type(tree.props) : tree.props.children) : "";
 
 test("canonical UI normalization accepts existing server responses but never device time or unknown status as authority", () => {
   assert.deepEqual(model.normalizeEntitlements({ plan: "FREE", subscriptionStatus: "FREE" }), model.FREE_ENTITLEMENTS);
@@ -131,6 +132,8 @@ function screen(path, entitlement) {
     "../../src/components/NotificationSettings": "Notifications", "../../src/components/XPBar": "XPBar", "../../src/components/LifeInput": "Input",
     ...Object.fromEntries(["../src", "../../src"].flatMap(prefix => [
       [`${prefix}/entitlements/useEntitlements`, { useEntitlements: () => entitlement }], [`${prefix}/theme/theme`, theme],
+      [`${prefix}/components/ui/Primitives`, { ScreenShell: "Scroll", SectionHeader: ({ title }) => title, SurfaceCard: "Card", UiPressable: "Pressable", UiText: "Text" }],
+      [`${prefix}/components/ui/Indicators`, { BadgePill: "Badge" }],
       [`${prefix}/components/LifeCard`, "Card"], [`${prefix}/components/LifeButton`, "Button"],
     ])) }).default;
   return { tree: Screen(), calls };

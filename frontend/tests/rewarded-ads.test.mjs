@@ -1,3 +1,5 @@
+import { SupersededCacheRead } from "../src/cache/PlayerCache.ts";
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -16,7 +18,7 @@ function load(path, imports) {
   const code = ts.transpileModule(readFileSync(new URL(path, import.meta.url), "utf8"), { compilerOptions: {
     module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } }).outputText;
-  new Function("require", "exports", code)(id => id === "react/jsx-runtime" ? require(id) : id in imports ? imports[id] : id === "./debug" ? adDiagnostics : (() => { throw new Error(`Missing ${id}`); })(), exports);
+  new Function("require", "exports", code)(id => { if (id === "react/jsx-runtime") return noticeJsxRuntime; const notice = noticeImport(id, imports); if (notice !== undefined) return notice; return id in imports ? imports[id] : id === "./debug" ? adDiagnostics : (() => { throw new Error(`Missing ${id}`); })(); }, exports);
   return exports;
 }
 const rewarded = load("../src/ads/rewarded.ts", { "../api/errors": { apiError } });
@@ -163,12 +165,12 @@ test("real DEV controls support cancellation, explicit completion, loading, anno
   assert.match(text(tree), /Closing this without completing grants no coins/);
   nodes(tree).find(n => n.props.title === "Complete DEV rewarded ad").props.onPress(); await new Promise(resolve => setImmediate(resolve));
   assert.equal(confirmed.coins, 50); assert.equal(confirmed.rewardedAdsRemainingToday, 2);
-  tree = f.render(); assert.equal(nodes(tree).find(n => n.props.accessibilityLiveRegion === "polite").props.children, "10 coins confirmed by Evrenthia.");
+  tree = f.render(); assert.equal(nodes(tree).find(n => n.type === "GameNotice").props.message, "10 coins confirmed by Evrenthia.");
   await f.flow.request(); nodes(f.render()).find(n => n.props.title === "Cancel DEV ad").props.onPress(); assert.equal(f.flow.getSnapshot().phase, "idle");
   for (let used = 2; used <= 3; used++) { await f.flow.request(); await f.flow.complete(); }
   tree = f.render(); assert.equal(nodes(tree).find(n => n.props.title === "Daily ad rewards claimed").props.disabled, true);
   const button = readFileSync(new URL("../src/components/LifeButton.tsx", import.meta.url), "utf8");
-  assert.match(button, /accessibilityRole="button"/); assert.match(button, /accessibilityLabel=\{title\}/); assert.match(button, /minHeight: 48/);
+  assert.match(button, /accessibilityRole="button"/); assert.match(button, /accessibilityLabel=\{accessibilityLabel \?\? title\}/); assert.match(button, /minHeight: 48/);
 });
 
 test("DEV adapter calls only our authenticated API, sends event/type not coins, and has no real SDK", async () => {
@@ -185,10 +187,10 @@ test("DEV adapter calls only our authenticated API, sends event/type not coins, 
 test("real Shop replaces balance with the authoritative total, including duplicate replies, without client addition", () => {
   let shop = { player: { coins: 40 }, items: [] }, refreshes = 0, index = 0;
   const Screen = load("../app/(tabs)/shop.tsx", {
-    react: { useCallback: fn => fn, useState: initial => index++ === 0 ? [shop, fn => { shop = fn(shop); }] : [initial, () => {}] },
+    react: { useRef: current => ({ current }), useCallback: fn => fn, useState: initial => index++ === 0 ? [shop, fn => { shop = fn(shop); }] : [initial, () => {}] },
     "react-native": { ...Object.fromEntries(["ActivityIndicator", "Alert", "Pressable", "ScrollView", "Text", "View"].map(x => [x, x])), StyleSheet: { create: x => x } },
     "expo-router": { useFocusEffect() {}, router: {} }, "@expo/vector-icons/MaterialCommunityIcons": "Icon",
-    "../../src/api/client": {}, "../../src/api/routes": {}, "../../src/avatar/assetRegistry": {}, "../../src/avatar/inventory": {},
+    "../../src/cache/PlayerCache": { SupersededCacheRead }, "../../src/api/client": {}, "../../src/api/routes": {}, "../../src/avatar/assetRegistry": {}, "../../src/avatar/inventory": {},
     "../../src/components/CosmeticImage": "Image", "../../src/components/LifeCard": "Card", "../../src/components/LifeButton": "Button",
     "../../src/components/ShopContent": "ShopContent",
     "../../src/context/AuthContext": { useAuth: () => ({ refreshUser: () => { refreshes++; } }) }, "../../src/theme/theme": theme,

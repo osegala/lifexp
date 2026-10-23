@@ -11,7 +11,7 @@ type Props = {
   source: ImageSourcePropType;
   crop?: ImageCrop;
   style: StyleProp<ViewStyle>;
-  /** Shop previews only; layered avatar rendering and wardrobe defaults stay unchanged. */
+  /** Use the shared memory/disk cache for wardrobe and Shop thumbnails. */
   cached?: boolean;
 };
 

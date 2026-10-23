@@ -1,3 +1,4 @@
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -17,7 +18,7 @@ function loader(path, imports) {
   const code = ts.transpileModule(readFileSync(new URL(path, import.meta.url), "utf8"), { compilerOptions: {
     module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } }).outputText;
-  new Function("require", "exports", code)(id => id === "react/jsx-runtime" ? require(id) : id in imports ? imports[id] : (() => { throw new Error(`Missing ${id}`); })(), exports);
+  new Function("require", "exports", code)(id => { if (id === "react/jsx-runtime") return noticeJsxRuntime; const notice = noticeImport(id, imports); if (notice !== undefined) return notice; return id in imports ? imports[id] : (() => { throw new Error(`Missing ${id}`); })(); }, exports);
   return exports;
 }
 
@@ -108,14 +109,19 @@ async function screen({ storage = new Map(), failAvatar = false, failFinish = fa
   const Screen = loader("../app/onboarding.tsx", { react: h.react, "react-native-get-random-values": {},
     "@react-native-async-storage/async-storage": { getItem: async key => storage.get(key) ?? null, setItem: async (key, value) => storage.set(key, value) },
     "react-native": { ...Object.fromEntries(["ActivityIndicator", "Pressable", "ScrollView", "Text", "View"].map(x => [x, x])),
-      StyleSheet: { create: x => x }, Platform: { OS: platform }, AccessibilityInfo: {}, findNodeHandle: () => null },
+      StyleSheet: { create: x => x }, Platform: { OS: platform, select: value => value.default }, AccessibilityInfo: {}, findNodeHandle: () => null },
     "../src/api/client": { apiError, api: {
       get: async route => { if (failLoad) throw new Error("offline"); return { data: route === apiRoutes.me ? appearance.DEFAULT_APPEARANCE : { time: { date: "2026-10-07", weekday: "WED", timeZone: "UTC" }, tasks: [] } }; },
       patch: async (route, body) => { calls.push([route, body]); if (body.onboardingCompleted ? failFinish : failAvatar) throw new Error("offline");
         if (body.onboardingCompleted) complete = true; return { data: body }; },
     } }, "../src/api/routes": { apiRoutes }, "../src/context/AuthContext": { useAuth: () => auth },
     "../src/avatar/appearance": appearance, "../src/avatar/localAppearance": { setLocalAppearance: async (...args) => cached.push(args) },
+    "../src/components/LifeButton": ({ title, onPress, disabled }) => require("react/jsx-runtime").jsx("Pressable", {
+      accessibilityRole: "button", accessibilityLabel: title, disabled, onPress,
+      style: () => [{ minHeight: 52 }], children: title,
+    }),
     "../src/components/AppearanceEditor": "Appearance", "../src/components/AvatarRenderer": "Avatar",
+    "../src/components/ui/Primitives": { ScreenShell: "ScrollView" },
     "../src/components/TaskEditor": "TaskEditor", "../src/components/NotificationSettings": "Notifications",
     "../src/tasks/saveTask": { saveTask: async (body, id, key) => { calls.push(["task", body, id, key]); return id ?? `task-${++serial}`; } },
     "../src/onboarding/progress": progress, "../src/theme/theme": theme,
@@ -192,7 +198,7 @@ test("step buttons have screen-reader names, 48-point targets, focusable heading
   }
   const source = readFileSync(new URL("../app/onboarding.tsx", import.meta.url), "utf8");
   assert.match(source, /animated: false/); assert.doesNotMatch(source, /Animated|LayoutAnimation|setTimeout/);
-  assert.match(source, /width: "100%", maxWidth: 680/);
+  assert.match(source, /content: \{ flexGrow: 1, maxWidth: 680/);
   const layout = readFileSync(new URL("../app/_layout.tsx", import.meta.url), "utf8");
   assert.match(layout, /Stack.Protected guard=\{destination === "\/onboarding"\}/);
   assert.match(layout, /Stack.Protected guard=\{destination === "\/\(tabs\)\/dashboard"\}/);
@@ -202,7 +208,8 @@ test("real root guards protect every main route while onboarding is incomplete a
   let session;
   const Stack = Object.assign(({ children }) => children, { Screen: "Screen", Protected: ({ guard, children }) => guard ? children : null });
   const Root = loader("../app/_layout.tsx", {
-    "expo-router": { Stack }, "react-native": { View: "View", ActivityIndicator: "Spinner", StyleSheet: { create: x => x } },
+    "expo-router": { Stack, usePathname: () => "/onboarding" }, "expo-status-bar": { StatusBar: "StatusBar" },
+    "../src/components/ui/PageBackground": "Background", "react-native": { View: "View", ActivityIndicator: "Spinner", StyleSheet: { create: x => x } },
     "react-native-gesture-handler": { GestureHandlerRootView: "Gestures" },
     "react-native-safe-area-context": { SafeAreaProvider: "SafeAreaProvider", SafeAreaView: "SafeAreaView" },
     "../src/context/AuthContext": { AuthProvider: "AuthProvider", useAuth: () => session },

@@ -1,0 +1,1623 @@
+[
+  {
+    "screen": "shop",
+    "width": 430,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 6,
+            "right": 86.3984375,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 6,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰋞󰮧Home"
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 90.3984375,
+            "right": 170.8046875,
+            "top": 873,
+            "width": 80.40625,
+            "x": 90.3984375,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰝖󰝖Tasks"
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 174.8046875,
+            "right": 255.203125,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 174.8046875,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰄚󰄚Base"
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 259.203125,
+            "right": 339.6015625,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 259.203125,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰀄󰀓Avatar"
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 343.6015625,
+            "right": 424,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 343.6015625,
+            "y": 873
+          },
+          "selected": "true",
+          "text": "󰒚󱇕Shop"
+        }
+      ],
+      "rootWidth": 430,
+      "viewport": {
+        "height": 932,
+        "width": 430
+      }
+    }
+  },
+  {
+    "screen": "avatar",
+    "state": "avatar-medium",
+    "width": 430,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 6,
+            "right": 86.3984375,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 6,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰋞󰮧Home",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 17.1953125,
+            "right": 75.1953125,
+            "top": 873.5,
+            "width": 58,
+            "x": 17.1953125,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 90.3984375,
+            "right": 170.8046875,
+            "top": 873,
+            "width": 80.40625,
+            "x": 90.3984375,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰝖󰝖Tasks",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 101.6015625,
+            "right": 159.6015625,
+            "top": 873.5,
+            "width": 58,
+            "x": 101.6015625,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 174.8046875,
+            "right": 255.203125,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 174.8046875,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰄚󰄚Base",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 186,
+            "right": 244,
+            "top": 873.5,
+            "width": 58,
+            "x": 186,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 259.203125,
+            "right": 339.6015625,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 259.203125,
+            "y": 873
+          },
+          "selected": "true",
+          "text": "󰀄󰀓Avatar",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 270.3984375,
+            "right": 328.3984375,
+            "top": 873.5,
+            "width": 58,
+            "x": 270.3984375,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 343.6015625,
+            "right": 424,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 343.6015625,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰒚󱇕Shop",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 354.796875,
+            "right": 412.796875,
+            "top": 873.5,
+            "width": 58,
+            "x": 354.796875,
+            "y": 873.5
+          }
+        }
+      ],
+      "rootWidth": 430,
+      "scene": {
+        "bottom": 868,
+        "height": 868,
+        "left": 0,
+        "right": 430,
+        "top": 0,
+        "width": 430,
+        "x": 0,
+        "y": 0
+      },
+      "tray": {
+        "bottom": 868,
+        "height": 317.1953125,
+        "left": 0,
+        "right": 430,
+        "top": 550.8046875,
+        "width": 430,
+        "x": 0,
+        "y": 550.8046875
+      },
+      "viewport": {
+        "height": 932,
+        "width": 430
+      }
+    }
+  },
+  {
+    "screen": "avatar",
+    "state": "avatar-expanded",
+    "width": 430,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 6,
+            "right": 86.3984375,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 6,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰋞󰮧Home",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 17.1953125,
+            "right": 75.1953125,
+            "top": 873.5,
+            "width": 58,
+            "x": 17.1953125,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 90.3984375,
+            "right": 170.8046875,
+            "top": 873,
+            "width": 80.40625,
+            "x": 90.3984375,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰝖󰝖Tasks",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 101.6015625,
+            "right": 159.6015625,
+            "top": 873.5,
+            "width": 58,
+            "x": 101.6015625,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 174.8046875,
+            "right": 255.203125,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 174.8046875,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰄚󰄚Base",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 186,
+            "right": 244,
+            "top": 873.5,
+            "width": 58,
+            "x": 186,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 259.203125,
+            "right": 339.6015625,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 259.203125,
+            "y": 873
+          },
+          "selected": "true",
+          "text": "󰀄󰀓Avatar",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 270.3984375,
+            "right": 328.3984375,
+            "top": 873.5,
+            "width": 58,
+            "x": 270.3984375,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 343.6015625,
+            "right": 424,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 343.6015625,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰒚󱇕Shop",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 354.796875,
+            "right": 412.796875,
+            "top": 873.5,
+            "width": 58,
+            "x": 354.796875,
+            "y": 873.5
+          }
+        }
+      ],
+      "rootWidth": 430,
+      "scene": {
+        "bottom": 868,
+        "height": 868,
+        "left": 0,
+        "right": 430,
+        "top": 0,
+        "width": 430,
+        "x": 0,
+        "y": 0
+      },
+      "tray": {
+        "bottom": 868,
+        "height": 531.3046875,
+        "left": 0,
+        "right": 430,
+        "top": 336.6953125,
+        "width": 430,
+        "x": 0,
+        "y": 336.6953125
+      },
+      "viewport": {
+        "height": 932,
+        "width": 430
+      }
+    }
+  },
+  {
+    "screen": "avatar",
+    "state": "avatar-collapsed",
+    "width": 430,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 6,
+            "right": 86.3984375,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 6,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰋞󰮧Home",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 17.1953125,
+            "right": 75.1953125,
+            "top": 873.5,
+            "width": 58,
+            "x": 17.1953125,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 90.3984375,
+            "right": 170.8046875,
+            "top": 873,
+            "width": 80.40625,
+            "x": 90.3984375,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰝖󰝖Tasks",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 101.6015625,
+            "right": 159.6015625,
+            "top": 873.5,
+            "width": 58,
+            "x": 101.6015625,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 174.8046875,
+            "right": 255.203125,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 174.8046875,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰄚󰄚Base",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 186,
+            "right": 244,
+            "top": 873.5,
+            "width": 58,
+            "x": 186,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 259.203125,
+            "right": 339.6015625,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 259.203125,
+            "y": 873
+          },
+          "selected": "true",
+          "text": "󰀄󰀓Avatar",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 270.3984375,
+            "right": 328.3984375,
+            "top": 873.5,
+            "width": 58,
+            "x": 270.3984375,
+            "y": 873.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 928,
+            "height": 55,
+            "left": 343.6015625,
+            "right": 424,
+            "top": 873,
+            "width": 80.3984375,
+            "x": 343.6015625,
+            "y": 873
+          },
+          "selected": "false",
+          "text": "󰒚󱇕Shop",
+          "tile": {
+            "bottom": 927.5,
+            "height": 54,
+            "left": 354.796875,
+            "right": 412.796875,
+            "top": 873.5,
+            "width": 58,
+            "x": 354.796875,
+            "y": 873.5
+          }
+        }
+      ],
+      "rootWidth": 430,
+      "scene": {
+        "bottom": 868,
+        "height": 868,
+        "left": 0,
+        "right": 430,
+        "top": 0,
+        "width": 430,
+        "x": 0,
+        "y": 0
+      },
+      "tray": {
+        "bottom": 868,
+        "height": 108,
+        "left": 0,
+        "right": 430,
+        "top": 760,
+        "width": 430,
+        "x": 0,
+        "y": 760
+      },
+      "viewport": {
+        "height": 932,
+        "width": 430
+      }
+    }
+  },
+  {
+    "screen": "account",
+    "state": "profile",
+    "width": 430,
+    "metrics": {
+      "nav": [],
+      "rootWidth": 430,
+      "viewport": {
+        "height": 932,
+        "width": 430
+      }
+    }
+  },
+  {
+    "screen": "account",
+    "state": "login",
+    "width": 430,
+    "metrics": {
+      "nav": [],
+      "rootWidth": 430,
+      "viewport": {
+        "height": 932,
+        "width": 430
+      }
+    }
+  },
+  {
+    "screen": "account",
+    "state": "signup",
+    "width": 430,
+    "metrics": {
+      "nav": [],
+      "rootWidth": 430,
+      "viewport": {
+        "height": 932,
+        "width": 430
+      }
+    }
+  },
+  {
+    "screen": "account",
+    "state": "premium",
+    "width": 430,
+    "metrics": {
+      "nav": [],
+      "rootWidth": 430,
+      "viewport": {
+        "height": 932,
+        "width": 430
+      }
+    }
+  },
+  {
+    "screen": "account",
+    "state": "onboarding",
+    "width": 430,
+    "metrics": {
+      "nav": [],
+      "rootWidth": 430,
+      "viewport": {
+        "height": 932,
+        "width": 430
+      }
+    }
+  },
+  {
+    "screen": "home",
+    "state": "home",
+    "width": 390,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 6,
+            "right": 78.3984375,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 6,
+            "y": 785
+          },
+          "selected": "true",
+          "text": "󰋞󰮧Home",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 13.1953125,
+            "right": 71.1953125,
+            "top": 785.5,
+            "width": 58,
+            "x": 13.1953125,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 82.3984375,
+            "right": 154.8046875,
+            "top": 785,
+            "width": 72.40625,
+            "x": 82.3984375,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰝖󰝖Tasks",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 89.6015625,
+            "right": 147.6015625,
+            "top": 785.5,
+            "width": 58,
+            "x": 89.6015625,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 158.8046875,
+            "right": 231.203125,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 158.8046875,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰄚󰄚Base",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 166,
+            "right": 224,
+            "top": 785.5,
+            "width": 58,
+            "x": 166,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 235.203125,
+            "right": 307.6015625,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 235.203125,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰀄󰀓Avatar",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 242.3984375,
+            "right": 300.3984375,
+            "top": 785.5,
+            "width": 58,
+            "x": 242.3984375,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 311.6015625,
+            "right": 384,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 311.6015625,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰒚󱇕Shop",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 318.796875,
+            "right": 376.796875,
+            "top": 785.5,
+            "width": 58,
+            "x": 318.796875,
+            "y": 785.5
+          }
+        }
+      ],
+      "rootWidth": 390,
+      "viewport": {
+        "height": 844,
+        "width": 390
+      }
+    }
+  },
+  {
+    "screen": "tasks",
+    "state": "tasks",
+    "width": 390,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 6,
+            "right": 78.3984375,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 6,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰋞󰮧Home",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 13.1953125,
+            "right": 71.1953125,
+            "top": 785.5,
+            "width": 58,
+            "x": 13.1953125,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 82.3984375,
+            "right": 154.8046875,
+            "top": 785,
+            "width": 72.40625,
+            "x": 82.3984375,
+            "y": 785
+          },
+          "selected": "true",
+          "text": "󰝖󰝖Tasks",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 89.6015625,
+            "right": 147.6015625,
+            "top": 785.5,
+            "width": 58,
+            "x": 89.6015625,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 158.8046875,
+            "right": 231.203125,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 158.8046875,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰄚󰄚Base",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 166,
+            "right": 224,
+            "top": 785.5,
+            "width": 58,
+            "x": 166,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 235.203125,
+            "right": 307.6015625,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 235.203125,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰀄󰀓Avatar",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 242.3984375,
+            "right": 300.3984375,
+            "top": 785.5,
+            "width": 58,
+            "x": 242.3984375,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 311.6015625,
+            "right": 384,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 311.6015625,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰒚󱇕Shop",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 318.796875,
+            "right": 376.796875,
+            "top": 785.5,
+            "width": 58,
+            "x": 318.796875,
+            "y": 785.5
+          }
+        }
+      ],
+      "rootWidth": 390,
+      "viewport": {
+        "height": 844,
+        "width": 390
+      }
+    }
+  },
+  {
+    "screen": "base",
+    "state": "base",
+    "width": 390,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 6,
+            "right": 78.3984375,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 6,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰋞󰮧Home",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 13.1953125,
+            "right": 71.1953125,
+            "top": 785.5,
+            "width": 58,
+            "x": 13.1953125,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 82.3984375,
+            "right": 154.8046875,
+            "top": 785,
+            "width": 72.40625,
+            "x": 82.3984375,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰝖󰝖Tasks",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 89.6015625,
+            "right": 147.6015625,
+            "top": 785.5,
+            "width": 58,
+            "x": 89.6015625,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 158.8046875,
+            "right": 231.203125,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 158.8046875,
+            "y": 785
+          },
+          "selected": "true",
+          "text": "󰄚󰄚Base",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 166,
+            "right": 224,
+            "top": 785.5,
+            "width": 58,
+            "x": 166,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 235.203125,
+            "right": 307.6015625,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 235.203125,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰀄󰀓Avatar",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 242.3984375,
+            "right": 300.3984375,
+            "top": 785.5,
+            "width": 58,
+            "x": 242.3984375,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 311.6015625,
+            "right": 384,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 311.6015625,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰒚󱇕Shop",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 318.796875,
+            "right": 376.796875,
+            "top": 785.5,
+            "width": 58,
+            "x": 318.796875,
+            "y": 785.5
+          }
+        }
+      ],
+      "rootWidth": 390,
+      "viewport": {
+        "height": 844,
+        "width": 390
+      }
+    }
+  },
+  {
+    "screen": "avatar",
+    "state": "avatar-medium",
+    "width": 390,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 6,
+            "right": 78.3984375,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 6,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰋞󰮧Home",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 13.1953125,
+            "right": 71.1953125,
+            "top": 785.5,
+            "width": 58,
+            "x": 13.1953125,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 82.3984375,
+            "right": 154.8046875,
+            "top": 785,
+            "width": 72.40625,
+            "x": 82.3984375,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰝖󰝖Tasks",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 89.6015625,
+            "right": 147.6015625,
+            "top": 785.5,
+            "width": 58,
+            "x": 89.6015625,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 158.8046875,
+            "right": 231.203125,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 158.8046875,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰄚󰄚Base",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 166,
+            "right": 224,
+            "top": 785.5,
+            "width": 58,
+            "x": 166,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 235.203125,
+            "right": 307.6015625,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 235.203125,
+            "y": 785
+          },
+          "selected": "true",
+          "text": "󰀄󰀓Avatar",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 242.3984375,
+            "right": 300.3984375,
+            "top": 785.5,
+            "width": 58,
+            "x": 242.3984375,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 311.6015625,
+            "right": 384,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 311.6015625,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰒚󱇕Shop",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 318.796875,
+            "right": 376.796875,
+            "top": 785.5,
+            "width": 58,
+            "x": 318.796875,
+            "y": 785.5
+          }
+        }
+      ],
+      "rootWidth": 390,
+      "scene": {
+        "bottom": 780,
+        "height": 780,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "tray": {
+        "bottom": 780,
+        "height": 282,
+        "left": 0,
+        "right": 390,
+        "top": 498,
+        "width": 390,
+        "x": 0,
+        "y": 498
+      },
+      "viewport": {
+        "height": 844,
+        "width": 390
+      }
+    }
+  },
+  {
+    "screen": "shop",
+    "state": "shop",
+    "width": 390,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 6,
+            "right": 78.3984375,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 6,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰋞󰮧Home",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 13.1953125,
+            "right": 71.1953125,
+            "top": 785.5,
+            "width": 58,
+            "x": 13.1953125,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 82.3984375,
+            "right": 154.8046875,
+            "top": 785,
+            "width": 72.40625,
+            "x": 82.3984375,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰝖󰝖Tasks",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 89.6015625,
+            "right": 147.6015625,
+            "top": 785.5,
+            "width": 58,
+            "x": 89.6015625,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 158.8046875,
+            "right": 231.203125,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 158.8046875,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰄚󰄚Base",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 166,
+            "right": 224,
+            "top": 785.5,
+            "width": 58,
+            "x": 166,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 235.203125,
+            "right": 307.6015625,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 235.203125,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰀄󰀓Avatar",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 242.3984375,
+            "right": 300.3984375,
+            "top": 785.5,
+            "width": 58,
+            "x": 242.3984375,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 311.6015625,
+            "right": 384,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 311.6015625,
+            "y": 785
+          },
+          "selected": "true",
+          "text": "󰒚󱇕Shop",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 318.796875,
+            "right": 376.796875,
+            "top": 785.5,
+            "width": 58,
+            "x": 318.796875,
+            "y": 785.5
+          }
+        }
+      ],
+      "rootWidth": 390,
+      "viewport": {
+        "height": 844,
+        "width": 390
+      }
+    }
+  },
+  {
+    "screen": "avatar",
+    "state": "avatar-expanded",
+    "width": 390,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 6,
+            "right": 78.3984375,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 6,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰋞󰮧Home",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 13.1953125,
+            "right": 71.1953125,
+            "top": 785.5,
+            "width": 58,
+            "x": 13.1953125,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 82.3984375,
+            "right": 154.8046875,
+            "top": 785,
+            "width": 72.40625,
+            "x": 82.3984375,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰝖󰝖Tasks",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 89.6015625,
+            "right": 147.6015625,
+            "top": 785.5,
+            "width": 58,
+            "x": 89.6015625,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 158.8046875,
+            "right": 231.203125,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 158.8046875,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰄚󰄚Base",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 166,
+            "right": 224,
+            "top": 785.5,
+            "width": 58,
+            "x": 166,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 235.203125,
+            "right": 307.6015625,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 235.203125,
+            "y": 785
+          },
+          "selected": "true",
+          "text": "󰀄󰀓Avatar",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 242.3984375,
+            "right": 300.3984375,
+            "top": 785.5,
+            "width": 58,
+            "x": 242.3984375,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 311.6015625,
+            "right": 384,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 311.6015625,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰒚󱇕Shop",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 318.796875,
+            "right": 376.796875,
+            "top": 785.5,
+            "width": 58,
+            "x": 318.796875,
+            "y": 785.5
+          }
+        }
+      ],
+      "rootWidth": 390,
+      "scene": {
+        "bottom": 780,
+        "height": 780,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "tray": {
+        "bottom": 780,
+        "height": 472.34375,
+        "left": 0,
+        "right": 390,
+        "top": 307.65625,
+        "width": 390,
+        "x": 0,
+        "y": 307.65625
+      },
+      "viewport": {
+        "height": 844,
+        "width": 390
+      }
+    }
+  },
+  {
+    "screen": "avatar",
+    "state": "avatar-collapsed",
+    "width": 390,
+    "metrics": {
+      "nav": [
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 6,
+            "right": 78.3984375,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 6,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰋞󰮧Home",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 13.1953125,
+            "right": 71.1953125,
+            "top": 785.5,
+            "width": 58,
+            "x": 13.1953125,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 82.3984375,
+            "right": 154.8046875,
+            "top": 785,
+            "width": 72.40625,
+            "x": 82.3984375,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰝖󰝖Tasks",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 89.6015625,
+            "right": 147.6015625,
+            "top": 785.5,
+            "width": 58,
+            "x": 89.6015625,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 158.8046875,
+            "right": 231.203125,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 158.8046875,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰄚󰄚Base",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 166,
+            "right": 224,
+            "top": 785.5,
+            "width": 58,
+            "x": 166,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 235.203125,
+            "right": 307.6015625,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 235.203125,
+            "y": 785
+          },
+          "selected": "true",
+          "text": "󰀄󰀓Avatar",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 242.3984375,
+            "right": 300.3984375,
+            "top": 785.5,
+            "width": 58,
+            "x": 242.3984375,
+            "y": 785.5
+          }
+        },
+        {
+          "rect": {
+            "bottom": 840,
+            "height": 55,
+            "left": 311.6015625,
+            "right": 384,
+            "top": 785,
+            "width": 72.3984375,
+            "x": 311.6015625,
+            "y": 785
+          },
+          "selected": "false",
+          "text": "󰒚󱇕Shop",
+          "tile": {
+            "bottom": 839.5,
+            "height": 54,
+            "left": 318.796875,
+            "right": 376.796875,
+            "top": 785.5,
+            "width": 58,
+            "x": 318.796875,
+            "y": 785.5
+          }
+        }
+      ],
+      "rootWidth": 390,
+      "scene": {
+        "bottom": 780,
+        "height": 780,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "tray": {
+        "bottom": 780,
+        "height": 108,
+        "left": 0,
+        "right": 390,
+        "top": 672,
+        "width": 390,
+        "x": 0,
+        "y": 672
+      },
+      "viewport": {
+        "height": 844,
+        "width": 390
+      }
+    }
+  },
+  {
+    "screen": "account",
+    "state": "onboarding",
+    "width": 390,
+    "metrics": {
+      "nav": [],
+      "rootWidth": 390,
+      "viewport": {
+        "height": 844,
+        "width": 390
+      }
+    }
+  }
+]

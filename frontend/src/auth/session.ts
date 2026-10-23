@@ -3,6 +3,9 @@ import type { AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import type { EntitlementResponse, User } from "../types";
 import { FREE_ENTITLEMENTS, isPremium, normalizeEntitlements } from "../entitlements/model.ts";
 import type { CognitoAuth, CognitoIdentity, RegistrationStep } from "./cognito";
+import { getDeviceTimeZone, normalizeTimeZone } from "../utils/timeZone.ts";
+import type { AvatarAppearance } from "../avatar/appearance.ts";
+import type { PlayerCache } from "../cache/PlayerCache.ts";
 
 type SessionState = {
   token: string | null;
@@ -16,7 +19,7 @@ type SessionState = {
   entitlementsError: string | null;
 };
 
-type ProfileResponse = {
+export type ProfileResponse = Partial<AvatarAppearance> & {
   onboardingCompleted: boolean;
   displayName: string;
   timeZone: string;
@@ -82,10 +85,18 @@ export class AuthSession {
   private signOutPending: Promise<void> = Promise.resolve();
   private client: AxiosInstance;
   private auth: CognitoAuth;
+  private readDeviceTimeZone: () => string | null;
+  private cache?: PlayerCache;
+  private accountId: string | null = null;
+  private prepareDisplay?: (userId: string) => Promise<unknown>;
 
-  constructor(client: AxiosInstance, auth: CognitoAuth) {
+  constructor(client: AxiosInstance, auth: CognitoAuth, readDeviceTimeZone = getDeviceTimeZone, cache?: PlayerCache,
+    prepareDisplay?: (userId: string) => Promise<unknown>) {
     this.client = client;
     this.auth = auth;
+    this.readDeviceTimeZone = readDeviceTimeZone;
+    this.cache = cache;
+    this.prepareDisplay = prepareDisplay;
   }
 
   getSnapshot = () => this.state;
@@ -98,6 +109,11 @@ export class AuthSession {
   private update(patch: Partial<SessionState>) {
     this.state = { ...this.state, ...patch };
     this.listeners.forEach(listener => listener());
+  }
+
+  private async prepareAccountDisplay(userId: string) {
+    try { await this.prepareDisplay?.(userId); }
+    catch { /* Asset warm-up is best effort; it cannot invalidate saved account data. */ }
   }
 
   private signOutFromCognito() {
@@ -142,6 +158,8 @@ export class AuthSession {
     notice = "Your session has expired. Please sign in again.",
   ) {
     if (revision !== this.revision || !this.state.token) return;
+    if (this.accountId) void this.cache?.clearUser(this.accountId);
+    this.accountId = null;
     this.revision++;
     this.update({
       token: null, user: null, loading: false, sessionError: null,
@@ -158,11 +176,27 @@ export class AuthSession {
       const identity = await this.auth.getSession();
       if (revision !== this.revision) return false;
       if (!identity) {
+        if (this.accountId) void this.cache?.clearUser(this.accountId);
+        this.accountId = null;
         this.update({ token: null, user: null, ...emptyEntitlements() });
         return false;
       }
+      if (this.accountId && this.accountId !== identity.userId) void this.cache?.clearUser(this.accountId);
+      this.accountId = identity.userId;
       this.update({ token: identity.token, user: null, ...emptyEntitlements() });
-      return await this.fetchUser(revision, identity);
+      await this.cache?.hydrateUser(identity.userId);
+      if (revision !== this.revision) return false;
+      await this.prepareAccountDisplay(identity.userId);
+      if (revision !== this.revision) return false;
+      const cached = this.cache?.peek(identity.userId, "profile");
+      // A restored Cognito identity may display its last completed profile while
+      // /me revalidates. First-time/incomplete onboarding still waits for /me.
+      // No cached field supplies credentials or Premium authorization.
+      if (cached?.onboardingCompleted) this.update({ user: userFromProfile(cached, identity), loading: false });
+      const promise = this.fetchUser(revision, identity);
+      this.refresh = { revision, promise };
+      void promise.finally(() => { if (this.refresh?.promise === promise) this.refresh = null; });
+      return await promise;
     } catch {
       if (revision === this.revision) {
         this.update({ sessionError: "Couldn't restore your saved sign-in. Please try again." });
@@ -194,6 +228,7 @@ export class AuthSession {
         this.expire(revision);
         return false;
       }
+      if (identity.userId !== this.accountId) return this.restore();
       this.update({ token: identity.token });
       return await this.fetchUser(revision, identity);
     } catch {
@@ -204,15 +239,45 @@ export class AuthSession {
     }
   }
 
-  private async fetchUser(revision: number, identity: CognitoIdentity) {
+  private async fetchUser(revision: number, identity: CognitoIdentity): Promise<boolean> {
     try {
       // Plan availability must not hold up the core profile or onboarding route.
       void this.loadEntitlements(revision);
+      const hydration = this.cache?.hydrateUser(identity.userId);
+      const cacheCurrent = this.cache?.checkpoint(identity.userId, "profile");
       const profile = await this.client.get<ProfileResponse>("/me", { timeout: AUTH_TIMEOUT });
       if (revision !== this.revision) return false;
+      // Startup, sign-in and every account refresh (including foreground/online)
+      // share the profile update path, which also wakes all notification schedules.
+      const detected = normalizeTimeZone(this.readDeviceTimeZone());
+      const timeZone = detected ?? normalizeTimeZone(profile.data.timeZone);
+      let timeZoneError: string | null = detected ? null
+        : "Couldn't detect your device time zone. Reminders use your last saved time zone. Try again after checking your device settings.";
+      if (timeZone && timeZone !== profile.data.timeZone) {
+        try {
+          const saved = await this.client.patch<{ timeZone: string }>("/me", { timeZone }, { timeout: AUTH_TIMEOUT });
+          if (revision !== this.revision) return false;
+          if (saved.data.timeZone !== timeZone) throw new Error("Time zone update was not confirmed");
+          profile.data = { ...profile.data, timeZone };
+        } catch (error) {
+          if (revision !== this.revision) return false;
+          if (isAxiosError(error) && error.response?.status === 401) throw error;
+          timeZoneError = "Couldn't confirm your device time zone update. Showing the last confirmed time zone. Reconnect and try again.";
+        }
+      }
+      await hydration;
+      if (revision !== this.revision) return false;
+      // A concurrent mutation/newer read superseded this GET. Ask the server
+      // again; a stale GET must not undo a confirmed profile mutation.
+      if (cacheCurrent && !cacheCurrent()) return this.fetchUser(revision, identity);
+      if (cacheCurrent?.()) this.cache?.set(identity.userId, "profile", profile.data);
+      const displayCurrent = this.cache?.checkpoint(identity.userId, "profile");
+      await this.prepareAccountDisplay(identity.userId);
+      if (revision !== this.revision) return false;
+      if (displayCurrent && !displayCurrent()) return this.fetchUser(revision, identity);
       this.update({
         user: userFromProfile(profile.data, identity, this.state.entitlements),
-        sessionError: null,
+        sessionError: timeZoneError,
         sessionNotice: null,
       });
       return true;
@@ -263,6 +328,8 @@ export class AuthSession {
       throw new Error("The sign-in attempt is no longer current.");
     }
     const revision = ++this.revision;
+    if (this.accountId && this.accountId !== identity.userId) void this.cache?.clearUser(this.accountId);
+    this.accountId = identity.userId;
     this.update({
       token: identity.token, user: null, loading: true,
       sessionError: null, sessionNotice: null, ...emptyEntitlements(),
@@ -290,19 +357,23 @@ export class AuthSession {
 
   logout = async () => {
     await this.signOutFromCognito();
+    if (this.accountId) void this.cache?.clearUser(this.accountId);
+    this.accountId = null;
     this.revision++;
     this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null, ...emptyEntitlements() });
   };
 
   clearDeletedAccountSession = async () => {
+    if (this.accountId) void this.cache?.clearUser(this.accountId);
+    this.accountId = null;
+    this.revision++;
+    this.refresh = null;
+    this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null, ...emptyEntitlements() });
     try {
       await this.signOutFromCognito();
     } catch {
       // The server has already deleted the identity; local UI must still be cleared.
     }
-    this.revision++;
-    this.refresh = null;
-    this.update({ token: null, user: null, loading: false, sessionError: null, sessionNotice: null, ...emptyEntitlements() });
   };
 
   retrySession = () => this.state.token ? this.refreshUser() : this.restore();

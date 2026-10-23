@@ -1,0 +1,202 @@
+[
+  {
+    "number": 1,
+    "file": "ChatGPT Image Oct 20, 2026, 08_37_07 PM-1.png",
+    "size": [
+      941,
+      1672
+    ],
+    "bytes": 2276451,
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "alphaBounds": [
+      0,
+      0,
+      941,
+      1672
+    ],
+    "centerRGBA": [
+      247,
+      229,
+      199,
+      255
+    ]
+  },
+  {
+    "number": 2,
+    "file": "ChatGPT Image Oct 20, 2026, 08_37_09 PM-2.png",
+    "size": [
+      1448,
+      1086
+    ],
+    "bytes": 1827952,
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "alphaBounds": [
+      0,
+      22,
+      1430,
+      1086
+    ],
+    "centerRGBA": [
+      247,
+      235,
+      215,
+      253
+    ]
+  },
+  {
+    "number": 3,
+    "file": "ChatGPT Image Oct 20, 2026, 08_37_11 PM-3.png",
+    "size": [
+      2172,
+      724
+    ],
+    "bytes": 924132,
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "alphaBounds": [
+      0,
+      305,
+      2172,
+      704
+    ],
+    "centerRGBA": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "number": 4,
+    "file": "ChatGPT Image Oct 20, 2026, 08_37_13 PM-4.png",
+    "size": [
+      2172,
+      724
+    ],
+    "bytes": 1850509,
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "alphaBounds": [
+      0,
+      0,
+      2172,
+      724
+    ],
+    "centerRGBA": [
+      29,
+      59,
+      40,
+      253
+    ]
+  },
+  {
+    "number": 5,
+    "file": "ChatGPT Image Oct 20, 2026, 08_37_16 PM-5.png",
+    "size": [
+      1942,
+      809
+    ],
+    "bytes": 1516877,
+    "alphaExtrema": [
+      0,
+      254
+    ],
+    "alphaBounds": [
+      0,
+      0,
+      1941,
+      809
+    ],
+    "centerRGBA": [
+      21,
+      47,
+      35,
+      253
+    ]
+  },
+  {
+    "number": 6,
+    "file": "ChatGPT Image Oct 20, 2026, 08_37_17 PM-6.png",
+    "size": [
+      1983,
+      793
+    ],
+    "bytes": 1182139,
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "alphaBounds": [
+      0,
+      0,
+      1969,
+      777
+    ],
+    "centerRGBA": [
+      16,
+      38,
+      35,
+      253
+    ]
+  },
+  {
+    "number": 7,
+    "file": "ChatGPT Image Oct 20, 2026, 08_37_19 PM-7.png",
+    "size": [
+      2172,
+      724
+    ],
+    "bytes": 959214,
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "alphaBounds": [
+      65,
+      21,
+      2126,
+      724
+    ],
+    "centerRGBA": [
+      250,
+      239,
+      221,
+      253
+    ]
+  },
+  {
+    "number": 8,
+    "file": "ChatGPT Image Oct 20, 2026, 08_37_22 PM-8.png",
+    "size": [
+      941,
+      1672
+    ],
+    "bytes": 1716028,
+    "alphaExtrema": [
+      0,
+      254
+    ],
+    "alphaBounds": [
+      0,
+      0,
+      941,
+      1672
+    ],
+    "centerRGBA": [
+      0,
+      0,
+      0,
+      0
+    ]
+  }
+]

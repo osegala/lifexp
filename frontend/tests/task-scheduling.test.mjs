@@ -1,3 +1,5 @@
+import { noticeJsxRuntime, noticeImport } from "./notice-test-support.mjs";
+import * as dateFormat from "../src/utils/dateFormat.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -6,6 +8,8 @@ import ts from "typescript";
 import * as scheduling from "../src/tasks/scheduling.ts";
 import * as theme from "../src/theme/theme.ts";
 import { apiError } from "../src/api/errors.ts";
+import { memoryCache, tasks as cacheTasks } from "./cache-test-support.mjs";
+import { SupersededCacheRead } from "../src/cache/PlayerCache.ts";
 import * as reminders from "../src/notifications/model.ts";
 
 const require = createRequire(import.meta.url);
@@ -15,7 +19,11 @@ function load(path, imports) {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true },
   }).outputText;
   new Function("exports", "require", code)(exports, id => {
-    if (id === "react/jsx-runtime") return require(id);
+    if (id === "react/jsx-runtime") return noticeJsxRuntime;
+    const notice = noticeImport(id, imports); if (notice !== undefined) return notice;
+    if (id === "./ui/FantasyMaterial") return "FantasyMaterial";
+    if (id === "../utils/dateFormat") return dateFormat;
+    if (id === "./ScheduleInput") return "Input";
     if (!(id in imports)) throw new Error(`Unmocked import: ${id}`);
     return imports[id];
   });
@@ -40,7 +48,7 @@ const field = (tree, label) => nodes(tree).find(node => node.type === "Input" &&
 const tick = () => new Promise(setImmediate);
 const time = { date: "2026-10-05", weekday: "MON", timeZone: "America/New_York" };
 const task = (id, extra = {}) => ({ taskId: id, title: id, description: null, repeatType: "NONE", repeatDays: [], taskSize: "NORMAL",
-  active: true, completed: false, isScheduledToday: true, isDueToday: true, completedToday: false,
+  active: true, archived: false, completed: false, isScheduledToday: true, isDueToday: true, completedToday: false,
   xpReward: 35, coinReward: 4, currentStreak: 0, bestStreak: 0, ...extra });
 
 function editor({ initial, save = async () => {}, tone = "parchment" } = {}) {
@@ -102,7 +110,7 @@ test("invalid calendar dates/times/weekdays never submit and failed saves retain
   ui.input("Task title", "Draft"); ui.input("Due date", "2026-02-30"); ui.press("Add task"); await tick();
   assert.equal(ui.submissions.length, 0); assert.match(text(ui.render()), /valid date/);
   ui.input("Due date", "2026-02-28"); ui.input("Due time", "24:00"); ui.press("Add task"); await tick();
-  assert.equal(ui.submissions.length, 0); assert.match(text(ui.render()), /24-hour time/);
+  assert.equal(ui.submissions.length, 0); assert.match(text(ui.render()), /valid time/);
   ui.input("Due time", "08:00"); ui.press("Repeat: Custom weekdays"); ui.press("Add task"); await tick();
   assert.equal(ui.submissions.length, 0); assert.match(text(ui.render()), /at least one weekday/);
   ui.press("Monday"); ui.press("Add task"); await tick();
@@ -155,16 +163,18 @@ async function screen({ get, post = async () => ({}), patch = async () => ({}), 
   });
   const Screen = load("../app/(tabs)/tasks.tsx", {
     "../../src/components/TasksContent": "TasksContent",
+    "../../src/cache/playerData": { playerCache: memoryCache().cache }, "../../src/cache/PlayerCache": { SupersededCacheRead },
     "../../src/tasks/saveTask": saving,
     react: h.react, "react-native": { ...native, AppState: { currentState: "active", addEventListener: (_, listener) => { resume = listener; return { remove() {} }; } } },
     "expo-router": { useFocusEffect: fn => { focus = fn; } }, "@expo/vector-icons/MaterialCommunityIcons": "Icon",
-    "../../src/api/client": { apiError, api: { get: async route => ({ data: await get(route) }),
+    "../../src/api/client": { apiError, api: { get: async route => { const data = await get(route); return { data: route === "tasks"
+        ? { ...data, summary: { ...cacheTasks.summary, ...data.summary } } : data }; },
       post: async (route, input) => { calls.push(["POST", route, input]); return { data: await post(route, input) }; },
       patch: async (route, input) => { calls.push(["PATCH", route, input]); return { data: await patch(route, input) }; },
       delete: async route => { calls.push(["DELETE", route]); return { data: await remove(route) }; } } },
     "../../src/api/routes": { apiRoutes: { tasks: "tasks", world: "world", task: id => `tasks/${id}`, completeTask: id => `tasks/${id}/complete` } },
     "../../src/components/LifeCard": "Card", "../../src/components/TaskEditor": "Editor", "../../src/tasks/scheduling": scheduling,
-    "../../src/context/AuthContext": { useAuth: () => ({ refreshUser: async () => {}, triggerDashboardRefresh() {} }) },
+    "../../src/context/AuthContext": { useAuth: () => ({ user: { id: "test-user" }, refreshUser: async () => {}, triggerDashboardRefresh() {} }) },
     "../../src/context/CompletionFeedbackContext": { useCompletionFeedback: () => value => events.push(value), useBuildingFeedback: () => ({ enqueue() {} }) },
     "../../src/base/buildingProgress": { buildingUpgrades: () => [] }, "../../src/feedback/completion": { completionEvent: () => ({ id: "event" }) },
     "../../src/theme/theme": theme,
@@ -182,20 +192,20 @@ test("Tasks creates/edits through existing routes, renders due time, and refresh
   const row = task("Read", { repeatType: "DAILY", startDate: time.date, dueTime: "09:30", nextScheduledDate: "2026-10-06" });
   const ui = await screen({ get: async () => { if (fail) throw new Error("offline"); return { time: { ...time, date: serverDate }, summary: {}, tasks: [row] }; } });
   t.after(ui.cleanup);
-  assert.match(text(ui.render()), /Daily · 09:30/);
-  assert.match(text(ui.render()), /America\/New_York/);
+  assert.match(text(ui.render()), /Daily · 9:30 AM/);
+  assert.match(text(ui.render()), /Monday, Oct 5/);
   const input = { title: "Created", description: null, repeatType: "WEEKLY", repeatDays: ["MON", "WED"], startDate: time.date, dueTime: "08:00", taskSize: "NORMAL" };
   await ui.create().onSave(input);
   assert.deepEqual(ui.calls[0], ["POST", "tasks", { ...input, active: true }]);
-  ui.press("Edit Read"); await ui.editor().onSave({ ...input, repeatType: "NONE", repeatDays: [] });
+  ui.press("Show details for Read"); ui.press("Edit Read"); await ui.editor().onSave({ ...input, repeatType: "NONE", repeatDays: [] });
   ui.editor().onCancel(); // Editor closes only after its reminder save also succeeds.
   assert.equal(ui.calls[1][0], "PATCH"); assert.equal(ui.calls[1][1], "tasks/Read"); assert.equal(ui.editor(), undefined);
-  ui.press("Upcoming tasks"); assert.match(text(ui.render()), /Next: 2026-10-06/);
+  ui.press("Upcoming tasks"); assert.match(text(ui.render()), /Next: Oct 6/);
   assert.equal(button(ui.render(), "Complete Read").props.disabled, true);
   serverDate = "2026-10-06"; t.mock.timers.tick(60_000); await tick();
-  assert.match(text(ui.render()), /2026-10-06/); assert.equal(nodes(ui.render()).find(node => node.type === "EmptyState").props.title, "No upcoming tasks.");
+  assert.match(text(ui.render()), /Tuesday, Oct 6/); assert.equal(nodes(ui.render()).find(node => node.type === "EmptyState").props.title, "No upcoming tasks.");
   ui.press("Today tasks"); fail = true; ui.resume(); await tick();
-  assert.match(text(ui.render()), /Daily · 09:30/, "failed refresh keeps last known tasks");
+  assert.match(text(ui.render()), /Daily · 9:30 AM/, "failed refresh keeps last known tasks");
   assert.ok(nodes(ui.render()).some(node => node.props.accessibilityRole === "alert"));
   assert.equal(ui.events.length, 0, "saving/refreshing never grants completion feedback");
 });
@@ -215,7 +225,7 @@ test("real task action shows next recurring occurrence only after confirmed comp
   assert.equal(writes, 1); assert.equal(ui.events.length, 1);
   assert.equal(button(ui.render(), "Complete Daily"), undefined, "confirmed completion leaves Today immediately");
   ui.press("Upcoming tasks"); assert.match(text(ui.render()), /Daily/);
-  assert.match(text(ui.render()), /Next: 2026-10-06/);
+  assert.match(text(ui.render()), /Next: Oct 6/);
   assert.equal(button(ui.render(), "Complete Daily").props.disabled, true);
   assert.equal(ui.events.length, 1);
 });
@@ -244,6 +254,8 @@ test("Tasks presentation retains canonical flat order, all three views, metadata
   assert.deepEqual(completions(), ["Complete Alpha", "Complete Beta", "Complete Later"]);
   assert.deepEqual(nodes(ui.render()).filter(n => n.type === "FilterChip").map(n => n.props.label), ["Today", "Upcoming", "All"]);
   assert.match(text(ui.render()), /Normal · \+35 XP · \+4 coins/);
+  assert.equal(button(ui.render(), "Edit Alpha"), undefined, "compact rows disclose secondary actions");
+  ui.press("Show details for Alpha");
   for (const action of ["Complete Alpha", "Edit Alpha", "Archive Alpha"]) {
     assert.equal(button(ui.render(), action).props.accessibilityRole, "button");
     assert.equal(button(ui.render(), action).props.accessibilityState.disabled, false);
@@ -277,7 +289,7 @@ test("archive uses the existing delete route; failed archive keeps the row and n
     if (fail) throw new Error("offline");
     assert.equal(route, "tasks/Read"); rows = [];
   } }); t.after(ui.cleanup);
-  ui.press("Archive Read"); await tick(); assert.ok(button(ui.render(), "Edit Read"));
+  ui.press("Show details for Read"); ui.press("Archive Read"); await tick(); assert.ok(button(ui.render(), "Edit Read"));
   fail = false; ui.press("Archive Read"); await tick();
   assert.equal(button(ui.render(), "Edit Read"), undefined);
   assert.deepEqual(ui.calls, [["DELETE", "tasks/Read"], ["DELETE", "tasks/Read"]]);
@@ -286,7 +298,7 @@ test("archive uses the existing delete route; failed archive keeps the row and n
 
 test("failed edit retains editor; cancel and filter changes close it without mutations", async t => {
   const ui = await screen({ get: async () => ({ time, summary: {}, tasks: [task("Read")] }), patch: async () => { throw new Error("offline"); } }); t.after(ui.cleanup);
-  ui.press("Edit Read");
+  ui.press("Show details for Read"); ui.press("Edit Read");
   assert.equal(ui.editor().tone, "parchment");
   await assert.rejects(ui.editor().onSave({ title: "Draft" }), /offline/);
   assert.ok(ui.editor()); ui.editor().onCancel(); assert.equal(ui.editor(), undefined);

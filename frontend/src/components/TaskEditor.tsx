@@ -1,10 +1,14 @@
+import GameNotice from "./ui/GameNotice";
 import { useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { apiError } from "../api/client";
 import { colors, radius, spacing, uiTheme as ui } from "../theme/theme";
 import type { Task, TaskSize, TasksResponse } from "../types";
 import { DAY_NAMES, TASK_SIZE_OPTIONS, WEEKDAYS, type TaskInput } from "../tasks/scheduling";
+import ButtonSurface, { buttonHitArea } from "./ui/ButtonSurface";
 import LifeInput from "./LifeInput";
+import ScheduleInput from "./ScheduleInput";
+import { formatDate, formatTime } from "../utils/dateFormat";
 import { UiPressable } from "./ui/Primitives";
 import { useTaskReminder } from "../notifications/useTaskReminder";
 import { REMINDER_OPTIONS, reminderTiming } from "../notifications/model";
@@ -29,7 +33,7 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel, onR
 }) {
   const styles = tone === "parchment" ? parchmentStyles : legacyStyles;
   const Action = tone === "parchment" ? UiPressable : Pressable;
-  const inputAppearance = tone === "parchment" ? { style: parchmentStyles.input, placeholderTextColor: ui.colors.subduedText } : {};
+  const inputAppearance = tone === "parchment" ? { tone: "parchment" as const, style: parchmentStyles.input, placeholderTextColor: ui.colors.subduedText } : {};
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
   const [taskSize, setTaskSize] = useState<TaskSize>(task?.taskSize ?? "NORMAL");
@@ -61,8 +65,8 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel, onR
     if (repeat === "MONTHLY" && !date) return setError("Choose a start date for the monthly task.");
     if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < "1900-01-01" || date > "9998-12-31"
       || !Number.isFinite(Date.parse(`${date}T00:00:00Z`))
-      || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)) return setError("Use a valid date in YYYY-MM-DD format.");
-    if (clock && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(clock)) return setError("Use a 24-hour time in HH:mm format.");
+      || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)) return setError("Enter a valid date, such as Oct 20, 2026.");
+    if (clock && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(clock)) return setError("Enter a valid time, such as 9:00 AM.");
     if (reminder.loading || reminder.error) return setError("Load the saved reminder before saving. Use Retry reminders below.");
     try { reminderTiming(reminder.choice, reminder.clock, clock); } catch (failure) { return setError((failure as Error).message); }
     savingRef.current = true;
@@ -118,7 +122,7 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel, onR
     </Action>)}</View>
     <Action accessibilityRole="button" accessibilityLabel="Schedule options" accessibilityState={{ expanded: scheduleOpen, disabled: locked }}
       disabled={locked} onPress={() => setScheduleOpen(value => !value)} style={styles.chip}>
-      <Text style={styles.chipText}>Schedule · {REPEAT_OPTIONS.find(option => option.value === repeat)?.label}{dueTime ? ` · ${dueTime}` : ""} {scheduleOpen ? "−" : "+"}</Text>
+      <Text style={styles.chipText}>Schedule · {REPEAT_OPTIONS.find(option => option.value === repeat)?.label}{dueTime ? ` · ${formatTime(dueTime)}` : ""} {scheduleOpen ? "−" : "+"}</Text>
     </Action>
     {scheduleOpen && <>
     <Text style={styles.label}>Repeat</Text>
@@ -136,12 +140,12 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel, onR
       <Text style={[styles.chipText, days.includes(day) && styles.selectedText]}>{DAY_NAMES[index].slice(0, 3)}</Text>
     </Action>)}</View>}
     <Text style={styles.label}>{repeat === "NONE" ? "Due date (optional)" : repeat === "MONTHLY" ? "Start date" : "Start date (optional)"}</Text>
-    <LifeInput {...inputAppearance} accessibilityLabel={repeat === "NONE" ? "Due date, YYYY-MM-DD, optional" : "Start date, YYYY-MM-DD"} placeholder={time?.date ?? "YYYY-MM-DD"}
-      value={startDate} onChangeText={setStartDate} autoCapitalize="none" autoCorrect={false} maxLength={10} editable={!locked} />
-    <Text style={styles.hint}>YYYY-MM-DD.{repeat === "MONTHLY" ? " Shorter months use their last day, then return to the original day." : repeat !== "NONE" ? " Leave blank to start today." : " Leave blank for an unscheduled task."}</Text>
-    <Text style={styles.label}>Due time (optional) · HH:mm</Text>
-    <LifeInput {...inputAppearance} accessibilityLabel="Due time, 24-hour HH:mm, optional" placeholder="09:00" value={dueTime} onChangeText={setDueTime}
-      autoCapitalize="none" autoCorrect={false} maxLength={5} editable={!locked} />
+    <ScheduleInput kind="date" {...inputAppearance} accessibilityLabel={repeat === "NONE" ? "Due date, optional" : "Start date"} placeholder={time?.date ? formatDate(time.date, { year: true }) : "Oct 20, 2026"}
+      value={startDate} onChangeText={setStartDate} autoCapitalize="none" autoCorrect={false} editable={!locked} />
+    <Text style={styles.hint}>{repeat === "MONTHLY" ? " Shorter months use their last day, then return to the original day." : repeat !== "NONE" ? " Leave blank to start today." : " Leave blank for an unscheduled task."}</Text>
+    <Text style={styles.label}>Due time (optional)</Text>
+    <ScheduleInput kind="time" {...inputAppearance} accessibilityLabel="Due time, optional" placeholder="9:00 AM" value={dueTime} onChangeText={setDueTime}
+      autoCapitalize="none" autoCorrect={false} editable={!locked} />
     <Text style={styles.hint}>Times use {time?.timeZone ?? "your profile timezone"}. Complete anytime on a scheduled day.</Text>
     <Text style={styles.label}>Reminder</Text>
     <View style={styles.options}>{REMINDER_OPTIONS.map(option => <Action key={option.value} accessibilityRole="button"
@@ -150,18 +154,19 @@ export default function TaskEditor({ task, time, disabled, onSave, onCancel, onR
       disabled={locked || reminder.loading || !!reminder.error} onPress={() => reminder.setChoice(option.value)} style={[styles.chip, reminder.choice === option.value && styles.selected]}>
       <Text style={[styles.chipText, reminder.choice === option.value && styles.selectedText]}>{option.label}</Text>
     </Action>)}</View>
-    {reminder.choice === "CUSTOM" && <><Text style={styles.label}>Reminder time · HH:mm</Text>
-      <LifeInput {...inputAppearance} accessibilityLabel="Reminder time, 24-hour HH:mm" value={reminder.clock} onChangeText={reminder.setClock} placeholder="08:45" maxLength={5} editable={!locked} /></>}
+    {reminder.choice === "CUSTOM" && <><Text style={styles.label}>Reminder time</Text>
+      <ScheduleInput kind="time" {...inputAppearance} accessibilityLabel="Reminder time" value={reminder.clock} onChangeText={reminder.setClock} placeholder="8:45 AM" editable={!locked} /></>}
     <Text style={styles.hint}>Offsets follow the due time and repeat schedule. Without a due time, choose an explicit time. Quiet hours suppress reminders; they are not delayed. Notifications also require enabled preferences and device permission.</Text>
     </>}
     {reminder.loading && <Text style={styles.hint}>Loading saved reminder…</Text>}
-    {!!reminder.error && <><Text accessibilityRole="alert" style={styles.error}>{reminder.error}</Text>
+    {!!reminder.error && <><GameNotice title="Reminder unavailable" message={reminder.error} variant="error" />
       <Action accessibilityRole="button" onPress={reminder.retry} style={styles.chip}><Text style={styles.chipText}>Retry reminders</Text></Action></>}
-    {!!reminder.notice && <Text accessibilityLiveRegion="polite" style={styles.hint}>{reminder.notice}</Text>}
+    {!!reminder.notice && <GameNotice title="Reminder status" message={reminder.notice} variant="info" />}
     {task && <Text style={styles.hint}>Changing the schedule starts a new task streak. Past completions and your best streak stay saved.</Text>}
-    {!!error && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
+    {!!error && <GameNotice title="Task not saved" message={error} variant="error" />}
     <Action accessibilityRole="button" accessibilityState={{ disabled: locked, busy: saving }} disabled={locked} onPress={() => void save()}
-      style={[styles.save, locked && styles.disabled]}><Text style={[styles.saveText, tone === "parchment" && locked && parchmentStyles.disabledText]}>{saving ? "Saving…" : task ? "Save changes" : "Add task"}</Text></Action>
+      style={[styles.save, locked && styles.disabled, tone === "parchment" && buttonHitArea]}>
+      {tone === "parchment" && <ButtonSurface disabled={locked} />}<Text style={[styles.saveText, tone === "parchment" && locked && parchmentStyles.disabledText]}>{saving ? "Saving…" : task ? "Save changes" : "Add task"}</Text></Action>
     {onCancel && <Action accessibilityRole="button" accessibilityLabel="Cancel task editing" disabled={locked} onPress={onCancel} style={styles.chip}>
       <Text style={styles.chipText}>Cancel</Text>
     </Action>}
@@ -203,11 +208,11 @@ const parchmentStyles = StyleSheet.create({
   selectedText: { color: ui.colors.onPrimary },
   hint: { ...ui.type.caption, color: ui.colors.secondaryText },
   error: { ...ui.type.body, color: ui.colors.danger },
-  save: { minHeight: ui.size.target, padding: ui.spacing.sm, borderRadius: ui.radius.md, backgroundColor: ui.colors.primary,
+  save: { minHeight: 52, padding: 12, borderRadius: ui.radius.md, backgroundColor: "transparent",
     alignItems: "center", justifyContent: "center", marginTop: ui.spacing.sm },
   saveText: { ...ui.type.label, color: ui.colors.onPrimary, textAlign: "center" },
   disabled: { opacity: 1, backgroundColor: ui.colors.disabled },
-  disabledText: { color: ui.colors.disabledText },
+  disabledText: { color: ui.colors.text },
   input: { minHeight: ui.size.target, backgroundColor: ui.colors.elevated, color: ui.colors.text,
     borderWidth: 1, borderColor: ui.colors.controlBorder, borderRadius: ui.radius.md, padding: ui.spacing.md,
     ...ui.type.body, fontFamily: Platform.select(ui.font.body) },

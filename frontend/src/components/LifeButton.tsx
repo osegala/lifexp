@@ -1,12 +1,18 @@
-import { useState } from "react";
-import { Text, Pressable, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
+import ButtonSurface, { buttonHitArea, type ButtonVariant } from "./ui/ButtonSurface";
+import { isFocusVisible } from "../utils/focus";
+import { useState, type ReactNode } from "react";
+import { ActivityIndicator, Platform, Text, Pressable, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { colors, radius, spacing, uiTheme } from "../theme/theme";
 
 type Props = {
   title: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "danger";
+  variant?: ButtonVariant;
   disabled?: boolean;
+  busy?: boolean;
+  accessibilityLabel?: string;
+  leading?: ReactNode;
+  framed?: boolean;
   tone?: "legacy" | "parchment";
   style?: StyleProp<ViewStyle>;
 };
@@ -16,39 +22,49 @@ export default function LifeButton({
   onPress,
   variant = "primary",
   disabled = false,
+  busy,
+  accessibilityLabel,
+  leading,
+  framed = false,
   tone = "legacy",
   style,
 }: Props) {
   const [focused, setFocused] = useState(false);
   const parchment = tone === "parchment";
+  const framedSecondary = parchment && variant === "secondary" && framed;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
-      accessibilityState={{ disabled }}
+      accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityState={{ disabled, ...(busy !== undefined ? { busy } : {}) }}
       onPress={onPress}
       disabled={disabled}
-      onFocus={() => setFocused(true)}
+      hitSlop={parchment && variant === "secondary" ? { top: 2, bottom: 2 } : undefined}
+      onPointerDown={() => setFocused(false)}
+      onFocus={event => setFocused(isFocusVisible(event))}
       onBlur={() => setFocused(false)}
       style={({ pressed }) => [
         styles.button,
-        variant === "secondary" && styles.secondary,
-        variant === "danger" && styles.danger,
+        !parchment && variant === "secondary" && styles.secondary,
+        !parchment && variant === "danger" && styles.danger,
         pressed && !disabled && styles.pressed,
         disabled && styles.disabled,
         parchment && styles.parchment,
         parchment && variant === "secondary" && styles.parchmentSecondary,
-        parchment && variant === "danger" && styles.parchmentDanger,
+        framedSecondary && styles.framedSecondary,
         parchment && pressed && !disabled && styles.parchmentPressed,
         parchment && disabled && styles.parchmentDisabled,
-        parchment && focused && styles.focused,
+        parchment && focused && Platform.OS === "web" && styles.focused,
         style,
+        parchment && buttonHitArea,
       ]}
     >
+      {parchment && <ButtonSurface variant={variant} disabled={disabled} />}
+      {busy ? <ActivityIndicator size="small" color={parchment ? uiTheme.colors.disabledText : colors.mutedText} /> : <>{leading}
       <Text style={[styles.text, disabled && styles.disabledText,
         parchment && styles.parchmentText,
         parchment && variant === "secondary" && styles.parchmentSecondaryText,
-        parchment && disabled && styles.parchmentDisabledText]}>{title}</Text>
+        parchment && disabled && styles.parchmentDisabledText]}>{title}</Text></>}
     </Pressable>
   );
 }
@@ -85,13 +101,14 @@ const styles = StyleSheet.create({
   disabledText: {
     color: colors.mutedText,
   },
-  parchment: { backgroundColor: uiTheme.colors.primary, borderRadius: uiTheme.radius.md, borderWidth: 2, borderColor: "transparent", paddingHorizontal: uiTheme.spacing.md },
-  parchmentSecondary: { backgroundColor: uiTheme.colors.surface, borderColor: uiTheme.colors.controlBorder, borderWidth: 1 },
-  parchmentDanger: { backgroundColor: uiTheme.colors.danger },
+  parchment: { minHeight: 52, backgroundColor: "transparent", borderRadius: uiTheme.radius.md, borderWidth: 0, paddingHorizontal: 24, paddingVertical: 12,
+    flexDirection: "row", gap: 8 },
+  parchmentSecondary: { minHeight: 44, paddingVertical: 8 },
+  framedSecondary: { minHeight: 52, paddingVertical: 12 },
   parchmentPressed: { opacity: 0.85, transform: [] },
-  parchmentDisabled: { opacity: 1, backgroundColor: uiTheme.colors.disabled, borderColor: uiTheme.colors.disabled },
-  focused: { outlineColor: uiTheme.colors.focus, outlineWidth: 2, outlineOffset: 3, outlineStyle: "solid" },
-  parchmentText: { ...uiTheme.type.label, color: uiTheme.colors.onPrimary, textAlign: "center" },
+  parchmentDisabled: { opacity: 1 },
+  focused: { outlineColor: uiTheme.colors.focus, outlineWidth: 2, outlineOffset: -3, outlineStyle: "solid" },
+  parchmentText: { ...uiTheme.type.label, color: uiTheme.colors.onPrimary, textAlign: "center", flexShrink: 1 },
   parchmentSecondaryText: { color: uiTheme.colors.primary },
-  parchmentDisabledText: { color: uiTheme.colors.disabledText },
+  parchmentDisabledText: { color: uiTheme.colors.text },
 });

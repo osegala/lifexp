@@ -1,0 +1,15 @@
+{
+  "backend/functions/billing/revenuecat.mjs": true,
+  "frontend/src/components/ShopItemCard.tsx": true,
+  "backend/README.md": true,
+  "frontend/src/components/BasePanels.tsx": true,
+  "frontend/app/register.tsx": true,
+  "backend/template.yaml": true,
+  "frontend/app/login.tsx": true,
+  "frontend/app/(tabs)/base.tsx": true,
+  "frontend/eas.json": true,
+  "backend/tests/infrastructure.test.mjs": true,
+  "frontend/src/notifications/model.ts": true,
+  "frontend/tests/environment.test.mjs": true,
+  "backend/tests/billing.test.mjs": true
+}

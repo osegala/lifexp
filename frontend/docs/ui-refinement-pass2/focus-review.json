@@ -1,0 +1,43 @@
+{
+  "pointer": {
+    "focusVisible": false,
+    "label": "All",
+    "offset": "0px",
+    "outline": "rgb(0, 0, 0) none 3px",
+    "selected": "true"
+  },
+  "keyboard": {
+    "focusVisible": true,
+    "label": "Upcoming",
+    "offset": "-3px",
+    "outline": "rgb(138, 100, 46) solid 2px"
+  },
+  "schedule": {
+    "summary": "Schedule · Never · 9:30 AM +"
+  },
+  "wardrobePointer": {
+    "focusVisible": false,
+    "offset": "0px",
+    "outline": "rgb(0, 0, 0) none 3px",
+    "rect": {
+      "bottom": 356.65625,
+      "height": 48,
+      "left": 0,
+      "right": 390,
+      "top": 308.65625,
+      "width": 390,
+      "x": 0,
+      "y": 308.65625
+    }
+  },
+  "onboarding": {
+    "offset": "3px",
+    "outline": "rgb(138, 100, 46) auto 1px",
+    "text": "Reminders"
+  },
+  "navigationKeyboard": {
+    "focusVisible": true,
+    "label": "󰒚󱇕Shop",
+    "outline": "rgb(242, 211, 148) solid 2px"
+  }
+}

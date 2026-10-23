@@ -46,7 +46,7 @@ test("failed deletion keeps the session and displays a canonical safe error", ()
   const cleanup = profile.indexOf("clearDeletedAccountSession()", request);
   const error = profile.indexOf('apiError(error, "Could not delete your account. Please try again.")', request);
   assert.ok(request >= 0 && cleanup > request && error > cleanup);
-  assert.match(profile, /Alert\.alert\("Account not deleted", apiError\(/);
+  assert.match(profile, /showGameNotice\("Account not deleted", apiError\(/);
 });
 
 test("frontend contains no Cognito admin deletion API", () => {

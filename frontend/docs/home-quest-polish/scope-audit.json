@@ -1,0 +1,9 @@
+{
+  "questLogicOutsideJSXAndStylesUnchanged": true,
+  "sharedXPBarUnchanged": true,
+  "productionFilesChangedThisPass": [
+    "src/components/QuestProgress.tsx"
+  ],
+  "developmentFixture": "src/dev/HomePreview.tsx",
+  "testDisplayMock": "tests/completion-feedback.test.mjs"
+}

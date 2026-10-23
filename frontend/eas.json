@@ -44,7 +44,8 @@
         "EXPO_PUBLIC_AWS_REGION": "us-east-2",
         "EXPO_PUBLIC_API_URL": "https://ifzeath0p5.execute-api.us-east-2.amazonaws.com",
         "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-2_oYWYSCv0W",
-        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "6pnoum6ishq8fcp4cn09jjj68m"
+        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "6pnoum6ishq8fcp4cn09jjj68m",
+        "EXPO_PUBLIC_BILLING_ENABLED": "true"
       }
     }
   },

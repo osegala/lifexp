@@ -1,0 +1,14 @@
+{
+  "homeDataLogicUnchanged": true,
+  "questAndStreakDataLogicUnchanged": true,
+  "homeHandlersUnchanged": true,
+  "sharedXPBarUnchanged": true,
+  "sharedIndicator_styles_unchanged": true,
+  "sharedIndicator_badges_unchanged": true,
+  "sharedIndicator_ResourcePill_unchanged": true,
+  "sharedIndicator_ResourceCluster_unchanged": true,
+  "HomeContent.tsx_styles_existingPropertiesUnchanged": true,
+  "QuestProgress.tsx_styles_existingPropertiesUnchanged": true,
+  "QuestProgress.tsx_parchment_existingPropertiesUnchanged": true,
+  "homeHeroAndTodayMarkupUnchanged": true
+}

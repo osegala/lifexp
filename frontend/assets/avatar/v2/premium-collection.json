@@ -1,0 +1,735 @@
+[
+  {
+    "itemId": "premium_rose_bard_tunic",
+    "name": "Rose Bard Tunic",
+    "category": "tunic",
+    "kind": "tops",
+    "set": "rose_bard",
+    "assetKey": "avatar-v2/tops/premium-rose-bard-tunic",
+    "file": "tops/premium-rose-bard-tunic.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_23_33 PM-3.png",
+    "sha256": "4a634afde651b291a2a6334af09a90f1c732214284ac3b127347de44f968054e",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      249,
+      101,
+      1005,
+      1160
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_verdant_sovereign_tunic",
+    "name": "Verdant Sovereign Tunic",
+    "category": "tunic",
+    "kind": "tops",
+    "set": "verdant_sovereign",
+    "assetKey": "avatar-v2/tops/premium-verdant-sovereign-tunic",
+    "file": "tops/premium-verdant-sovereign-tunic.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_23_35 PM-4.png",
+    "sha256": "347432fb75da6c89de8f9f1606ae382e8cee537ea51dff386d0676b026d5a868",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      236,
+      64,
+      1017,
+      1199
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_celestial_regent_tunic",
+    "name": "Celestial Regent Tunic",
+    "category": "tunic",
+    "kind": "tops",
+    "set": "celestial_regent",
+    "assetKey": "avatar-v2/tops/premium-celestial-regent-tunic",
+    "file": "tops/premium-celestial-regent-tunic.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_23_30 PM-2.png",
+    "sha256": "f40858b093dd1ddb5faaa615c99d6c10ec648c4501128b523f6c92a6659178c2",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      214,
+      57,
+      1040,
+      1195
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_dawnfire_sovereign_tunic",
+    "name": "Dawnfire Sovereign Tunic",
+    "category": "tunic",
+    "kind": "tops",
+    "set": "dawnfire_sovereign",
+    "assetKey": "avatar-v2/tops/premium-dawnfire-sovereign-tunic",
+    "file": "tops/premium-dawnfire-sovereign-tunic.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_23_28 PM-1.png",
+    "sha256": "b21e77a96e1c390aef8fca1f9fc4b9213996c4d42a76c520fd035b08a07f7b0b",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      236,
+      89,
+      1018,
+      1186
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_royal_wayfinder_tunic",
+    "name": "Royal Wayfinder Tunic",
+    "category": "tunic",
+    "kind": "tops",
+    "set": "royal_wayfinder",
+    "assetKey": "avatar-v2/tops/premium-royal-wayfinder-tunic",
+    "file": "tops/premium-royal-wayfinder-tunic.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_23_37 PM-5.png",
+    "sha256": "4d87a7edb5acac645f4682c0c153885193dfab1b3e830510e4b6e72b8959f339",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      241,
+      90,
+      1012,
+      1174
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_rose_bard_dress",
+    "name": "Rose Bard Dress",
+    "category": "tunic",
+    "kind": "dresses",
+    "set": "rose_bard",
+    "assetKey": "avatar-v2/dresses/premium-rose-bard-dress",
+    "file": "dresses/premium-rose-bard-dress.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_33_52 PM-1.png",
+    "sha256": "9e3a92644c7fdf6fe6760764fb9b78b124b62ef633da82bbadf3a90f24672470",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      103,
+      36,
+      1151,
+      1224
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_verdant_sovereign_dress",
+    "name": "Verdant Sovereign Dress",
+    "category": "tunic",
+    "kind": "dresses",
+    "set": "verdant_sovereign",
+    "assetKey": "avatar-v2/dresses/premium-verdant-sovereign-dress",
+    "file": "dresses/premium-verdant-sovereign-dress.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_33_55 PM-2.png",
+    "sha256": "6e61d74bb31804af2070e01ab9b4867bb667b200db5717ce70f4815a1493fa94",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      127,
+      27,
+      1129,
+      1231
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_celestial_regent_dress",
+    "name": "Celestial Regent Dress",
+    "category": "tunic",
+    "kind": "dresses",
+    "set": "celestial_regent",
+    "assetKey": "avatar-v2/dresses/premium-celestial-regent-dress",
+    "file": "dresses/premium-celestial-regent-dress.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_33_57 PM-3.png",
+    "sha256": "3a666e7b388fc8e7fe31f93c360778a6f080174b6ca618729481e0ded098353e",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      84,
+      8,
+      1171,
+      1249
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_dawnfire_sovereign_dress",
+    "name": "Dawnfire Sovereign Dress",
+    "category": "tunic",
+    "kind": "dresses",
+    "set": "dawnfire_sovereign",
+    "assetKey": "avatar-v2/dresses/premium-dawnfire-sovereign-dress",
+    "file": "dresses/premium-dawnfire-sovereign-dress.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_34_00 PM-4.png",
+    "sha256": "b34a63516345c918982b81f7d1fd4ec8911c13d88fff883aebb0eb38f9ca1d17",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      89,
+      25,
+      1166,
+      1227
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_royal_wayfinder_dress",
+    "name": "Royal Wayfinder Dress",
+    "category": "tunic",
+    "kind": "dresses",
+    "set": "royal_wayfinder",
+    "assetKey": "avatar-v2/dresses/premium-royal-wayfinder-dress",
+    "file": "dresses/premium-royal-wayfinder-dress.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_34_02 PM-5.png",
+    "sha256": "cd664163ff71fdaaa8ddf5a8bf17ae37414978cfa06cf6c2743918433bf6f906",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      96,
+      35,
+      1157,
+      1227
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_rose_bard_trousers",
+    "name": "Rose Bard Trousers",
+    "category": "pants",
+    "kind": "bottoms",
+    "set": "rose_bard",
+    "assetKey": "avatar-v2/bottoms/premium-rose-bard-trousers",
+    "file": "bottoms/premium-rose-bard-trousers.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_23_16 PM-3.png",
+    "sha256": "bf9f2a51914243e47be05fe03c143e23c14c5b5e7178793082d6dcb63f7aeb27",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      207,
+      107,
+      1047,
+      1132
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_verdant_sovereign_trousers",
+    "name": "Verdant Sovereign Trousers",
+    "category": "pants",
+    "kind": "bottoms",
+    "set": "verdant_sovereign",
+    "assetKey": "avatar-v2/bottoms/premium-verdant-sovereign-trousers",
+    "file": "bottoms/premium-verdant-sovereign-trousers.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_23_18 PM-4.png",
+    "sha256": "41c6e9134add0a7908ded2f1324950b15fd8bfd265ede4b27aa86cd971741008",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      201,
+      96,
+      1056,
+      1153
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_celestial_regent_trousers",
+    "name": "Celestial Regent Trousers",
+    "category": "pants",
+    "kind": "bottoms",
+    "set": "celestial_regent",
+    "assetKey": "avatar-v2/bottoms/premium-celestial-regent-trousers",
+    "file": "bottoms/premium-celestial-regent-trousers.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_23_14 PM-2.png",
+    "sha256": "01605ff69c15efb7e3d7d1cc2b66986a63db02bd015c86371e30a957c4637787",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      180,
+      65,
+      1074,
+      1182
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_dawnfire_sovereign_trousers",
+    "name": "Dawnfire Sovereign Trousers",
+    "category": "pants",
+    "kind": "bottoms",
+    "set": "dawnfire_sovereign",
+    "assetKey": "avatar-v2/bottoms/premium-dawnfire-sovereign-trousers",
+    "file": "bottoms/premium-dawnfire-sovereign-trousers.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_23_11 PM-1.png",
+    "sha256": "bfdeb7d32525e81c71e22aafc1eb03958234fb9cc810e9566d9a8ca4267daa70",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      211,
+      90,
+      1051,
+      1168
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_royal_wayfinder_trousers",
+    "name": "Royal Wayfinder Trousers",
+    "category": "pants",
+    "kind": "bottoms",
+    "set": "royal_wayfinder",
+    "assetKey": "avatar-v2/bottoms/premium-royal-wayfinder-trousers",
+    "file": "bottoms/premium-royal-wayfinder-trousers.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_23_20 PM-5.png",
+    "sha256": "d7f3ff95dc52f948fb4dd02041f35a1fc3f7f18fb7db751447e2eb17afa37c95",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      192,
+      54,
+      1088,
+      1170
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_rose_bard_hat",
+    "name": "Rose Bard Hat",
+    "category": "hat",
+    "kind": "hats",
+    "set": "rose_bard",
+    "assetKey": "avatar-v2/hats/premium-rose-bard-hat",
+    "file": "hats/premium-rose-bard-hat.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_47 PM-1.png",
+    "sha256": "983dd3e18cdee1acd264d655ce4fcfe8be126bc15231c737cf2f3191f2dad8d9",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      13,
+      35,
+      1250,
+      1193
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_verdant_sovereign_hat",
+    "name": "Verdant Sovereign Hat",
+    "category": "hat",
+    "kind": "hats",
+    "set": "verdant_sovereign",
+    "assetKey": "avatar-v2/hats/premium-verdant-sovereign-hat",
+    "file": "hats/premium-verdant-sovereign-hat.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_50 PM-2.png",
+    "sha256": "d26f48fb7d1eda3b15e95d5be9628e8f54dd39630037d6b9d816e0b97e7cd0c8",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      23,
+      159,
+      1246,
+      1133
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_celestial_regent_hat",
+    "name": "Celestial Regent Hat",
+    "category": "hat",
+    "kind": "hats",
+    "set": "celestial_regent",
+    "assetKey": "avatar-v2/hats/premium-celestial-regent-hat",
+    "file": "hats/premium-celestial-regent-hat.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_52 PM-3.png",
+    "sha256": "7e4cd104ca709c3e86836c00249b0c9b26292114bc3e96542c8a7fda16006f79",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      40,
+      51,
+      1214,
+      1185
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_dawnfire_sovereign_hat",
+    "name": "Dawnfire Sovereign Hat",
+    "category": "hat",
+    "kind": "hats",
+    "set": "dawnfire_sovereign",
+    "assetKey": "avatar-v2/hats/premium-dawnfire-sovereign-hat",
+    "file": "hats/premium-dawnfire-sovereign-hat.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_53 PM-4.png",
+    "sha256": "fb1135cc78b004b4ad59973c35b7802122bf21ce09ac2b76227bd352c472f303",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      32,
+      81,
+      1223,
+      1194
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_royal_wayfinder_hat",
+    "name": "Royal Wayfinder Hat",
+    "category": "hat",
+    "kind": "hats",
+    "set": "royal_wayfinder",
+    "assetKey": "avatar-v2/hats/premium-royal-wayfinder-hat",
+    "file": "hats/premium-royal-wayfinder-hat.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_56 PM-5.png",
+    "sha256": "e4dbad71416a6c1c2887c2d3c635ad3a98b6afb9fc0526d69ff2ce667279ae62",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      25,
+      87,
+      1250,
+      1185
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_rose_bard_boots",
+    "name": "Rose Bard Boots",
+    "category": "boots",
+    "kind": "boots",
+    "set": "rose_bard",
+    "assetKey": "avatar-v2/boots/premium-rose-bard-boots",
+    "file": "boots/premium-rose-bard-boots.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_21_24 PM-1.png",
+    "sha256": "74f46d8147c68c8f062411967d08e9e89dfde328f935c334bf59358b72f30737",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      177,
+      165,
+      1078,
+      1106
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_verdant_sovereign_boots",
+    "name": "Verdant Sovereign Boots",
+    "category": "boots",
+    "kind": "boots",
+    "set": "verdant_sovereign",
+    "assetKey": "avatar-v2/boots/premium-verdant-sovereign-boots",
+    "file": "boots/premium-verdant-sovereign-boots.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_21_26 PM-2.png",
+    "sha256": "ff13d2b67b9a58612ea8a60acf6c0f5d485b662a59651564fd586ad600a8b61e",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      90,
+      179,
+      1165,
+      1063
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_celestial_regent_boots",
+    "name": "Celestial Regent Boots",
+    "category": "boots",
+    "kind": "boots",
+    "set": "celestial_regent",
+    "assetKey": "avatar-v2/boots/premium-celestial-regent-boots",
+    "file": "boots/premium-celestial-regent-boots.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_21_27 PM-3.png",
+    "sha256": "2858585f2a874e9aca2e01d2a3cecc22d857761beacd5a7b580a5badd784a591",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      95,
+      147,
+      1162,
+      1119
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_dawnfire_sovereign_boots",
+    "name": "Dawnfire Sovereign Boots",
+    "category": "boots",
+    "kind": "boots",
+    "set": "dawnfire_sovereign",
+    "assetKey": "avatar-v2/boots/premium-dawnfire-sovereign-boots",
+    "file": "boots/premium-dawnfire-sovereign-boots.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_21_30 PM-4.png",
+    "sha256": "06b9abc029944b4892136e3ad49a3466a2638d39089e4d17b9973f20e7f89a13",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      74,
+      133,
+      1180,
+      1149
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_royal_wayfinder_boots",
+    "name": "Royal Wayfinder Boots",
+    "category": "boots",
+    "kind": "boots",
+    "set": "royal_wayfinder",
+    "assetKey": "avatar-v2/boots/premium-royal-wayfinder-boots",
+    "file": "boots/premium-royal-wayfinder-boots.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_21_32 PM-5.png",
+    "sha256": "27616aa1235876693efb099a046099d7bd12cea6e314c1727898688394b80b82",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      112,
+      175,
+      1142,
+      1103
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_rose_palace",
+    "name": "Rose Palace",
+    "category": "background",
+    "kind": "backgrounds",
+    "set": null,
+    "assetKey": "avatar-v2/backgrounds/premium-rose-palace",
+    "file": "backgrounds/premium-rose-palace.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_28 PM-1.png",
+    "sha256": "e52fe3304d050612bd5229e7823de9dd692b3fcfd71fac78ba3f8a4f7b5c75dc",
+    "canvas": [
+      941,
+      1672
+    ],
+    "bounds": null,
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_aurora_springs",
+    "name": "Aurora Springs",
+    "category": "background",
+    "kind": "backgrounds",
+    "set": null,
+    "assetKey": "avatar-v2/backgrounds/premium-aurora-springs",
+    "file": "backgrounds/premium-aurora-springs.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_31 PM-2.png",
+    "sha256": "ae07393862666d6558b142402195b11cb16fb567f29d9027ca5fededae3f8cc1",
+    "canvas": [
+      941,
+      1672
+    ],
+    "bounds": null,
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_starwatch_terrace",
+    "name": "Starwatch Terrace",
+    "category": "background",
+    "kind": "backgrounds",
+    "set": null,
+    "assetKey": "avatar-v2/backgrounds/premium-starwatch-terrace",
+    "file": "backgrounds/premium-starwatch-terrace.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_32 PM-3.png",
+    "sha256": "af9f42d7650ff8521bb3e9f71201e5ea0de6b1e4e2bbf15ccfc97430251348ee",
+    "canvas": [
+      941,
+      1672
+    ],
+    "bounds": null,
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_astral_clockwork",
+    "name": "Astral Clockwork",
+    "category": "aura",
+    "kind": "auras",
+    "set": null,
+    "assetKey": "avatar-v2/auras/premium-astral-clockwork",
+    "file": "auras/premium-astral-clockwork.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_10 PM-1.png",
+    "sha256": "c3d902f11d286ad3b511456456297f2d20c13701f08f3eeb931c07199c8223b7",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      56,
+      20,
+      1199,
+      1221
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_lunar_veil",
+    "name": "Lunar Veil",
+    "category": "aura",
+    "kind": "auras",
+    "set": null,
+    "assetKey": "avatar-v2/auras/premium-lunar-veil",
+    "file": "auras/premium-lunar-veil.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_12 PM-2.png",
+    "sha256": "de8a5ffbecb3d708d2e31b30fa41f11e5ba38b1aad469b813673316e9093cc0e",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      75,
+      24,
+      1180,
+      1203
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_prismatic_crown",
+    "name": "Prismatic Crown",
+    "category": "aura",
+    "kind": "auras",
+    "set": null,
+    "assetKey": "avatar-v2/auras/premium-prismatic-crown",
+    "file": "auras/premium-prismatic-crown.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_22_14 PM-3.png",
+    "sha256": "951aa26eeaa362733c2ba7d0fd0cc46a171892903cf7bc88e0bc6a3d948cbd3f",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      111,
+      17,
+      1143,
+      1236
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_mooncrystal_fawn",
+    "name": "Mooncrystal Fawn",
+    "category": "pet",
+    "kind": "pets",
+    "set": null,
+    "assetKey": "avatar-v2/pets/premium-mooncrystal-fawn",
+    "file": "pets/premium-mooncrystal-fawn.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_21_54 PM-1.png",
+    "sha256": "7c1dbac900a46280fe39041ba34624240e334e838f25be79f00792ede5c36c97",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      234,
+      15,
+      1179,
+      1232
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_lotus_otter",
+    "name": "Lotus Otter",
+    "category": "pet",
+    "kind": "pets",
+    "set": null,
+    "assetKey": "avatar-v2/pets/premium-lotus-otter",
+    "file": "pets/premium-lotus-otter.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_21_57 PM-2.png",
+    "sha256": "5cc81a839980585b87d9754be63a0d8526ffaa5044bb3e8cd80ebe6633828b22",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      32,
+      131,
+      1237,
+      1183
+    ],
+    "requiresPremium": true
+  },
+  {
+    "itemId": "premium_starlight_moth",
+    "name": "Starlight Moth",
+    "category": "pet",
+    "kind": "pets",
+    "set": null,
+    "assetKey": "avatar-v2/pets/premium-starlight-moth",
+    "file": "pets/premium-starlight-moth.png",
+    "source": "ChatGPT Image Oct 22, 2026, 04_21_59 PM-3.png",
+    "sha256": "b9f8934978a20d686f35952235a5a9c76ced3f59cb6a2a643de4941609440e2a",
+    "canvas": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      59,
+      73,
+      1226,
+      1169
+    ],
+    "requiresPremium": true
+  }
+]

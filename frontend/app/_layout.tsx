@@ -1,31 +1,35 @@
-import { Stack } from "expo-router";
+import GameNoticeHost from "../src/components/GameNoticeHost";
+import { Stack, usePathname } from "expo-router";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import SessionRecovery from "../src/components/SessionRecovery";
-import { colors } from "../src/theme/theme";
+import { uiTheme as ui } from "../src/theme/theme";
 import { authDestination } from "../src/auth/destination";
 
 export default function RootLayout() {
+  const pathname = usePathname();
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <SafeAreaView edges={["top"]} style={styles.safeArea}>
+        <View style={styles.foundation}>
+          <StatusBar style={pathname === "/base" ? "light" : "dark"} />
           <AuthProvider>
-            <SessionNavigator />
+            <SessionNavigator pathname={pathname} />
           </AuthProvider>
-        </SafeAreaView>
+        </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
-function SessionNavigator() {
+function SessionNavigator({ pathname }: { pathname: string }) {
   const { token, user, loading, sessionError } = useAuth();
 
   if (loading) {
-    return <View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /></View>;
+    return <View style={styles.loading}><ActivityIndicator size="large" color={ui.colors.primary} /></View>;
   }
   if (sessionError && !user) return <SessionRecovery fullScreen />;
   const destination = authDestination(token, user);
@@ -33,7 +37,7 @@ function SessionNavigator() {
   return (
     <View style={styles.root}>
       {token && sessionError ? <SessionRecovery /> : null}
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "transparent" } }}>
         <Stack.Screen name="index" />
         <Stack.Protected guard={destination === "/onboarding"}>
           <Stack.Screen name="onboarding" />
@@ -50,17 +54,15 @@ function SessionNavigator() {
           <Stack.Screen name="register" />
         </Stack.Protected>
       </Stack>
+      <GameNoticeHost scope={String(user?.id ?? "signed-out")} placement={pathname === "/tasks" ? "lower" : "upper"} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  foundation: { flex: 1, backgroundColor: ui.colors.ivory },
   root: {
     flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
   },
   loading: {
     flex: 1,

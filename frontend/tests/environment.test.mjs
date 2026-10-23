@@ -37,6 +37,7 @@ const prodValues = {
   EXPO_PUBLIC_API_URL: PROD_API_URL,
   EXPO_PUBLIC_COGNITO_USER_POOL_ID: PROD_COGNITO_USER_POOL_ID,
   EXPO_PUBLIC_COGNITO_CLIENT_ID: PROD_COGNITO_CLIENT_ID,
+  EXPO_PUBLIC_BILLING_ENABLED: "true",
 };
 
 test("canonical environment configuration loads development without defaulting to production", () => {

@@ -16,13 +16,13 @@ import { deleteUserPartition } from "../functions/delete-account/logic.mjs";
 
 const premium = { PK: { S: "USER#tester" }, SK: { S: "ENTITLEMENTS" }, plan: { S: "PREMIUM" },
   subscriptionStatus: { S: "ACTIVE" }, expiresAt: { S: "2099-01-01T00:00:00.000Z" }, provider: { S: "APPLE" } };
-function fixture({ gated = false, entitlement, owned = false } = {}) {
+function fixture({ gated = false, entitlement, owned = false, price = 25 } = {}) {
   const calls = [], writes = [];
   const ownedItems = new Map(owned ? [["test-hat", { PK: { S: "USER#tester" }, SK: { S: "ITEM#test-hat" }, itemId: { S: "test-hat" }, category: { S: "hats" } }]] : []);
   const equipment = {};
   const f = { entitlement, coins: 100 };
   const catalogItem = itemId => ({ PK: { S: "CATALOG#COSMETICS" }, SK: { S: `ITEM#${itemId}` }, itemId: { S: itemId },
-    category: { S: "hats" }, name: { S: "Test hat" }, price: { N: "25" }, requiresPremium: { BOOL: gated } });
+    category: { S: "hats" }, name: { S: "Test hat" }, price: { N: String(price) }, requiresPremium: { BOOL: gated } });
   class GetItemCommand { constructor(input) { this.input = input; } }
   class QueryCommand extends GetItemCommand {}
   class UpdateItemCommand extends GetItemCommand {}
@@ -188,4 +188,16 @@ test("account partition deletion includes ENTITLEMENTS without deleting another 
     assert.deepEqual(i.ExpressionAttributeValues[":pk"], { S: "USER#tester" }); return { Items: records };
   }, writeBatch: async i => { deleted.push(...i.RequestItems.local.map(x => x.DeleteRequest.Key.SK.S)); return {}; }, sleep: async () => {} });
   assert.equal(count, 3); assert.ok(deleted.includes("ENTITLEMENTS"));
+});
+
+
+test("zero-price Premium claims retain the same entitlement/ownership checks and never deduct coins", async () => {
+  const f = fixture({ gated: true, entitlement: premium, price: 0 });
+  const claimed = await f.call("purchase-item"); assert.equal(claimed.status, 200);
+  assert.equal(claimed.data.player.coins, 100); assert.equal(claimed.data.item.price, 0);
+  assert.equal(f.ownedItems.get("test-hat").purchasePrice.N, "0");
+  assert.equal(f.writes[0].TransactItems[0].Update.ExpressionAttributeValues[":negativePrice"].N, "0");
+  f.setEntitlement(expired); assert.equal((await f.call("equip-item")).status, 200);
+  assert.equal((await f.call("purchase-item", { itemId: "another-release" })).status, 403);
+  assert.equal((await f.call("purchase-item")).status, 409);
 });

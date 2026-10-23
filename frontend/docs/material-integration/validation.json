@@ -1,0 +1,65 @@
+{
+  "commands": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "result": "278 passed; 0 failed"
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "exitCode": 0,
+      "result": "passed"
+    },
+    {
+      "command": "npm run lint",
+      "exitCode": 0,
+      "result": "passed; 0 warnings"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "result": "passed"
+    },
+    {
+      "command": "npm run validate:avatar-assets",
+      "exitCode": 0,
+      "result": "143 sprites passed"
+    },
+    {
+      "command": "npm run audit:assets",
+      "exitCode": 0,
+      "result": "281 images inventoried; static references resolve"
+    }
+  ],
+  "browserReview": {
+    "runtime": "Expo Web DEV local fixture, not native",
+    "viewports": [
+      [
+        390,
+        844
+      ],
+      [
+        430,
+        932
+      ]
+    ],
+    "keyStates": [
+      "Home",
+      "Tasks",
+      "Base",
+      "Avatar collapsed",
+      "Avatar medium",
+      "Avatar expanded",
+      "Shop"
+    ],
+    "additionalWidths": [
+      320,
+      768,
+      1024,
+      1440
+    ],
+    "nativeRuntimeReviewed": false,
+    "notes": "Local fixtures reject real transport. No real account, purchase, reward ad, or server mutation was exercised."
+  },
+  "protectedInitialChangesPreserved": true
+}

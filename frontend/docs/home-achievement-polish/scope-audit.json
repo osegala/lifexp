@@ -1,0 +1,10 @@
+{
+  "homeLogicOutsideJSXAndStylesUnchanged": true,
+  "existingHandlersUnchanged": true,
+  "dashboardControllerUnchanged": true,
+  "questComponentUnchanged": true,
+  "sharedXPBarUnchanged": true,
+  "developmentFixtureUnchanged": true,
+  "sameHomeAchievementLimit": true,
+  "displayedProgressUsesServerPercent": true
+}

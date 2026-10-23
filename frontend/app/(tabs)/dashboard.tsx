@@ -1,95 +1,130 @@
+import { showGameNotice } from "../../src/feedback/notices";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { Alert, AppState } from "react-native";
+import { AppState } from "react-native";
+import type { AxiosRequestConfig } from "axios";
 import { BannerAdPlacement } from "../../src/ads/Ads";
 import { api, apiError } from "../../src/api/client";
 import { apiRoutes } from "../../src/api/routes";
-import { loadPreferredAppearance, type AvatarAppearance } from "../../src/avatar/appearance";
+import { loadPreferredAppearance, normalizeAppearance } from "../../src/avatar/appearance";
 import { getLocalAppearance, setLocalAppearance } from "../../src/avatar/localAppearance";
 import HomeContent from "../../src/components/HomeContent";
 import { useAuth } from "../../src/context/AuthContext";
 import { homeAvatarFromInventory, type HomeAvatar } from "../../src/home/avatar";
 import type { AchievementsResponse, GoalsResponse, TasksResponse } from "../../src/types";
 import type { InventoryResponse } from "../../src/types/avatar";
+import type { ProfileResponse } from "../../src/auth/session";
+import { playerCache } from "../../src/cache/playerData";
+import { SupersededCacheRead } from "../../src/cache/PlayerCache";
+import { prefetchAvatarAssets } from "../../src/avatar/prefetch";
+
+function cachedScene(userId: string | number | undefined) {
+  if (userId == null) return null;
+  const inventory = playerCache.peek(userId, "inventory"), profile = playerCache.peek(userId, "profile");
+  return inventory && profile ? homeAvatarFromInventory(inventory, normalizeAppearance(profile)) : null;
+}
 
 export default function DashboardScreen() {
   const { user, refreshUser } = useAuth();
   const userId = user?.id;
-  const [goals, setGoals] = useState<GoalsResponse | null>(null);
-  const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [goals, setGoals] = useState(() => userId == null ? null : playerCache.peek(userId, "goals"));
+  const [achievementData, setAchievementData] = useState(() => userId == null ? null : playerCache.peek(userId, "achievements"));
+  const [loading, setLoading] = useState(!goals);
+  const [achievementsLoading, setAchievementsLoading] = useState(!achievementData);
   const [questError, setQuestError] = useState(false);
-  const [tasks, setTasks] = useState<TasksResponse | null>(null);
-  const [scene, setScene] = useState<HomeAvatar | null>(null);
-  const [tasksLoading, setTasksLoading] = useState(true);
-  const [avatarLoading, setAvatarLoading] = useState(true);
+  const [tasks, setTasks] = useState(() => userId == null ? null : playerCache.peek(userId, "tasks"));
+  const [scene, setScene] = useState<HomeAvatar | null>(() => cachedScene(userId));
+  const [tasksLoading, setTasksLoading] = useState(!tasks);
+  const [avatarLoading, setAvatarLoading] = useState(!scene);
   const [taskError, setTaskError] = useState("");
   const [avatarError, setAvatarError] = useState("");
   const [progressError, setProgressError] = useState("");
   const refreshHome = useRef<() => void>(() => {});
 
   useFocusEffect(useCallback(() => {
+    if (userId == null) return;
+    const accountId = userId;
     let active = true;
+    const accountCurrent = playerCache.accountCurrent(userId);
+    const current = () => active && accountCurrent();
+    const config = { expectedUserId: String(userId) } as AxiosRequestConfig;
     let refreshing = false;
     let refreshingTasks = false;
     let refreshingAvatar = false;
     let loadingDashboard = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    function showCachedState() {
+      if (!current()) return;
+      const goals = playerCache.peek(accountId, "goals"), achievements = playerCache.peek(accountId, "achievements");
+      const tasks = playerCache.peek(accountId, "tasks"), scene = cachedScene(userId);
+      if (goals) { setGoals(goals); setLoading(false); }
+      if (achievements) { setAchievementData(achievements); setAchievementsLoading(false); }
+      if (tasks) { setTasks(tasks); setTasksLoading(false); }
+      if (scene) { setScene(scene); setAvatarLoading(false); void prefetchAvatarAssets(scene.avatar, scene.cosmetics); }
+    }
+    showCachedState();
+    const hydration = playerCache.hydrateUser(userId).then(showCachedState);
     async function refreshTasks() {
-      if (!active || refreshingTasks) return;
+      if (!current() || refreshingTasks) return;
       refreshingTasks = true;
-      setTasksLoading(true);
+      setTasksLoading(!playerCache.peek(accountId, "tasks"));
       try {
-        const response = await api.get<TasksResponse>(apiRoutes.tasks);
-        if (active) { setTasks(response.data); setTaskError(""); }
+        const data = await playerCache.refresh(accountId, "tasks", async () => (await api.get<TasksResponse>(apiRoutes.tasks, config)).data);
+        if (current()) { setTasks(data); setTaskError(""); }
       } catch (error) {
-        if (active) setTaskError(apiError(error, "Could not refresh tasks. Any saved schedule shown below is the last confirmed one.").message);
+        if (current() && !(error instanceof SupersededCacheRead)) setTaskError(apiError(error, "Could not refresh tasks. Any saved schedule shown below is the last confirmed one.").message);
       } finally {
         refreshingTasks = false;
-        if (active) setTasksLoading(false);
+        await hydration;
+        if (current()) setTasksLoading(false);
       }
     }
     async function refreshAvatar() {
-      if (!active || refreshingAvatar || userId == null) return;
+      if (!current() || refreshingAvatar) return;
       refreshingAvatar = true;
-      setAvatarLoading(true);
+      setAvatarLoading(!cachedScene(userId));
       try {
         const [inventory, appearance] = await Promise.all([
-          api.get<InventoryResponse>(apiRoutes.inventory),
+          playerCache.refresh(accountId, "inventory", async () => (await api.get<InventoryResponse>(apiRoutes.inventory, config)).data),
           loadPreferredAppearance(
-            async () => (await api.get<AvatarAppearance>(apiRoutes.me)).data,
-            () => getLocalAppearance(userId),
-            value => setLocalAppearance(userId, value),
+            () => playerCache.refresh(accountId, "profile", async () => (await api.get<ProfileResponse>(apiRoutes.me, config)).data),
+            () => getLocalAppearance(accountId),
+            value => current() ? setLocalAppearance(accountId, value) : Promise.resolve(),
           ),
         ]);
-        if (active) { setScene(homeAvatarFromInventory(inventory.data, appearance)); setAvatarError(""); }
+        if (current()) {
+          const scene = cachedScene(userId) ?? homeAvatarFromInventory(inventory, appearance);
+          setScene(scene); setAvatarError(""); void prefetchAvatarAssets(scene.avatar, scene.cosmetics);
+        }
       } catch (error) {
-        if (active) setAvatarError(apiError(error, "Could not refresh your character. Your equipment has not changed.").message);
+        if (current() && !(error instanceof SupersededCacheRead)) setAvatarError(apiError(error, "Could not refresh your character. Your equipment has not changed.").message);
       } finally {
         refreshingAvatar = false;
-        if (active) setAvatarLoading(false);
+        await hydration;
+        if (current()) setAvatarLoading(false);
       }
     }
     async function refreshGoals() {
-      if (!active || refreshing) return;
+      if (!current() || refreshing) return;
       refreshing = true;
       clearTimeout(timer);
       void refreshTasks(); // Use the server schedule across focus, resume and local midnight.
       let delay = 60_000;
       try {
-        const result = await api.get<GoalsResponse>(apiRoutes.goals);
-        if (active) {
-          setGoals(result.data);
+        const data = await playerCache.refresh(accountId, "goals", async () => (await api.get<GoalsResponse>(apiRoutes.goals, config)).data);
+        if (current()) {
+          setGoals(data);
           setQuestError(false);
           // The server schedules local midnight, including DST. A bounded refresh
           // also picks up timezone/building changes without using the device date.
-          delay = Math.max(1000, Math.min(delay, result.data.refreshAfterMs ?? delay));
+          delay = Math.max(1000, Math.min(delay, data.refreshAfterMs ?? delay));
         }
-      } catch {
-        if (active) setQuestError(true); // Keep the last confirmed snapshot.
+      } catch (error) {
+        if (current() && !(error instanceof SupersededCacheRead)) setQuestError(true);
       } finally {
         refreshing = false;
-        if (active) {
+        await hydration;
+        if (current()) {
           setLoading(false);
           if (AppState.currentState !== "background" && AppState.currentState !== "inactive") {
             timer = setTimeout(() => { void refreshGoals(); }, delay);
@@ -98,29 +133,29 @@ export default function DashboardScreen() {
       }
     }
     async function loadDashboard() {
-      if (!active || loadingDashboard) return;
+      if (!current() || loadingDashboard) return;
       loadingDashboard = true;
       try {
-        setLoading(true);
-        if (!await refreshUser()) {
-          if (active) {
-            setProgressError("Could not refresh your profile. Refresh Home to try again.");
-            setTasksLoading(false);
-            setAvatarLoading(false);
-          }
-          return;
-        }
-        if (!active) return;
-        const [, achievementsResponse] = await Promise.all([
-          refreshGoals(), api.get<AchievementsResponse>(apiRoutes.achievements), refreshAvatar(),
+        setLoading(!playerCache.peek(accountId, "goals"));
+        setAchievementsLoading(!playerCache.peek(accountId, "achievements"));
+        const [profile, achievements] = await Promise.allSettled([
+          refreshUser(),
+          playerCache.refresh(accountId, "achievements", async () => (await api.get<AchievementsResponse>(apiRoutes.achievements, config)).data)
+            .then(data => { if (current()) setAchievementData(data); return data; })
+            .finally(() => { if (current()) setAchievementsLoading(false); }),
+          refreshGoals(), refreshAvatar(),
         ]);
-        if (active) { setAchievementData(achievementsResponse.data); setProgressError(""); }
+        if (!current()) return;
+        if (profile.status === "rejected" || !profile.value) setProgressError("Could not refresh your profile. Refresh Home to try again.");
+        else if (achievements.status === "rejected" && !(achievements.reason instanceof SupersededCacheRead)) throw achievements.reason;
+        else setProgressError("");
       } catch (error) {
         const message = apiError(error, "Could not load your progress.").message;
-        if (active) { setProgressError(message); Alert.alert("Home", message); }
+        if (current()) { setProgressError(message); showGameNotice("Home", message, "error"); }
       } finally {
         loadingDashboard = false;
-        if (active) setLoading(false);
+        await hydration;
+        if (current()) { setLoading(false); setAchievementsLoading(false); }
       }
     }
     refreshHome.current = () => { void loadDashboard(); };
@@ -133,7 +168,7 @@ export default function DashboardScreen() {
   }, [refreshUser, userId]));
 
   return <HomeContent user={user} goals={goals} achievements={achievementData} tasks={tasks} scene={scene}
-    loading={loading} tasksLoading={tasksLoading} avatarLoading={avatarLoading} questError={questError}
+    loading={loading} achievementsLoading={achievementsLoading} tasksLoading={tasksLoading} avatarLoading={avatarLoading} questError={questError}
     progressError={progressError} taskError={taskError} avatarError={avatarError}
     onRetry={() => refreshHome.current()}
     onProfile={() => router.navigate("/(tabs)/profile")}
